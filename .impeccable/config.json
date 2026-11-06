@@ -1,0 +1,36 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/core/contract.ts"
+        ],
+        "createdAt": "2026-11-04T11:00:17.926Z",
+        "reason": "agent: false positive, L45 is a regex that parses <img> tags from GitHub comments, not markup"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter variable",
+        "createdAt": "2026-11-04T14:26:37.877Z",
+        "reason": "Agent: issue #15 notes allow Inter via @fontsource (self-hosted, local-first); the system stack alone was the AI tell, an unloaded font"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-04T14:26:37.897Z",
+        "reason": "Agent: issue #15 notes allow Inter via @fontsource; fallback entry in the same stack"
+      }
+    ]
+  },
+  "hook": {
+    "enabled": true,
+    "limits": {
+      "maxFindings": 5,
+      "maxChars": 8000
+    }
+  }
+}

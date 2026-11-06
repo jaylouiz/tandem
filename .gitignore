@@ -1,0 +1,11 @@
+node_modules
+dist/
+test-results/
+playwright-report/
+.tandem-dev/
+.env*
+.claude/settings.local.json
+.claude/worktrees/
+blob-report/
+playwright/.cache/
+.impeccable/hook.cache.json
