@@ -1,10 +1,10 @@
 # Tandem
 
-An opinionated personal kanban board over GitHub issues: see what waits on you across your repos, give Feedback in place (decisions, agent decisions, design rounds, PR approvals, Looks), and Push it to the running [agent-workflow](https://github.com/jaylouiz/agent-workflow) coordinator through Orca.
+A kanban board over GitHub issues: see what waits on you across your repos, give Feedback in place (decisions, agent decisions, design rounds, PR approvals, Looks), and Push it to the running [agent-workflow](https://github.com/jaylouiz/agent-workflow) coordinator through Orca.
 
 ## Who it's for
 
-Tandem is opinionated. It is built around one developer steering coding agents that run the [agent-workflow](https://github.com/jaylouiz/agent-workflow) skills (Design, Specify, Build, coordinated by an orchestrator) in [Orca](https://github.com/stablyai/orca). It reads and writes the exact comment shapes those skills use. Without them it is still a board over your GitHub issues, but most of Feedback and all of Push assume that setup.
+Tandem is opinionated. It is built for solo developers steering coding agents that run the [agent-workflow](https://github.com/jaylouiz/agent-workflow) skills (Design, Specify, Build, coordinated by an orchestrator) and has made to work with [Orca](https://github.com/stablyai/orca). It reads and writes the exact comment shapes those skills use. Without them it is still a board over your GitHub issues, but most of Feedback and all of Push assume that setup. Use of Orca is optional.
 
 ## Requirements
 
