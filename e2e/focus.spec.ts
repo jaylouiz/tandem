@@ -449,6 +449,32 @@ test("the drawer behind e shows the Card's Decided, Activity and Issue tabs; Esc
   await expect(focus(page)).toHaveCount(0);
 });
 
+test("an earlier round's gallery opened from the drawer owns its keys: they reach neither the drawer nor the ask, and Esc closes one layer at a time", async ({ page }) => {
+  await start(page);
+  await row(page, 110).click(); // round 2 waits, round 1 is on Decided
+  await expect(page.getByTestId("stage").locator("img")).toHaveAttribute("alt", "R2 · a · desktop");
+  await page.keyboard.press("e");
+  const drawer = page.getByTestId("focus-drawer");
+  await drawer.getByRole("tab", { name: "Decided" }).click();
+  await drawer.getByTestId("round-1").locator(".thumb").first().click();
+  const gallery = page.getByTestId("gallery");
+  await expect(gallery).toBeVisible();
+  await expect.poll(() => gallery.evaluate((el) => el.contains(document.activeElement))).toBe(true); // the library moves focus a frame later
+  await page.keyboard.press("]"); // the gallery's next variant, not the drawer's next tab
+  await expect(page.getByTestId("gallery-title")).toContainText("Variant b");
+  await page.keyboard.press("2"); // the gallery's jump, not a pick on the ask
+  await page.keyboard.press("ControlOrMeta+Enter"); // a read-only gallery sends nothing
+  await page.keyboard.press("Escape");
+  await expect(gallery).toHaveCount(0);
+  await expect(drawer.getByRole("tab", { selected: true })).toHaveText("Decided");
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await on(page, 110);
+  await expect(page.getByTestId("stage").locator("img")).toHaveAttribute("alt", "R2 · a · desktop"); // the ask did not move
+  await expect(bar(page)).toHaveAttribute("data-state", "hint");
+  expect((await answers(page, 110)).pickup).toBe(false);
+});
+
 test("the palette lists what the Focus keys do on the ask that is on screen, and says what a digit does", async ({ page }) => {
   await page.goto("/waiting");
   await loaded(page);

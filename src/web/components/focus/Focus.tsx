@@ -54,6 +54,8 @@ function Drawer({ card }: { card: Card }) {
   const setDetails = useFocus((s) => s.setDetails);
   const onKey = (e: React.KeyboardEvent) => {
     const el = e.target;
+    // a dialog opened from inside the drawer (the gallery of an earlier round) owns its keys: React bubbles them here through the portal, the DOM does not contain them
+    if (!(el instanceof Node) || !e.currentTarget.contains(el)) return;
     if (el instanceof HTMLElement && el.closest("input, textarea, select, [contenteditable]")) return;
     const mod = e.metaKey || e.ctrlKey;
     if (!mod && !e.altKey && (e.key === "[" || e.key === "]")) {
