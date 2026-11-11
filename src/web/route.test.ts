@@ -7,6 +7,16 @@ const at = (url: string) => {
 };
 const state = { view: "waiting" as const, selected: null, tab: "now" as const, repoFilter: null };
 
+describe("appPath (a demo mounted under a sub-path)", () => {
+  it("strips the mount point and leaves other paths alone", async () => {
+    const { appPath } = await import("./route.ts");
+    expect(appPath("/tandem/pr-4/waiting/o/r/12", "/tandem/pr-4")).toBe("/waiting/o/r/12");
+    expect(appPath("/tandem/pr-4", "/tandem/pr-4")).toBe("/");
+    expect(appPath("/tandem/pr-40/board", "/tandem/pr-4")).toBe("/tandem/pr-40/board");
+    expect(appPath("/board", "")).toBe("/board");
+  });
+});
+
 describe("parseRoute", () => {
   it("reads the view, the Card, the tab and the Repo filter", () => {
     expect(at("/board/acme/tandem/48?tab=activity&repo=acme/tandem")).toEqual({ view: "board", selected: "acme/tandem#48", tab: "activity", repoFilter: "acme/tandem" });

@@ -44,7 +44,7 @@ An "Update pending" chip appears in the Board when the checkout has commits that
 
 Demo data without GitHub: `TANDEM_SOURCE=fixture npm run dev`, then http://localhost:5317.
 
-A static demo that runs entirely in the browser (the API over demo data lives in the page, nothing is sent anywhere): `npm run build:demo` writes `dist/demo`, which any static host can serve when it rewrites every path to `/index.html` (a `vercel.json` is included).
+A static demo that runs entirely in the browser (the API over demo data lives in the page, nothing is sent anywhere): `npm run build:demo` writes `dist/demo`, which any static host can serve when it rewrites every path to `/index.html` (a `vercel.json` and, for GitHub Pages, a `404.html` are included; `DEMO_BASE=/sub/path/` builds it for a sub-path).
 
 ## Keys
 

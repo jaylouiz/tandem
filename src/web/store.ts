@@ -5,7 +5,7 @@ import { toLookAt, waitingOnMe } from "../core/card.ts";
 import { pruneDrafts, type Draft } from "../core/drafts.ts";
 import type { ShotsTarget } from "../core/gallery.ts";
 import { nextAfterAnswer } from "./answered.ts";
-import { navigation, parseRoute, VIEWS, type Nav } from "./route.ts";
+import { appPath, navigation, parseRoute, VIEWS, type Nav } from "./route.ts";
 import { closeToast } from "./ui/Toast.tsx";
 import { pruneHanded, type HandedRecord } from "../core/triage.ts";
 import { NO_COORDINATOR, type ActivityEntry, type BoardView, type Card, type Coordinator, type NextStep, type Phase, type WayfinderMap } from "../core/types.ts";
@@ -168,7 +168,7 @@ export function storeFilter(repo: string | null) {
  * The URL's own filter wins even when empty: `/board` shows every repo (#48).
  */
 function startingPlace(): { view: View; selected: string | null; tab: Tab; repoFilter: string | null } {
-  const r = typeof location === "undefined" ? null : parseRoute(location.pathname, location.search);
+  const r = typeof location === "undefined" ? null : parseRoute(appPath(location.pathname), location.search);
   const remembered = localStorage.getItem(FILTER_KEY);
   if (!r?.view) return { view: storedView(), selected: null, tab: "now", repoFilter: r?.repoFilter ?? remembered };
   return { view: r.view, selected: r.selected, tab: r.tab, repoFilter: r.repoFilter };

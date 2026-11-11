@@ -9,6 +9,8 @@ const node = fileURLToPath(new URL("./src/demo/node.ts", import.meta.url));
 
 export default defineConfig({
   root: "src/demo",
+  // a host that serves the demo from a sub-path (GitHub Pages: `/tandem/pr-4/`): DEMO_BASE names it, with both slashes
+  base: process.env.DEMO_BASE ?? "/",
   publicDir: "../web/public",
   plugins: [react(), tailwindcss()],
   resolve: { alias: [{ find: /^node:(fs|fs\/promises|os|path|url|child_process|util)$/, replacement: node }] },

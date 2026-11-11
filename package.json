@@ -20,7 +20,7 @@
     "dev:server": "TANDEM_DEV=1 tsx watch src/server/main.ts",
     "dev:web": "vite",
     "build": "vite build && tsc -p tsconfig.server.json && node scripts/write-version.mjs",
-    "build:demo": "vite build -c vite.demo.config.ts && cp src/demo/vercel.json dist/demo/vercel.json",
+    "build:demo": "vite build -c vite.demo.config.ts && cp src/demo/vercel.json dist/demo/vercel.json && cp dist/demo/index.html dist/demo/404.html",
     "start": "node dist/server/server/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p tsconfig.demo.json",
     "test": "vitest run",
