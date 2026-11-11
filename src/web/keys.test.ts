@@ -15,9 +15,61 @@ describe("the key table", () => {
       for (const k of b.keys) {
         const slot = `${b.chord ?? ""}|${b.mod ? "mod+" : ""}${k}`;
         const was = seen.get(slot);
-        if (was) expect([was, b.id].some((id) => id === "pick-choice" || id === "leave-field" || id === "clear-repo-filter"), `${was} and ${b.id} on ${slot}`).toBe(true);
+        // a Focus key hands the key on outside Focus (`x`, `[` and `]` are the Card's there), like the Feedback digits hand on to the priorities
+        if (was) expect([was, b.id].some((id) => id === "pick-choice" || id === "leave-field" || id === "clear-repo-filter" || id.startsWith("focus-")), `${was} and ${b.id} on ${slot}`).toBe(true);
         seen.set(slot, b.id);
       }
+  });
+
+  it("lists every key of Focus as a binding with when: Focus, scoped to Card views, before the Card binding it takes the key from", () => {
+    const focus = keys.BINDINGS.filter((b) => b.id.startsWith("focus-"));
+    expect(focus.map((b) => b.id).sort()).toEqual(["focus-details", "focus-next", "focus-note", "focus-previous", "focus-reject", "focus-side", "focus-start", "focus-step", "focus-viewport"]);
+    for (const b of focus) expect([b.when, b.scope, b.group], b.id).toEqual(["Focus", "cards", "Focus"]);
+    const at = (id: string) => keys.BINDINGS.findIndex((b) => b.id === id);
+    expect(at("focus-reject")).toBeLessThan(at("mark"));
+    expect(at("focus-step")).toBeLessThan(at("tab"));
+    // the keys the design round asked for are taken (Move to Inbox, Capture an idea): details and side by side moved (D1)
+    expect(keys.keyOf("focus-details")).toBe("e");
+    expect(keys.keyOf("focus-side")).toBe("t");
+    expect(keys.keyOf("move-inbox")).toBe("i");
+    expect(keys.keyOf("capture")).toBe("c");
+  });
+
+  it("in Focus the Selection, tab and triage keys do not act on the Card behind the ask; outside Focus they do", async () => {
+    vi.stubGlobal("HTMLElement", class {});
+    const { useStore } = await import("./store.ts");
+    const { useFocus } = await import("./focus/session.ts");
+    const press = (key: string, mod = false) => {
+      let prevented = false;
+      keys.handleKey({ key, metaKey: mod, ctrlKey: false, altKey: false, shiftKey: false, target: null, preventDefault: () => (prevented = true) } as unknown as KeyboardEvent, { order: [], groups: [] });
+      return prevented;
+    };
+    const st = () => useStore.getState();
+    st().setView("waiting");
+    st().select("o/r#1");
+    press("x");
+    expect(st().marked).toEqual(["o/r#1"]);
+    st().clearMarks();
+    press("]");
+    expect(st().tab).toBe("decided");
+
+    st().setFocus(true);
+    expect(st()).toMatchObject({ focus: true, selected: null }); // Focus starts on its start screen, nothing open
+    expect(useFocus.getState().stage).toBe("start");
+    st().select("o/r#1");
+    useFocus.getState().setStage("ask");
+    for (const k of ["x", "[", "]"]) expect(press(k), k).toBe(true); // spent in Focus, whatever is on screen
+    expect(st().marked).toEqual([]);
+    expect(st().tab).toBe("now");
+    expect(press("a", true)).toBe(true); // ⌘A marks nothing
+    expect(st().marked).toEqual([]);
+    for (const k of ["d", "s", "b", "h", "a", "w", "m", "i", "0", "1", "2", "3"]) expect(press(k), k).toBe(false); // triage: nothing runs, the key is nobody's
+    expect(st().notice).toBeNull();
+    // Esc: back to the overview is the frame's (not mounted here), so the key leaves Focus
+    press("Escape");
+    expect(st().focus).toBe(false);
+    expect(useFocus.getState().stage).toBe("start");
+    st().select(null);
   });
 
   it("scopes every key that acts on Cards to the views that list Cards (not Maps, Settings)", () => {

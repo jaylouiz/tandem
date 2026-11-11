@@ -20,7 +20,7 @@ function sendFeedback(card: Card, f: Feedback | null, push: boolean, dKey: strin
   if (!f || !canSend(f)) return Promise.resolve(false);
   const patch = f.action === "pr" && f.body.verdict === "hold" ? { ...DONE, onHold: true } : DONE;
   return via(card, f, async () => {
-    const sent = await giveFeedback(card, f.action, { ...f.body, push }, patch);
+    const sent = await giveFeedback(card, f.action, { ...f.body, push }, patch, { cover: via !== direct });
     if (sent) useStore.getState().clearDraft(dKey);
     return sent;
   });

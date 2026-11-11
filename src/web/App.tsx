@@ -151,7 +151,8 @@ export function App() {
   ];
 
   return (
-    <div className="shell">
+    // Focus takes the window: the sidebar and the top bar step aside (styles.css), Esc and its own top strip lead back
+    <div className="shell" data-focus={(focus && split) || undefined}>
       <nav className="sidebar" aria-label="Views">
         <div className="brand">
           <svg width="18" height="18" viewBox="0 0 32 32" aria-hidden>

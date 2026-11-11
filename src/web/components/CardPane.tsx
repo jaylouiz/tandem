@@ -5,13 +5,12 @@ import type { Card, DesignRound } from "../../core/types.ts";
 import type { ShotsTarget } from "../../core/gallery.ts";
 import { NO_COORDINATORS, TABS, api, useActivity, useCard, useNow, useStore } from "../store.ts";
 import { useSigned } from "../signed.ts";
-import { markSeen } from "../seen.ts";
 import { handedValid, startNotice, startRequests } from "../../core/triage.ts";
 import { TRIAGE_ENTRIES, actionBlocked, runTriage } from "../triage.ts";
 import { BINDINGS, keyCaps, keyOf } from "../keys.ts";
 import { AgentDecisionPanel, DecisionPanel, EarlierRounds, LookPanel, PrPanel, RoundPanel } from "./Feedback.tsx";
 import { Tooltip } from "../ui/Tooltip.tsx";
-import { ActDot, Age, Btn, CardChips, Ext, KindGlyph, Markdown, RepoTag, Stepper, ago } from "./bits.tsx";
+import { ActDot, Age, Btn, CardChips, Ext, KindGlyph, Markdown, RepoTag, Stepper, ago, clock } from "./bits.tsx";
 
 
 function Triage({ card }: { card: Card }) {
@@ -103,12 +102,6 @@ function useLog(card: Card, enabled: boolean): string | null | undefined {
   }, [enabled, card.repo, card.number, stamp]);
   return log;
 }
-
-const clock = (iso: string) => {
-  const d = new Date(iso);
-  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
-};
 
 function useActivityOf(card: Card | null): Activity | null {
   const activity = useActivity();
@@ -208,11 +201,13 @@ function Decided({ card, rounds, roundWaits, src, signal }: { card: Card; rounds
   );
 }
 
-/** `focus`: the Card as the one sheet of Focus (Waiting on me, one at a time): the ask and its tabs, without triage and status. */
-export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "aside" | "focus" }) {
+/** `drawer`: the Card behind an ask of Focus (`focus/Focus.tsx`): Decided, Activity and Issue, without the Now tab (the ask is on the cover), so no second Feedback panel is mounted. */
+export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "split" | "aside" | "drawer"; onClose?: () => void }) {
   const card = useCard(cardKey);
   const select = useStore((s) => s.select);
-  const tab = useStore((s) => s.tab);
+  const storeTab = useStore((s) => s.tab);
+  const drawer = mode === "drawer";
+  const tab = drawer && storeTab === "now" ? "issue" : storeTab;
   const setTab = useStore((s) => s.setTab);
   const failure = useStore((s) => s.failures[cardKey]);
   const clearFailure = useStore((s) => s.clearFailure);
@@ -258,7 +253,6 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
   // a Card that changes afterwards (Send moves the round to "earlier") never re-targets the panel
   const signalFor = (who: ShotsTarget) => (shotsRequest?.key === card.key && shotsRequest.target === who ? shotsRequest.id : undefined);
   const kind = kindOf(card);
-  const focus = mode === "focus";
   // the Feedback panels lead with their own question: only an ask without a panel (Awaiting pickup) is spelled out in the head
   const headAsk = kind === "pickup";
 
@@ -271,9 +265,9 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
           <a className="btn ghost" href={card.url} target="_blank" rel="noreferrer">
             GitHub<Ext />
           </a>
-          {mode === "aside" && (
-            <Tooltip label="Close the Card" keys={keyOf("escape")} side="bottom">
-              <button className="btn ghost" onClick={() => select(null)} aria-label="Close">
+          {(mode === "aside" || drawer) && (
+            <Tooltip label={drawer ? "Close the Card details" : "Close the Card"} keys={keyOf("escape")} side="bottom">
+              <button className="btn ghost" onClick={() => (onClose ? onClose() : select(null))} aria-label="Close">
                 <kbd>{keyOf("escape")}</kbd>
               </button>
             </Tooltip>
@@ -284,7 +278,7 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
           <RepoTag repo={card.repo} number={card.number} />
           <CardChips card={card} />
         </div>
-        {kind && headAsk && (
+        {kind && headAsk && !drawer && (
           <div className="pane-ask" data-kind={kind}>
             <KindGlyph kind={kind} box />
             <div>
@@ -295,7 +289,7 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
           </div>
         )}
         <div className="tabs" role="tablist" aria-label="Card">
-          {TABS.map((t) => (
+          {TABS.filter((t) => !drawer || t.id !== "now").map((t) => (
             <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>
               {t.label}
             </button>
@@ -308,6 +302,7 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
         </div>
       </div>
       <div className="pane-body">
+        {!drawer && (
         <div className="tab-body" role="tabpanel" hidden={tab !== "now"} data-testid="tab-now">
           {failure && (
             <div className="section failed" role="alert" data-testid="not-sent">
@@ -328,15 +323,6 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
           {roundWaits && round && <RoundPanel key={`${card.key}-${round.round}`} card={card} round={round} src={signed} openSignal={signalFor("round")} />}
           {card.waiting?.kind === "pr-approval" && card.pullRequest && <PrPanel card={card} />}
           {lookShown && <LookPanel key={`look-${card.key}`} card={card} look={look} src={signed} openSignal={signalFor("look")} />}
-          {/* Focus shows a Look without marking it: Seen is the developer's own reaction here, and it moves on to the next Card */}
-          {lookShown && focus && !card.seenAt && (
-            <div className="actions">
-              <span className="spacer" />
-              <button className="btn primary" data-testid="focus-seen" onClick={() => void markSeen([card], true, { quiet: true })}>
-                Mark Seen <kbd>{keyOf("seen")}</kbd>
-              </button>
-            </div>
-          )}
 
           {card.awaitingPickup && (
             <div className="section" data-testid="awaiting-pickup">
@@ -355,7 +341,7 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
             </div>
           )}
 
-          {card.phase !== "Done" && !focus && (
+          {card.phase !== "Done" && (
             <div className="section">
               <Triage key={card.key} card={card} />
               {card.phase === "Backlog" && !card.waiting && (
@@ -386,8 +372,9 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
               )}
             </div>
           )}
-          {!focus && <Status key={`status-${card.key}`} card={card} act={act} expanded={false} />}
+          <Status key={`status-${card.key}`} card={card} act={act} expanded={false} />
         </div>
+        )}
         <div className="tab-body" role="tabpanel" hidden={tab !== "decided"} data-testid="tab-decided">
           <Decided card={card} rounds={rounds} roundWaits={roundWaits} src={signed} signal={signalFor("earlier")} />
         </div>

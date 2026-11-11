@@ -42,6 +42,17 @@ const fullest = (): import("./actions.ts").ActionCtx => ({
     extras: () => [{ id: "push", label: "Push this Feedback: turn off", run: () => {} }],
     canSend: () => true,
   },
+  // what Focus registers at its fullest (`focus/keys.ts`): the start, an ask with a note, a design round's stage
+  focusKeys: [
+    { id: "focus-start", label: "Start with the first Card" },
+    { id: "focus-note", label: "Answer with a note" },
+    { id: "focus-details", label: "Card details: Decided, Activity, Issue" },
+    { id: "focus-side", label: "All variants side by side" },
+    { id: "focus-viewport", label: "Show the mobile screenshot" },
+    { id: "focus-step", label: "Next variant", key: "]" },
+    { id: "focus-step", label: "Previous variant", key: "[" },
+    { id: "focus-reject", label: "Reject variant b" },
+  ],
   triage: { targets: 2, moves: triage.MOVE_ENTRIES, entries: triage.TRIAGE_ENTRIES, seen: true, unseen: true },
   setTheme: () => {},
 });
@@ -135,6 +146,24 @@ describe("the palette lists every key binding", () => {
     const tabs = onMaps.filter((a) => a.id.startsWith("tab-"));
     expect(tabs.length).toBeGreaterThan(0);
     for (const a of tabs) expect(a.keys, a.id).toBeUndefined();
+  });
+
+  it("in Focus offers the Focus keys and the ask's choices, and nothing that acts on the Card behind the ask", () => {
+    const entries = actions.paletteActions({ ...fullest(), view: "waiting", focus: true, triage: { targets: 0, moves: [], entries: [], seen: false, unseen: false } });
+    const ids = entries.map((a) => a.id);
+    expect(entries.filter((a) => a.group === "Focus").map((a) => [a.label, actions.keyShown(a)])).toEqual([
+      ["Start with the first Card", "↵"],
+      ["Answer with a note", "n"],
+      ["Card details: Decided, Activity, Issue", "e"],
+      ["All variants side by side", "t"],
+      ["Show the mobile screenshot", "v"],
+      ["Next variant", "]"],
+      ["Previous variant", "["],
+      ["Reject variant b", "x"],
+    ]);
+    for (const id of ["tab-now", "tab-decided", "show-log", "mark", "close-card", "shots", "select-all", "next-design", "move-inbox", "seen"]) expect(ids, id).not.toContain(id);
+    for (const id of ["focus", "next", "previous", "open", "choice-1", "send-feedback", "panel-push", "capture", "shortcuts", "go-board"]) expect(ids, id).toContain(id);
+    expect(entries.find((a) => a.id === "focus")?.label).toBe("Leave Focus: back to the list");
   });
 
   it("runBinding leaves a Card-scoped binding alone on Maps and Settings", () => {

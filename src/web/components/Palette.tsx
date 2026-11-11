@@ -4,6 +4,7 @@ import { shotsTarget } from "../../core/gallery.ts";
 import { keyShown, paletteActions, type PaletteAction } from "../actions.ts";
 import { keyOf } from "../keys.ts";
 import { panelKeys } from "../panelKeys.ts";
+import { liveFocusKeys } from "../focus/keys.ts";
 import { seenLooks, unseenLooks } from "../seen.ts";
 import { NO_COORDINATORS, NO_REPOS, openCard, useStore, useCard, useCards } from "../store.ts";
 import { Dialog } from "../ui/Dialog.tsx";
@@ -67,16 +68,20 @@ function PaletteBody() {
         lanes,
         repoFilter: filter,
         panel: live,
-        triage: {
-          targets: targets.length,
-          moves: cfg ? MOVE_ENTRIES.filter((e) => moveBlocked(e.to, targets, cfg, moveStep) === null) : [],
-          entries: TRIAGE_ENTRIES.filter((e) => applicable(e.action, targets, handed)),
-          seen: unseenLooks(targets).length > 0,
-          unseen: seenLooks(targets).length > 0,
-        },
+        focusKeys: focus ? liveFocusKeys() : [],
+        // Focus has no triage: its keys do not act on the Card behind the ask, so the palette does not offer them either (Mark Seen is a Focus key there)
+        triage: focus
+          ? { targets: 0, moves: [], entries: [], seen: false, unseen: false }
+          : {
+              targets: targets.length,
+              moves: cfg ? MOVE_ENTRIES.filter((e) => moveBlocked(e.to, targets, cfg, moveStep) === null) : [],
+              entries: TRIAGE_ENTRIES.filter((e) => applicable(e.action, targets, handed)),
+              seen: unseenLooks(targets).length > 0,
+              unseen: seenLooks(targets).length > 0,
+            },
         setTheme,
       }),
-    [view, selected, coordinators, failed, tab, marked, repoCount, lanes, filter, live, targets, cfg, moveStep, handed],
+    [view, focus, selected, coordinators, failed, tab, marked, repoCount, lanes, filter, live, targets, cfg, moveStep, handed],
   );
   const groups = [...new Set(actions.map((a) => a.group))];
   const item = (a: PaletteAction) => {
