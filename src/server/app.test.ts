@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { decisionFeedback, feedbackComment, prFeedback, roundFeedback, type Feedback } from "../core/answer.ts";
 import { parseMarker } from "../core/contract.ts";
 import { NO_COORDINATOR } from "../core/types.ts";
 import { createApp } from "./app.ts";
@@ -50,6 +51,27 @@ describe("feedback", () => {
     expect(c.waiting).toBeNull();
     expect(c.awaitingPickup).toBe(true);
     expect(pusher.sent).toEqual([{ repo: "acme/app", number: 105, event: "feedback", text: "D1 answered" }]);
+  });
+
+  it("writes, for every kind of Feedback, the comment the web app shows for it beforehand (#8: an option in Focus shows its comment)", async () => {
+    const all: Feedback[] = [
+      decisionFeedback("D1", "B: field-level merge", ""),
+      decisionFeedback("D1", "B: field-level merge", "keep the undo toast"),
+      decisionFeedback("D1", null, "neither"),
+      prFeedback("D1", "approve", ""),
+      prFeedback("D1", "hold", ""),
+      prFeedback("D1", "send-back", "the empty state is missing"),
+      prFeedback(null, "approve", ""),
+      roundFeedback(1, ["b"], [], ""),
+      roundFeedback(1, ["a", "b"], ["c"], "header from a, list from b"),
+    ];
+    for (const f of all) {
+      const res = await post(`/api/cards/acme/app/105/${f.action}`, { ...f.body, push: false });
+      expect(res.status).toBe(200);
+      const raw = (await source.fetchIssues("acme/app", null)).find((i) => i.number === 105)!;
+      expect(raw.comments.at(-1)!.body).toBe(feedbackComment(f));
+      expect(parseMarker(raw.comments.at(-1)!.body)).toBeNull();
+    }
   });
 
   it("can switch Push off for one piece of Feedback", async () => {
