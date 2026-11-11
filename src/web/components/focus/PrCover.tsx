@@ -3,7 +3,7 @@
 // their digit; Send back needs a note, so its tile opens the note instead.
 import { feedbackComment } from "../../../core/answer.ts";
 import type { PrVerdict } from "../../../core/contract.ts";
-import { prEvidence, whyStopped } from "../../../core/evidence.ts";
+import { prEvidence, whyStopped, type EvidenceLine } from "../../../core/evidence.ts";
 import type { Card } from "../../../core/types.ts";
 import { VERDICTS, usePrVerdict } from "../../feedback/answers.ts";
 import { useRegisterPanel } from "../../feedback/panel.ts";
@@ -15,15 +15,19 @@ import { KeyLine, Meta, Note, SendBar, Tile, useCover } from "./parts.tsx";
 
 const PALETTE: Record<PrVerdict, string> = { approve: "Approve the PR", hold: "Hold the merge", "send-back": "Send the PR back" };
 
-function Facts({ title, lines, tone }: { title: string; lines: string[] | null; tone: "waiting" | "ok" }) {
+/** `open`: an unchecked item of the agent's list. It reads as not done (its own mark and words), never like passed evidence. */
+function Facts({ title, lines, tone }: { title: string; lines: EvidenceLine[] | null; tone: "waiting" | "ok" }) {
   return (
     <div className="fact">
       <h2>{title}</h2>
       {lines ? (
         <ul>
           {lines.map((l, i) => (
-            <li key={`${i}${l}`} data-tone={tone}>
-              {l}
+            <li key={`${i}${l.text}`} data-tone={l.open ? "open" : tone}>
+              <span>
+                {l.open && <b>Not done: </b>}
+                {l.text}
+              </span>
             </li>
           ))}
         </ul>
@@ -83,7 +87,7 @@ export function PrCover({ card }: { card: Card }) {
           <Meta card={card} kind="pr-approval" />
           <h1 className="cover-q">{question}</h1>
           <div className="facts" data-testid="facts">
-            {why && <Facts title="Why it stopped" lines={[why]} tone="waiting" />}
+            {why && <Facts title="Why it stopped" lines={[{ text: why, open: false }]} tone="waiting" />}
             <Facts title="Verification" lines={evidence.verification} tone="ok" />
             <Facts title="Review" lines={evidence.review} tone="ok" />
             <a className="cover-link" href={`${pr.url}/files`} target="_blank" rel="noreferrer">

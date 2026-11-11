@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { prEvidence, whyStopped } from "./evidence.ts";
 
+const done = (...texts: string[]) => texts.map((text) => ({ text, open: false }));
+
 describe("a PR body's evidence", () => {
   it("reads both sections, list items and plain lines alike", () => {
     expect(prEvidence("Closes #106\n\n## Review\nNo findings above low.\n\n## Verification\n- unit 212/212\n- e2e 31/31")).toEqual({
-      review: ["No findings above low."],
-      verification: ["unit 212/212", "e2e 31/31"],
+      review: done("No findings above low."),
+      verification: done("unit 212/212", "e2e 31/31"),
     });
   });
 
   it("reads the one section there is", () => {
-    expect(prEvidence("Closes #173\n\n## Review\nNo findings above low.")).toEqual({ review: ["No findings above low."], verification: null });
-    expect(prEvidence("## Verification\n* typecheck\n* build")).toEqual({ review: null, verification: ["typecheck", "build"] });
+    expect(prEvidence("Closes #173\n\n## Review\nNo findings above low.")).toEqual({ review: done("No findings above low."), verification: null });
+    expect(prEvidence("## Verification\n* typecheck\n* build")).toEqual({ review: null, verification: done("typecheck", "build") });
   });
 
   it("reports nothing for a body without them, or with an empty one", () => {
@@ -20,13 +22,31 @@ describe("a PR body's evidence", () => {
     expect(prEvidence("## Verification\n\n## Review\n")).toEqual({ review: null, verification: null });
   });
 
-  it("stops at the next heading and leaves other sections out", () => {
-    const body = "## Summary\nAdds the picker.\n\n## Verification\n1. unit green\n2) e2e green\n\n### Notes\nnot evidence\n\n## Screenshots\n![x](y)\n\n## Review\n- [x] no findings\n- [ ] one nit, P3\nplain line\n\n## Left out\n- mobile";
-    expect(prEvidence(body)).toEqual({ verification: ["unit green", "e2e green"], review: ["no findings", "one nit, P3", "plain line"] });
+  it("stops at the next heading of its level and leaves other sections out", () => {
+    const body = "## Summary\nAdds the picker.\n\n## Verification\n1. unit green\n2) e2e green\n\n## Screenshots\n![x](y)\n\n## Review\n- no findings\nplain line\n\n## Left out\n- mobile";
+    expect(prEvidence(body)).toEqual({ verification: done("unit green", "e2e green"), review: done("no findings", "plain line") });
+  });
+
+  it("marks an unchecked task-list item as open, so it does not read like passed evidence", () => {
+    expect(prEvidence("## Verification\n- [x] unit\n- [ ] e2e (not run)\n## Review\n- [ ] one P1 finding open\n- [X] style")).toEqual({
+      verification: [
+        { text: "unit", open: false },
+        { text: "e2e (not run)", open: true },
+      ],
+      review: [
+        { text: "one P1 finding open", open: true },
+        { text: "style", open: false },
+      ],
+    });
+  });
+
+  it("keeps sub-headings and fenced code inside the section", () => {
+    const body = "## Verification\n### Automated\n- unit 212/212\n### Manual\n- checked on mobile\n```sh\n# run the e2e suite\nnpm run e2e\n```\n- e2e 31/31\n# Next\n- not evidence";
+    expect(prEvidence(body).verification).toEqual(done("Automated", "unit 212/212", "Manual", "checked on mobile", "# run the e2e suite", "npm run e2e", "e2e 31/31"));
   });
 
   it("takes any heading level, case and a trailing colon, but not a heading that only starts with the word", () => {
-    expect(prEvidence("### verification:\n- a\r\n# REVIEW\n- b")).toEqual({ verification: ["a"], review: ["b"] });
+    expect(prEvidence("### verification:\n- a\r\n# REVIEW\n- b")).toEqual({ verification: done("a"), review: done("b") });
     expect(prEvidence("## Review notes\n- a\n## Verification steps\n- b")).toEqual({ verification: null, review: null });
   });
 });

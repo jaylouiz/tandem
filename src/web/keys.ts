@@ -85,7 +85,10 @@ function step(card: Card) {
 function move({ order }: KeyCtx, dir: 1 | -1) {
   const s = useStore.getState();
   if (!order.length) return false;
-  const i = order.findIndex((c) => c.key === s.selected);
+  let i = order.findIndex((c) => c.key === s.selected);
+  // Focus: the ask on screen may have left the queue (it is being written, or was answered elsewhere). The Card that took its place
+  // is the next one and the one before it the previous, as Up next says: step from where it was, not from the top.
+  if (i < 0 && s.focus && s.selected) i = useFocus.getState().at - (dir === 1 ? 1 : 0);
   const to = order[Math.max(0, Math.min(order.length - 1, i + dir))]!;
   if (to.key === s.selected) return false;
   step(to);
@@ -129,9 +132,10 @@ export const BINDINGS: Binding[] = [
     mod: true,
     label: "Send the chosen Feedback",
     scope: "cards",
-    run: () => {
+    run: (e) => {
       const panel = livePanel();
       if (!panel) return false;
+      if (e.repeat) return; // a held key writes once
       panel.send();
     },
   },
@@ -145,6 +149,9 @@ export const BINDINGS: Binding[] = [
     run: (e) => {
       const panel = livePanel(); // digits belong to the open Feedback panel; priority keys stay for Cards without one
       if (!panel) return false;
+      // A held digit acts once. In Focus a digit sends, and the next ask takes the screen as soon as the write is through: without
+      // this, the key's auto-repeat would answer that one too (and the one after), each a comment that cannot be taken back.
+      if (e.repeat) return;
       panel.pick(Number(e.key));
     },
   },
@@ -224,7 +231,7 @@ export const BINDINGS: Binding[] = [
     },
   },
   // in Focus only the Look on screen is marked, by the developer's own key; on any other ask the key does nothing
-  { id: "seen", group: "Cards", keys: ["l"], label: "Mark Seen", scope: "cards", run: (e) => void (inFocus() ? runFocusKey("seen", e) : markSelectionSeen()) },
+  { id: "seen", group: "Cards", keys: ["l"], label: "Mark Seen", scope: "cards", run: (e) => void (inFocus() ? !e.repeat && runFocusKey("seen", e) : markSelectionSeen()) },
   {
     id: "tab",
     group: "Cards",

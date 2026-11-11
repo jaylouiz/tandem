@@ -128,8 +128,8 @@ export function End({ receipt, queue, onStart }: { receipt: ReceiptEntry[]; queu
         <p className="muted">{receipt.length ? `${tally(receipt.map((r) => r.kind))}. The agents take it from here.` : "Nothing was sent in this Focus."}</p>
         {receipt.length > 0 && (
           <ol className="receipt" data-testid="receipt" aria-label="What was sent in this Focus">
-            {receipt.map((r) => (
-              <li key={r.key} data-kind={r.kind}>
+            {receipt.map((r, i) => (
+              <li key={`${r.key}${i}`} data-kind={r.kind}>
                 <KindGlyph kind={r.kind} />
                 <div className="receipt-main">
                   <span className="receipt-title">

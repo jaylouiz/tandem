@@ -545,9 +545,11 @@ export async function giveFeedback(card: Card, action: string, body: Record<stri
   if (!res.ok) {
     // the Card is back in the list; bring it back into view and say why on the Card itself
     useStore.getState().fail(card.key, res.error);
-    // In Focus the Send bar of the ask says it (Not sent, the reason, Send again): no toast beside it, and the developer stays where they are
-    if (opts.cover && useStore.getState().focus) return false;
-    useStore.getState().select(card.key, "now"); // "now" also when it is still the open Card on Decided (the last blocker)
+    // In Focus the developer stays where they are. While the ask is still on screen its Send bar says it (Not sent, the reason, Send
+    // again) and no toast is raised beside it; once they have moved on (another ask, the overview) the toast is the only place that can.
+    const now = useStore.getState();
+    if (opts.cover && now.focus && now.selected === card.key) return false;
+    if (!now.focus) now.select(card.key, "now"); // "now" also when it is still the open Card on Decided (the last blocker)
     setNotice({ key: card.key, text: `Failed: ${res.error}`, canStart: false, failed: true });
     return false;
   }

@@ -35,6 +35,10 @@ interface Session {
   noting: Record<string, boolean>;
   /** card key -> the Card as it was when its send started: the ask stays on screen until the write is through */
   sending: Record<string, Card>;
+  /** card key -> the last send from its cover did not go through (the reason is the store's `failures`): its Send bar says so and offers Send again. Another write's failure on that Card (accepting agent decisions in the drawer) is not the cover's */
+  failed: Record<string, boolean>;
+  /** where the ask on screen sits in the queue (the last known place once it has left it): j / k and the arrows step from here */
+  at: number;
   receipt: ReceiptEntry[];
   setStage: (stage: Stage) => void;
   setDetails: (open: boolean, tab?: Tab) => void;
@@ -54,7 +58,7 @@ const readLeft = (): string | null => {
   }
 };
 
-const fresh = () => ({ stage: "start" as Stage, since: readLeft(), details: false, noting: NO_NOTES, sending: NO_SENDS, receipt: NO_RECEIPT });
+const fresh = () => ({ stage: "start" as Stage, since: readLeft(), details: false, noting: NO_NOTES, sending: NO_SENDS, failed: NO_NOTES, at: 0, receipt: NO_RECEIPT });
 
 export const useFocus = create<Session>((set) => ({
   ...fresh(),
@@ -104,17 +108,23 @@ export function effectOf(f: Feedback): string {
  */
 export const focusSend: SendVia = async (card, feedback, run) => {
   if (useFocus.getState().sending[card.key]) return false;
-  useFocus.setState((s) => ({ sending: { ...s.sending, [card.key]: card } }));
+  const without = (m: Record<string, boolean>) => {
+    const { [card.key]: _, ...rest } = m;
+    return Object.keys(rest).length ? rest : NO_NOTES;
+  };
+  useFocus.setState((s) => ({ sending: { ...s.sending, [card.key]: card }, failed: without(s.failed) }));
   let sent = false;
   try {
     sent = await run();
   } finally {
     useFocus.setState((s) => {
       const { [card.key]: _, ...rest } = s.sending;
+      const on = useStore.getState().focus; // only a visit that is still on keeps the line: leaving Focus started a new session
       return {
         sending: Object.keys(rest).length ? rest : NO_SENDS,
-        // only a visit that is still on keeps the line: leaving Focus started a new session
-        receipt: sent && useStore.getState().focus ? [...s.receipt.filter((r) => r.key !== card.key), receiptOf(card, feedbackComment(feedback), effectOf(feedback))] : s.receipt,
+        failed: !sent && on ? { ...s.failed, [card.key]: true } : s.failed,
+        // every comment written is a line of its own: a Card answered twice in one visit (D1, then D2) shows both
+        receipt: sent && on ? [...s.receipt, receiptOf(card, feedbackComment(feedback), effectOf(feedback))] : s.receipt,
       };
     });
   }
@@ -127,5 +137,5 @@ export async function focusSeen(card: Card) {
   const now = currentCards({ ...useStore.getState(), repoFilter: null }).find((c) => c.key === card.key);
   if (!now?.seenAt || !useStore.getState().focus) return;
   const days = useStore.getState().board?.workflow.seenRetentionDays ?? 7;
-  useFocus.setState((s) => ({ receipt: [...s.receipt.filter((r) => r.key !== card.key), receiptOf(card, null, `It leaves the Board ${days} days after it was Seen`)] }));
+  useFocus.setState((s) => ({ receipt: [...s.receipt.filter((r) => r.key !== card.key || r.comment !== null), receiptOf(card, null, `It leaves the Board ${days} days after it was Seen`)] }));
 }

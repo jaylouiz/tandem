@@ -255,9 +255,10 @@ test("Focus does not mark a Look Seen by passing it; l and Mark Seen do, and mov
 });
 
 test("a failed send stays on its Card: Not sent with the reason, the answer kept, no toast beside it, ⌘↵ sends again", async ({ page }) => {
+  // intercepts go in before the page loads: one registered a few ms before the key that sends is not always in force yet (it let the write through under load)
+  await page.route("**/api/cards/acme/app/170/answer", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await start(page);
   await row(page, 170).click();
-  await page.route("**/api/cards/acme/app/170/answer", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await page.keyboard.press("2");
   await expect(page.getByTestId("not-sent")).toHaveText("Not sent. boom");
   await on(page, 170); // Focus did not move on
@@ -278,8 +279,6 @@ test("a failed send stays on its Card: Not sent with the reason, the answer kept
 });
 
 test("an option cannot send twice: while the write is under way the ask stays, says Sending, and clicks and digits do nothing", async ({ page }) => {
-  await start(page);
-  await row(page, 170).click();
   let posts = 0;
   let release!: () => void;
   const held = new Promise<void>((r) => (release = r));
@@ -288,6 +287,8 @@ test("an option cannot send twice: while the write is under way the ask stays, s
     await held;
     await r.continue();
   });
+  await start(page);
+  await row(page, 170).click();
   await page.keyboard.press("1");
   await expect(bar(page)).toHaveAttribute("data-state", "sending");
   await expect(bar(page)).toContainText("Sending…");
@@ -301,6 +302,74 @@ test("an option cannot send twice: while the write is under way the ask stays, s
   await on(page, 127);
   expect(posts).toBe(1);
   await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["D1: A"]);
+});
+
+test("a held digit answers one ask, not the next ones too", async ({ page }) => {
+  await start(page);
+  await row(page, 170).click();
+  await page.keyboard.down("1"); // sends A on #170
+  await on(page, 127);
+  await page.keyboard.down("1"); // the key is still down: the browser repeats it on the ask that took the screen
+  await page.keyboard.down("1");
+  await page.keyboard.up("1");
+  await on(page, 127);
+  await expect(bar(page)).toHaveAttribute("data-state", "hint");
+  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["D1: A"]);
+  expect((await answers(page, 127)).pickup).toBe(false);
+  await page.keyboard.press("1"); // a fresh press does send
+  await on(page, 171);
+});
+
+test("a send that fails after the developer moved on says so in a toast; back on the ask its Send bar offers Send again", async ({ page }) => {
+  let fail!: () => void;
+  const held = new Promise<void>((r) => (fail = r));
+  await page.route("**/api/cards/acme/app/170/answer", async (r) => {
+    await held;
+    await r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) });
+  });
+  await start(page);
+  await row(page, 170).click();
+  await page.keyboard.press("2");
+  await expect(bar(page)).toHaveAttribute("data-state", "sending");
+  await page.keyboard.press("j"); // on to the Card that Up next named, while the write is under way
+  await on(page, 127);
+  fail();
+  await expect(page.locator(".toast", { hasText: "Failed: boom" })).toBeVisible();
+  await on(page, 127); // not pulled back
+  await expect(page.getByTestId("focus-pips").locator('button[data-state="failed"]')).toHaveCount(1);
+  await page.keyboard.press("k");
+  await on(page, 170);
+  await expect(page.getByTestId("not-sent")).toHaveText("Not sent. boom");
+  await expect(page.getByTestId("writes")).toHaveText("D1: B");
+});
+
+test("an ask answered somewhere else while it is on screen is not swapped for the next one under the keyboard", async ({ page }) => {
+  await start(page);
+  await row(page, 170).click();
+  await on(page, 170);
+  // answered on GitHub or in a terminal: the snapshot takes the Card out of the queue
+  const res = await page.request.post("/api/cards/acme/app/170/answer", { data: { requestId: "D1", answer: "A", push: false }, headers: { "x-tandem": "1" } });
+  expect(res.ok()).toBe(true);
+  const gone = page.getByTestId("cover-gone");
+  await expect(gone).toContainText("This ask is no longer open");
+  await page.keyboard.press("2"); // a digit meant for #170 reaches no other ask
+  await page.keyboard.press("1");
+  await expect(gone).toBeVisible();
+  expect((await answers(page, 127)).pickup).toBe(false);
+  await page.keyboard.press("Enter"); // the developer goes on by themselves
+  await on(page, 127);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  expect((await answers(page, 127)).pickup).toBe(false);
+});
+
+test("a Card opened from the palette while the start is on screen opens as its ask", async ({ page }) => {
+  await start(page);
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.getByPlaceholder("Type a command or search Cards…").fill("Retry policy for sync");
+  await page.keyboard.press("Enter");
+  await on(page, 127);
+  await expect(page.getByTestId("cover-decision")).toBeVisible();
 });
 
 test("the end is a receipt: every Card answered in this Focus with the comment written, every Look marked Seen", async ({ page }) => {
@@ -355,6 +424,14 @@ test("coming back: the start says what is new since Focus was last left and list
   await page.keyboard.press("f");
   await expect(overview(page).getByRole("heading", { level: 1 })).toHaveText(/Cards wait on you$/);
   await expect(overview(page).getByRole("list", { name: "Still waiting" })).toHaveCount(0);
+  // Start opens the first row of the list: the first new ask, not the oldest open one
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => localStorage.setItem("tandem.focus.left", new Date(Date.now() - 90 * 60_000).toISOString()));
+  await page.keyboard.press("f");
+  await expect(overview(page).getByRole("heading", { level: 1 })).toHaveText(/^1 new since/);
+  await expect(overview(page).getByRole("list", { name: "New" }).locator("button")).toHaveAttribute("data-card", "acme/app#176");
+  await page.keyboard.press("Enter");
+  await on(page, 176);
 });
 
 test("f starts Focus from the Board; with nothing waiting it says so, with the two ways on", async ({ page }) => {
@@ -418,6 +495,7 @@ test("the drawer behind e shows the Card's Decided, Activity and Issue tabs; Esc
   await expect(drawer.getByRole("tab", { selected: true })).toHaveText("Decided");
   await expect(drawer.getByTestId("panel-agent-decision")).toBeVisible();
   await expect(drawer.getByTestId("panel-decision")).toHaveCount(0); // no second Feedback panel
+  await expect.poll(() => drawer.evaluate((el) => el.contains(document.activeElement))).toBe(true); // the library moves focus a frame later
   // a digit here belongs to the agent decisions, never to the ask under the drawer
   await page.keyboard.press("1");
   await expect(drawer.getByRole("button", { name: /Accept all/ })).toHaveAttribute("aria-pressed", "true");

@@ -43,9 +43,16 @@ describe("a send from Focus", () => {
   it("keeps a failed send off the receipt and lets it be sent again", async () => {
     const f = decisionFeedback("D1", "A: x", "");
     expect(await session.focusSend(card(1), f, async () => false)).toBe(false);
-    expect(session.useFocus.getState()).toMatchObject({ sending: {}, receipt: [] });
+    expect(session.useFocus.getState()).toMatchObject({ sending: {}, receipt: [], failed: { "o/r#1": true } }); // the cover's own failure: its Send bar says it
     expect(await session.focusSend(card(1), f, async () => true)).toBe(true);
+    expect(session.useFocus.getState().failed).toEqual({});
     expect(session.useFocus.getState().receipt.map((r) => r.comment)).toEqual(["D1: A"]);
+  });
+
+  it("gives every comment written its own line: a Card answered twice in one visit shows both", async () => {
+    await session.focusSend(card(1), decisionFeedback("D1", "A: x", ""), async () => true);
+    await session.focusSend(card(1), decisionFeedback("D2", "B: y", ""), async () => true);
+    expect(session.useFocus.getState().receipt.map((r) => r.comment)).toEqual(["D1: A", "D2: B"]);
   });
 
   it("lets go of the ask when the write throws", async () => {

@@ -3,7 +3,7 @@
 // starts on what waits (or what is new since the last visit) and ends on a receipt of what was written.
 // The ask on screen is the store's open Card, so `o`, the palette and the Feedback keys (`1`-`9`, ⌘↵ through `panelKeys`) reach it.
 import { useEffect, useMemo, useRef } from "react";
-import { kindOf, type Kind } from "../../../core/ask.ts";
+import { kindOf, splitNew, type Kind } from "../../../core/ask.ts";
 import type { Card } from "../../../core/types.ts";
 import { panelKeys } from "../../panelKeys.ts";
 import { useFocusKeys } from "../../focus/keys.ts";
@@ -83,6 +83,8 @@ export function Focus({ cards }: { cards: Card[] }) {
   const select = useStore((s) => s.select);
   const setFocus = useStore((s) => s.setFocus);
   const failures = useStore((s) => s.failures);
+  const pending = useStore((s) => s.pending);
+  const failed = useFocus((s) => s.failed);
   const stage = useFocus((s) => s.stage);
   const since = useFocus((s) => s.since);
   const sending = useFocus((s) => s.sending);
@@ -102,28 +104,43 @@ export function Focus({ cards }: { cards: Card[] }) {
   const held = selected ? sending[selected] : undefined;
   const card = stage === "ask" ? (held ?? queue[idx] ?? null) : null;
   const last = useRef(0);
-  // The ask on screen left the queue (answered, marked Seen, or gone any other way): the one that took its place opens; after the last one, the end.
-  useEffect(() => {
-    if (stage !== "ask") return;
-    if (idx >= 0) {
-      last.current = idx;
-      return;
-    }
-    if (held) return;
+  // The ask left the queue through the developer's own action here (its answer is on the receipt, or its optimistic patch is still there).
+  const own = !!selected && (!!pending[selected] || receipt.some((r) => r.key === selected));
+  // It left any other way (answered on GitHub or in a terminal, withdrawn by the agent): Focus does not put another ask under the
+  // developer's hands by itself, where a digit sends. It says so and waits for them to go on.
+  const gone = stage === "ask" && idx < 0 && !held && !own ? (cards.find((c) => c.key === selected) ?? null) : null;
+  const goOn = () => {
     const next = queue[Math.min(last.current, queue.length - 1)];
     if (next) return select(next.key);
     select(null);
     setStage("end");
-  }, [stage, idx, held, queue, select, setStage]);
+  };
+  useEffect(() => {
+    // a Card opened from outside (a notification, the palette) while the start or the end is on screen: its ask opens
+    if (stage !== "ask") {
+      if (idx >= 0) setStage("ask");
+      return;
+    }
+    if (idx >= 0) {
+      last.current = idx;
+      if (useFocus.getState().at !== idx) useFocus.setState({ at: idx });
+      return;
+    }
+    // held while it is written; after the developer's own answer or Mark Seen the one that took its place opens, after the last one the end
+    if (held || gone) return;
+    goOn();
+  });
   // the drawer belongs to the ask it was opened on
   useEffect(() => {
     if (!card && useFocus.getState().details) setDetails(false);
   }, [card, setDetails]);
 
   const start = (key?: string) => {
-    const to = key ?? queue[0]?.key;
+    // Start opens the first row of the list: after an earlier visit that is the first new ask, not the oldest open one
+    const to = key ?? (stage === "start" ? splitNew(queue, since).fresh[0]?.key : undefined) ?? queue[0]?.key;
     if (!to) return;
     last.current = Math.max(0, queue.findIndex((c) => c.key === to));
+    useFocus.setState({ at: last.current });
     select(to);
     setStage("ask");
   };
@@ -133,8 +150,9 @@ export function Focus({ cards }: { cards: Card[] }) {
   };
 
   useFocusKeys("frame", {
-    "focus-start":
-      stage !== "ask" && queue.length
+    "focus-start": gone
+      ? { label: "Go on to the next Card", run: (e) => (e.target instanceof HTMLElement && e.target.closest("button, a, input, textarea, select") ? false : goOn()) }
+      : stage !== "ask" && queue.length
         ? {
             label: stage === "end" ? "Go on with the next Card" : "Start with the first Card",
             // Enter on a row, a button or a link is that control's own
@@ -154,7 +172,7 @@ export function Focus({ cards }: { cards: Card[] }) {
   const at = pips.findIndex(([k]) => k === selected);
   const done = pips.filter(([k]) => !inQueue.has(k) && !sending[k]).length;
   // while the ask is held its Card has left the queue already: the one that took its place is next
-  const cover = { next: idx >= 0 ? queue[idx + 1] : queue[Math.min(last.current, queue.length - 1)], sending: !!held, failure: card ? failures[card.key] : undefined, details };
+  const cover = { next: idx >= 0 ? queue[idx + 1] : queue[Math.min(last.current, queue.length - 1)], sending: !!held, failure: card && failed[card.key] ? failures[card.key] : undefined, details };
 
   return (
     <div className="focus" data-testid="focus" data-stage={stage} data-kind={card ? (kindOf(card) ?? undefined) : undefined}>
@@ -164,7 +182,7 @@ export function Focus({ cards }: { cards: Card[] }) {
           <>
             <div className="focus-pips" data-testid="focus-pips" role="group" aria-label={`Focus progress: ${done} of ${pips.length} done`}>
               {pips.map(([key, p], i) => {
-                const state = key === selected ? "now" : failures[key] ? "failed" : !inQueue.has(key) ? "done" : undefined;
+                const state = key === selected ? "now" : failed[key] && failures[key] ? "failed" : !inQueue.has(key) ? "done" : undefined;
                 const open = inQueue.has(key);
                 return (
                   <button
@@ -202,7 +220,26 @@ export function Focus({ cards }: { cards: Card[] }) {
       </div>
       <div className="focus-body" ref={body} tabIndex={-1} key={card?.key ?? stage} data-failed={cover.failure ? true : undefined}>
         <CoverCtx.Provider value={cover}>
-          {card ? <Cover card={card} /> : stage === "ask" ? null : stage === "end" ? <End receipt={receipt} queue={queue} onStart={() => start()} /> : queue.length ? <Start queue={queue} since={since} onStart={() => start()} onOpen={start} /> : <Empty />}
+          {card ? (
+            <Cover card={card} />
+          ) : gone ? (
+            <>
+              <div className="cover-scroll">
+                <div className="cover-col" data-testid="cover-gone">
+                  <h1 className="cover-q">This ask is no longer open</h1>
+                  <p className="muted">
+                    {gone.title} was answered somewhere else or withdrawn while it was on screen. Nothing was sent from here.
+                  </p>
+                  <div className="actions">
+                    <button className="btn primary" data-testid="focus-go-on" onClick={goOn}>
+                      Go on <kbd>{keyOf("focus-start")}</kbd>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <KeyLine hints={[[keyOf("focus-start"), "go on"]]} />
+            </>
+          ) : stage === "ask" ? null : stage === "end" ? <End receipt={receipt} queue={queue} onStart={() => start()} /> : queue.length ? <Start queue={queue} since={since} onStart={() => start()} onOpen={start} /> : <Empty />}
         </CoverCtx.Provider>
       </div>
       {card && <Drawer card={card} />}
