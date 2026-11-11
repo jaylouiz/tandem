@@ -69,14 +69,15 @@ none
 ## Branches
 
 - name: `<type>/<n>-<kebab-slug>`, type `fix|feat|test|docs|chore`
-- worktree notes: run `npm ci` in a new worktree (no symlinked node_modules)
+- worktree notes: run `npm ci` in a new worktree (no symlinked node_modules). In an EnterWorktree session the shell refuses compound commands (heredocs, inline scripts, pipes or loops around `git`/`gh`): one plain command per call, scripts and long bodies as files in the scratchpad
 
 ## Verification
 
 - gate command: `npm run verify` (typecheck, vitest, build, Playwright E2E on the built app with demo data)
 - E2E port: `E2E_PORT=<port> npm run e2e`; output outside the worktree: `E2E_OUT=<scratchpad>/e2e`
 - unit tests next to the code (`*.test.ts`); E2E in `e2e/`
-- E2E shares one fixture server, reset before every test (`e2e/fixtures.ts` auto-fixture → `POST /api/fixture/reset`, fixture mode only): specs import `test`/`expect` from `./fixtures.ts` (`npm run check:e2e-reset`), start from boot-state demo data and may change any Card; new demo Cards go in `src/core/fixtures.ts` (numbers are unit-tested unique); `--repeat-each` is safe on any test
+- E2E shares one fixture server, reset before every test (`e2e/fixtures.ts` auto-fixture → `POST /api/fixture/reset`, fixture mode only): specs import `test`/`expect` from `./fixtures.ts` (`npm run check:e2e-reset`), start from boot-state demo data and may change any Card; new demo Cards go in `src/core/fixtures.ts` (numbers are unit-tested unique); `--repeat-each` is safe on any test with `--workers=1` only (several workers reset the one server under each other: every test that writes fails at random)
+- E2E intercepts (`page.route`) go in before `page.goto`: one registered a few ms before the key or click that sends is not always in force yet, and the write reaches the server
 - anything that changes what Tandem writes to GitHub: a unit test asserting the exact comment text and that `parseMarker` returns null for it
 
 ## Pull requests
