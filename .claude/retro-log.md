@@ -8,6 +8,7 @@
 | 2026-11-04 | run_cf77613a627c (#26 + agent-workflow#17) | 524 / 29 | 371 / 26 | 870 | 1765 | no edits; W5 seen 2, still caught by the reviewer route every time |
 | 2026-11-05 | run_f7031804d2dd (22 issues, 15 PRs) | 524 / 29 | 388 / 26 | 900 | 1812 | run added ADR 0005 + routing lines (+73); convergence: CLAUDE.md routing detail trimmed (-26) |
 | 2026-11-06 | run_bc1b0b0183b1 (#63 #68 #38, 3 PRs) | 524 / 29 | 407 / 26 | 919 | 1850 | CLAUDE.md +1 line (fixture reset, from #68); no convergence needed; no friction lines logged |
+| 2026-11-11 | session b91b8147 (#3, PR #4: Focus, Feedback panels, static demo) | 617 / 33 | 526 / 30 | 938 | 2081 | CLAUDE.md +2 lines (build:demo, src/demo invariant), profile share line replaced; global file grew outside this repo since the last row; all under the 200-line budget, no convergence needed |
 
 ## Watch list
 | id | root cause | kind | target | seen | last | status |
@@ -23,3 +24,5 @@
 | W9 | a lead's own fix rounds push the diff over WF_REVIEW_LINES after it reported route=lead | rework | task-template lead step 3 | 1 | run_f7031804d2dd | watching: prep catches it |
 | W10 | coordinator command slips (unmarked gh issue comment, merge chained after prep, unquoted zsh var, next.sh output piped to head) | slip | orchestrate-gh-issues | 2 | run_bc1b0b0183b1 | watching: run_bc1b0b0183b1 repeated it (merge chained with `after`, next.sh piped to head); guard rule filed in agent-workflow inbox |
 | W11 | worktree without node_modules fails merge-pr.sh prep verify | tool-failure | issue-workflow.sh wf_verify | 1 | run_f7031804d2dd | fixed 2026-11-05 .claude/issue-workflow.sh wf_verify runs npm ci when node_modules is missing: expect no tsc-not-found in prep |
+| W12 | a preview deploy was asked for, the profile said "share: none" and the app needs a server; `vercel deploy --temporary` answers 403 | missing-instruction | issue-workflow.md Prototype share | 1 | session b91b8147 | fixed 2026-11-11 package.json build:demo + issue-workflow.md share line: expect the next preview to be a static deploy of dist/demo without a detour |
+| W13 | auto mode denies `gh issue create --label inbox` (External System Writes) though global CLAUDE.md requires inbox issues; `gh pr create/comment` pass | wait | ~/.claude settings (permission rule) | 1 | session b91b8147 | watching: findings went into the final report instead; act (allow rule) if seen again |
