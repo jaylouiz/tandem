@@ -20,6 +20,8 @@ import { useNoticeToasts } from "./notices.ts";
 import { useScrollMemory } from "./scroll.ts";
 import { blockerCount, groupsOf, openCard, reconnect, syncProgress, useAllCards, useCards, useLaneView, useStore, type LaneView, type View } from "./store.ts";
 import { ToastRegion } from "./ui/Toast.tsx";
+import { Prototype, Switcher } from "./prototype/index.tsx";
+import { useProto } from "./prototype/model.ts";
 
 const TITLES: Record<View, string> = { waiting: "Waiting on me", board: "Board", maps: "Wayfinder maps", settings: "Settings" };
 
@@ -119,6 +121,7 @@ export function App() {
   const lanes = useLaneView();
   const linger = useStore((s) => s.linger);
   const focus = useStore((s) => s.focus);
+  const proto = useProto((s) => s.on); // PROTOTYPE #8: ?variant= swaps the Waiting on me view
   const setFocus = useStore((s) => s.setFocus);
   const keyCtx = useMemo<KeyCtx>(() => {
     const groups = navGroups(view, cards, openDays, linger, lanes, focus);
@@ -242,7 +245,9 @@ export function App() {
           )}
         </header>
         <div className="content">
-          {split ? (
+          {split && proto ? (
+            <Prototype cards={cards} />
+          ) : split ? (
             <WaitingView cards={cards} />
           ) : (
           <div className="scroll" ref={scroller}>
@@ -281,6 +286,7 @@ export function App() {
       <Shortcuts />
       <DragGhost />
       <ToastRegion />
+      {proto && <Switcher />}
     </div>
   );
 }

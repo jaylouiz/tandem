@@ -9,6 +9,9 @@ import "./styles.css";
 try {
   const theme = localStorage.getItem("tandem.theme");
   if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  // PROTOTYPE #8: ?theme=dark|light for shared links and screenshots
+  const asked = new URLSearchParams(location.search).get("theme");
+  if (asked === "light" || asked === "dark") document.documentElement.dataset.theme = asked;
 } catch {}
 
 startRouting();

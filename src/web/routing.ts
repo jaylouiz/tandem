@@ -16,7 +16,11 @@ function flush() {
   const mode = due;
   due = null;
   if (!mode) return;
-  const url = formatRoute(useStore.getState());
+  let url = formatRoute(useStore.getState());
+  // PROTOTYPE #8: the prototype's own parameters survive the app's URL sync
+  const q = new URLSearchParams(location.search);
+  const keep = ["variant", "state", "fail", "at", "theme"].filter((p) => q.has(p)).map((p) => `${p}=${encodeURIComponent(q.get(p)!)}`);
+  if (keep.length) url += (url.includes("?") ? "&" : "?") + keep.join("&");
   if (url === here()) return;
   history[mode === "push" ? "pushState" : "replaceState"](null, "", BASE + url);
 }
