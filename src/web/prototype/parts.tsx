@@ -1,5 +1,5 @@
 // PROTOTYPE (issue #8): the pieces the three variants share. Each variant composes them differently; none of this is production code.
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { create } from "zustand";
 import { KIND_LABEL, kindOf, sinceOf } from "../../core/ask.ts";
 import type { PrVerdict } from "../../core/contract.ts";
@@ -89,20 +89,21 @@ export function Meta({ card, link }: { card: Card; link?: boolean }) {
 }
 
 /** The options of a decision or the verdicts of a PR as tiles: a choice between a few things, side by side. */
-export function Tiles({ card, ask, dense }: { card: Card; ask: Ask; dense?: boolean }) {
+export function Tiles({ card, ask, dense, onPick, writes }: { card: Card; ask: Ask; dense?: boolean; onPick?: (n: number) => void; writes?: (n: number) => string | null }) {
   const d = useDraftOf(card.key);
   return (
     <div className="pv-tiles" data-dense={dense || undefined} role="group" aria-label={ask.kind === "pr-approval" ? "Verdict" : "Options"} style={{ "--n": ask.options.length } as React.CSSProperties}>
       {ask.options.map((o, i) => {
         const on = isPicked(ask, d, o.key, o.raw);
         return (
-          <button key={o.key} className="pv-tile" aria-pressed={on} onClick={() => pick(card, i + 1)}>
+          <button key={o.key} className="pv-tile" aria-pressed={on} onClick={() => (onPick ? onPick(i + 1) : pick(card, i + 1))}>
             <span className="pv-tile-top">
               <kbd>{i + 1}</kbd>
               <b>{ask.kind === "pr-approval" ? o.raw : o.key}</b>
               {on && <Check />}
             </span>
             <span className="pv-tile-text">{o.text}</span>
+            {writes && <code className="pv-tile-writes">{writes(i + 1) ?? "needs your note"}</code>}
             {o.recommended && (
               <span className="pv-rec">
                 <i aria-hidden />
@@ -221,7 +222,7 @@ export function ViewTools({ ask, preview }: { ask: Ask; preview: string | null }
 }
 
 /** The images of a round: the shown variant at real size, or all variants side by side. Picking happens on the image. */
-export function RoundImages({ card, ask }: { card: Card; ask: Ask }) {
+export function RoundImages({ card, ask, onPick, onReject, sends }: { card: Card; ask: Ask; onPick?: (n: number) => void; onReject?: (key: string) => void; sends?: boolean }) {
   const d = useDraftOf(card.key);
   const { shown, viewport, compare, set } = useView();
   const list = compare ? ask.options : ask.options.slice(shown, shown + 1);
@@ -242,10 +243,10 @@ export function RoundImages({ card, ask }: { card: Card; ask: Ask }) {
             )}
             {shot ? <Shot shot={shot} /> : <div className="muted">No screenshot of this variant.</div>}
             <div className="pv-image-acts">
-              <button className={`btn ${state === "picked" ? "selected" : ""}`} aria-pressed={state === "picked"} onClick={() => pick(card, i + 1)}>
-                Pick {o.key} <kbd>{i + 1}</kbd>
+              <button className={`btn ${state === "picked" ? "selected" : ""}`} aria-pressed={state === "picked"} onClick={() => (onPick ? onPick(i + 1) : pick(card, i + 1))}>
+                {sends ? `Send pick ${o.key}` : `Pick ${o.key}`} <kbd>{i + 1}</kbd>
               </button>
-              <button className={`btn ${state === "rejected" ? "selected" : ""}`} aria-pressed={state === "rejected"} onClick={() => reject(card, o.key)}>
+              <button className={`btn ${state === "rejected" ? "selected" : ""}`} aria-pressed={state === "rejected"} onClick={() => (onReject ? onReject(o.key) : reject(card, o.key))}>
                 Reject {compare ? o.key : <kbd>x</kbd>}
               </button>
             </div>
@@ -298,20 +299,19 @@ export function Checks({ ask }: { ask: Ask }) {
 }
 
 /** The note: closed until asked for (key n), so a pick-and-send Card shows no empty field. */
-export function Note({ card, always, placeholder }: { card: Card; always?: boolean; placeholder?: string }) {
+export function Note({ card, always, placeholder, addLabel }: { card: Card; always?: boolean; placeholder?: string; addLabel?: string }) {
   const d = useDraftOf(card.key);
   const edit = useProto((s) => s.edit);
   const ref = useRef<HTMLTextAreaElement>(null);
   const open = always || d.noteOpen || !!d.note;
-  const wasOpen = useRef(open);
-  useEffect(() => {
-    if (open && !wasOpen.current) ref.current?.focus();
-    wasOpen.current = open;
-  }, [open]);
   if (!open)
     return (
-      <button className="btn ghost pv-note-add" onClick={() => edit(card.key, { noteOpen: true })}>
-        Add a note <kbd>n</kbd>
+      <button className="btn ghost pv-note-add" onClick={() => {
+          edit(card.key, { noteOpen: true });
+          requestAnimationFrame(() => ref.current?.focus());
+        }}
+      >
+        {addLabel ?? "Add a note"} <kbd>n</kbd>
       </button>
     );
   return (

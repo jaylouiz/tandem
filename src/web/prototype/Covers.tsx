@@ -6,13 +6,28 @@ import type { Card } from "../../core/types.ts";
 import { Btn, KindGlyph, Markdown, RepoTag, Stepper, ago } from "../components/bits.tsx";
 import { useStore } from "../store.ts";
 import { askKeys, variantKeys } from "./keys.ts";
-import { SINCE, askOfCard, isDone, nextOpen, send, useProto, whyNot, type AskKind } from "./model.ts";
-import { Checks, Facts, Failure, LookImage, Meta, Note, PushToggle, Receipt, RoundImages, Tiles, VariantTabs, ViewTools, Written, tallyOf, useDraftOf, useView } from "./parts.tsx";
+import { EMPTY, SINCE, askOfCard, isDone, literal, nextOpen, send, useProto, whyNot, type AskKind } from "./model.ts";
+import { Checks, Facts, Failure, LookImage, Meta, Note, PushToggle, Receipt, RoundImages, Tiles, VariantTabs, ViewTools, Written, reject, tallyOf, useDraftOf, useView } from "./parts.tsx";
 
 const MANY: Record<AskKind, [string, string]> = { "pr-approval": ["PR approval", "PR approvals"], decision: ["Decision", "Decisions"], "design-round": ["Design round", "Design rounds"], look: ["to look at", "to look at"] };
 
-function Body({ card }: { card: Card }) {
+/** Round 2: a click on an option (or its digit) sends it at once. With a note open, options only pick and Send writes. */
+interface Direct {
+  onPick: (n: number) => void;
+  onReject: (key: string) => void;
+}
+
+/** The comment a click on option n writes, without a note. */
+function writesOf(card: Card, n: number): string | null {
   const ask = askOfCard(card);
+  const o = ask.options[n - 1];
+  if (!o) return null;
+  return literal(card, { ...EMPTY, choice: ask.kind === "decision" ? o.raw : null, verdict: ask.kind === "pr-approval" ? (o.key as "approve") : null });
+}
+
+function Body({ card, onPick, onReject }: { card: Card } & Direct) {
+  const ask = askOfCard(card);
+  const noting = useDraftOf(card.key).noteOpen;
   if (ask.kind === "design-round")
     return (
       <div className="pv-cover-wide" data-kind={ask.kind}>
@@ -25,9 +40,9 @@ function Body({ card }: { card: Card }) {
         </div>
         <VariantTabs card={card} ask={ask} />
         <div className="pv-stage">
-          <RoundImages card={card} ask={ask} />
+          <RoundImages card={card} ask={ask} onPick={noting ? undefined : onPick} onReject={noting ? undefined : onReject} sends={!noting} />
         </div>
-        <Note card={card} />
+        <Note card={card} addLabel="React with a comment, or pick and reject several" />
       </div>
     );
   if (ask.kind === "look")
@@ -49,16 +64,17 @@ function Body({ card }: { card: Card }) {
       <Meta card={card} />
       <h1 className="pv-question">{ask.question}</h1>
       {ask.kind === "pr-approval" && <Facts card={card} ask={ask} />}
-      <Tiles card={card} ask={ask} />
-      <Note card={card} />
+      <Tiles card={card} ask={ask} onPick={noting ? undefined : onPick} writes={noting ? undefined : (n) => writesOf(card, n)} />
+      <Note card={card} addLabel={ask.kind === "pr-approval" ? "Send with a note" : "Answer with a note"} />
     </div>
   );
 }
 
-function SendBar({ card, onSend, onSeen }: { card: Card; onSend: () => void; onSeen: () => void }) {
+function SendBar({ card, onSend, onSeen, onCancel }: { card: Card; onSend: () => void; onSeen: () => void; onCancel: () => void }) {
   const d = useDraftOf(card.key);
   const st = useProto((s) => s.status[card.key]);
   const look = kindOf(card) === "look";
+  const noting = d.noteOpen;
   return (
     <div className="pv-sendbar" data-status={st}>
       {st === "failed" ? (
@@ -68,8 +84,10 @@ function SendBar({ card, onSend, onSeen }: { card: Card; onSend: () => void; onS
           <span className="pv-written-label">Seen stays in Tandem</span>
           <span className="faint">Nothing is written to GitHub. The Card leaves the Board 7 days after it is Seen.</span>
         </div>
-      ) : (
+      ) : noting ? (
         <Written card={card} />
+      ) : (
+        <div className="pv-sendbar-hint">{st === "sending" ? "Sending…" : kindOf(card) === "design-round" ? "A pick sends at once. To reject, pick several or comment, react with a comment." : "A click or its digit sends at once. Each option shows the comment it writes."}</div>
       )}
       <span className="spacer" />
       {look ? (
@@ -79,9 +97,16 @@ function SendBar({ card, onSend, onSeen }: { card: Card; onSend: () => void; onS
       ) : (
         <>
           <PushToggle card={card} />
-          <Btn className="btn primary big" why={st === "sending" ? "Sending" : whyNot(card, d)} onClick={onSend}>
-            {st === "sending" ? "Sending…" : st === "failed" ? "Send again" : "Send"} <kbd>⌘↵</kbd>
-          </Btn>
+          {noting && st !== "failed" && (
+            <button className="btn big" onClick={onCancel}>
+              Cancel <kbd>esc</kbd>
+            </button>
+          )}
+          {(noting || st === "failed") && (
+            <Btn className="btn primary big" why={st === "sending" ? "Sending" : whyNot(card, d)} onClick={onSend}>
+              {st === "sending" ? "Sending…" : st === "failed" ? "Send again" : "Send with note"} <kbd>⌘↵</kbd>
+            </Btn>
+          )}
         </>
       )}
     </div>
@@ -194,11 +219,36 @@ export function Covers({ queue }: { queue: Card[] }) {
     mark(card.key, "seen");
     advance(card);
   };
+  /** a click or a digit outside note mode: this option is the whole answer and goes out at once (Send back first asks for its note) */
+  const direct = (n: number) => {
+    if (!card) return;
+    const st = useProto.getState();
+    if (st.status[card.key] === "sending" || isDone(st.status[card.key])) return;
+    const ask = askOfCard(card);
+    const o = ask.options[n - 1];
+    if (!o) return;
+    const base = { ...EMPTY, push: (st.drafts[card.key] ?? EMPTY).push };
+    if (ask.kind === "pr-approval" && o.key === "send-back") {
+      st.edit(card.key, { ...base, verdict: "send-back", noteOpen: true });
+      requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>("[data-note]")?.focus());
+      return;
+    }
+    st.edit(card.key, ask.kind === "decision" ? { ...base, choice: o.raw } : ask.kind === "pr-approval" ? { ...base, verdict: o.key as "approve" } : { ...base, picks: [o.key] });
+    if (ask.kind === "design-round") useView.getState().set({ shown: n - 1 });
+    doSend();
+  };
+  const rejectWithNote = (key: string) => {
+    if (!card) return;
+    useProto.getState().edit(card.key, { noteOpen: true });
+    reject(card, key);
+  };
+  const cancelNote = () => card && useProto.getState().clear(card.key);
   const go = (dir: 1 | -1) => {
     const next = queue[idx + dir];
     if (next) open(next.key);
   };
 
+  const noting = !!card && (useProto.getState().drafts[card.key] ?? EMPTY).noteOpen;
   variantKeys.current = (e, typing) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       doSend();
@@ -224,7 +274,14 @@ export function Covers({ queue }: { queue: Card[] }) {
         return useView.getState().set({ details: !details }), true;
       case "Escape":
         if (details) return useView.getState().set({ details: false }), true;
+        if (noting) return cancelNote(), true;
         return useProto.setState({ started: false, current: null }), true;
+    }
+    if (!noting && /^[1-9]$/.test(e.key)) return direct(Number(e.key)), true;
+    if (!noting && e.key === "x" && kindOf(card) === "design-round") {
+      const o = askOfCard(card).options[useView.getState().shown];
+      if (o) rejectWithNote(o.key);
+      return true;
     }
     return askKeys(e, card);
   };
@@ -271,23 +328,27 @@ export function Covers({ queue }: { queue: Card[] }) {
         </button>
       </div>
       <div className="pv-cover" key={card.key}>
-        <Body card={card} />
+        <Body card={card} onPick={direct} onReject={rejectWithNote} />
         {details && <Details card={card} />}
       </div>
-      <SendBar card={card} onSend={doSend} onSeen={doSeen} />
+      <SendBar card={card} onSend={doSend} onSeen={doSeen} onCancel={cancelNote} />
       <div className="pv-legend faint">
         {kind === "look" ? (
           <>
             <kbd>l</kbd> Mark Seen
           </>
+        ) : noting ? (
+          <>
+            <kbd>1–{askOfCard(card).options.length}</kbd> pick <kbd>⌘↵</kbd> send <kbd>esc</kbd> cancel the note
+          </>
         ) : kind === "design-round" ? (
           <>
-            <kbd>1–3</kbd> pick <kbd>x</kbd> reject <kbd>[</kbd>
-            <kbd>]</kbd> variant <kbd>n</kbd> note <kbd>⌘↵</kbd> send
+            <kbd>1–3</kbd> send that pick <kbd>[</kbd>
+            <kbd>]</kbd> variant <kbd>c</kbd> side by side <kbd>n</kbd> comment
           </>
         ) : (
           <>
-            <kbd>1–{askOfCard(card).options.length}</kbd> pick <kbd>n</kbd> note <kbd>⌘↵</kbd> send
+            <kbd>1–{askOfCard(card).options.length}</kbd> send <kbd>n</kbd> with a note
           </>
         )}
         <kbd>→</kbd> skip

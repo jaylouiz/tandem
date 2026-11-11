@@ -42,6 +42,9 @@ body:has(.pv-switch) #root { height: calc(100% - var(--pv-switch)); }
 .pv-tile-top b { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.02em; }
 .pv-tile-top .pv-check { margin-left: auto; }
 .pv-tile-text { font-size: var(--fs-lg); line-height: 1.35; letter-spacing: -0.012em; color: var(--text); text-wrap: pretty; }
+.pv-tile-writes { align-self: flex-start; font-family: var(--mono); font-size: var(--fs-sm); padding: 2px 6px; border-radius: var(--radius); background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); color: var(--text-muted); }
+.pv-tile-writes + .pv-rec { margin-top: var(--s-2); }
+.pv-sendbar-hint { display: flex; align-items: center; gap: var(--s-2); color: var(--text-muted); }
 .pv-rec { margin-top: auto; display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-muted); }
 .pv-rec i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .pv-tiles[data-dense] .pv-tile { min-height: 0; padding: var(--s-3); }
