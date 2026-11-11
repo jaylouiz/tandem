@@ -3,7 +3,7 @@
 <title>Tandem demo</title>
 <script>
   // Deep links into a preview (/tandem/pr-4/waiting/…) have no file: hand them to that preview's app, which reads the path it was asked for.
-  const m = location.pathname.match(/^\/tandem\/(pr-\d+)\//);
+  const m = location.pathname.match(/^\/tandem\/((?:pr|proto)-\d+)\//);
   if (m) location.replace(`/tandem/${m[1]}/?__path=${encodeURIComponent(location.pathname + location.search)}`);
 </script>
-<p>Nothing here. Previews live under <code>/tandem/pr-&lt;number&gt;/</code>.</p>
+<p>Nothing here. Previews live under <code>/tandem/pr-&lt;number&gt;/</code> and <code>/tandem/proto-&lt;issue&gt;/</code>.</p>
