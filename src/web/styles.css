@@ -1520,10 +1520,10 @@ button.done-head:hover { background: var(--bg-hover); color: var(--text); }
 .focus .spacer { flex: 1; }
 .focus-top { flex-shrink: 0; display: flex; align-items: center; gap: var(--s-3); min-height: 44px; padding: var(--s-2) var(--s-5) 0; }
 .focus-mode { font-weight: 600; }
-/* one pip per Card, a gap where the kind changes; each is a 20px target around a 4px bar */
-.focus-pips { flex: 1; min-width: 0; display: flex; align-items: center; gap: 3px; height: 20px; }
-.focus-pips button { flex: 1 1 0; min-width: 3px; max-width: 72px; height: 20px; padding: 0; border: 0; background: none; position: relative; }
-.focus-pips button::after { content: ""; position: absolute; inset: 8px 0; border-radius: 2px; background: var(--border-strong); }
+/* one pip per Card, a gap where the kind changes; each is a 24px-high target (WCAG 2.5.8) around a 4px bar */
+.focus-pips { flex: 1; min-width: 0; display: flex; align-items: center; gap: 3px; height: 24px; }
+.focus-pips button { flex: 1 1 0; min-width: 3px; max-width: 72px; height: 24px; padding: 0; border: 0; background: none; position: relative; }
+.focus-pips button::after { content: ""; position: absolute; inset: 10px 0; border-radius: 2px; background: var(--border-strong); }
 .focus-pips button:hover:not([aria-disabled="true"])::after { background: var(--edge); }
 .focus-pips button[data-state="done"]::after { background: var(--text-faint); }
 .focus-pips button[data-state="now"]::after { background: var(--accent); }

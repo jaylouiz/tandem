@@ -53,7 +53,7 @@ The set of Cards blocked on the developer's Feedback (decision request, design r
 _Avoid_: notifications, queue
 
 **Focus**:
-Waiting on me, one Card at a time: the list steps aside and each ask is shown alone, the blockers first, then the unseen Looks. Giving Feedback or marking Seen moves on to the next Card; passing a Look does not mark it Seen. Started from the list (key `f`), left with `esc`.
+Waiting on me, one Card at a time: the list steps aside and each ask is shown alone, the blockers first, then the unseen Looks. In Focus an option sends when it is clicked or its digit is pressed, and shows beforehand the comment it will write; an answer with a note is sent from the note. Giving Feedback or marking Seen moves on to the next Card; passing a Look does not mark it Seen. Started from the list (key `f`), left with `esc`.
 _Avoid_: review mode, slideshow, wizard
 
 **Agent decision**:
