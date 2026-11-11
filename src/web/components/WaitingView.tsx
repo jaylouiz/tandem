@@ -9,7 +9,7 @@ import { keyOf } from "../keys.ts";
 import { clickRow } from "../select.ts";
 import { useScrollMemory } from "../scroll.ts";
 import { blockerCount, groupsOf, useAllCards, useStore } from "../store.ts";
-import { Focus } from "./Focus.tsx";
+import { Focus } from "./focus/Focus.tsx";
 import { Tooltip } from "../ui/Tooltip.tsx";
 import { CardPane } from "./CardPane.tsx";
 import { Age, KindChip, KindGlyph, RepoTag, shortRepo } from "./bits.tsx";

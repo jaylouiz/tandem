@@ -44,6 +44,12 @@ typography:
     fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
     fontSize: "11px"
     fontWeight: 500
+  cover:
+    fontFamily: "Inter Variable, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "32px"
+    fontWeight: 600
+    lineHeight: 1.15
+    letterSpacing: "-0.03em"
 rounded:
   xs: "2px"
   sm: "4px"
@@ -108,7 +114,7 @@ Dark theme is the same token names re-valued through `light-dark()`: one definit
 
 Inter Variable, self-hosted via `@fontsource-variable/inter` (Latin and Latin-ext subsets, no runtime CDN). One family does everything; mono (`ui-monospace`) is only for code, ids in the Decided list and logs.
 
-- **Scale (tight, ~1.125):** 11 micro (kbd, chips) / 12 label (meta, group heads) / 13 body / 15 heading (open-question title, command input) / 18 Card title / 24 display (the one Card of Focus and its end, nowhere else). Fixed px, never fluid.
+- **Scale (tight, ~1.125):** 11 micro (kbd, chips) / 12 label (meta, group heads) / 13 body / 15 heading (open-question title, command input) / 18 Card title / 24 display (in Focus: the question of a design round or a Look, beside its screenshot) / 32 cover (the question of the one ask on screen in Focus, its start and its end, nowhere else; 28 at 1100px and below, `--fs-cover`). Fixed px, never fluid.
 - **Weights:** 400 body, 500 for interactive labels and titles in rows, 600 for headings and group heads.
 - **Tracking:** body `-0.006em`, headings `-0.012em` to `-0.02em`; Card title uses `text-wrap: balance`.
 - **Numerals:** `tabular-nums` on counts, ages, ids and key caps so columns align.
@@ -126,7 +132,7 @@ Layered, not flat. Shadows always carry an offset and a soft blur, tinted by `--
 - **elev-2:** floats above it (hovered Card, the open question in the Card pane).
 - **elev-3:** over the app (dialogs, palette, toast).
 - The aside Card pane casts a soft shadow onto the board; the Board columns are wells one step below the canvas.
-- **Named rule, One Raised Thing.** In a Card pane exactly one block is raised: the question waiting for the developer. Everything else is a quiet group separated by a hairline.
+- **Named rule, One Raised Thing.** In a Card pane exactly one block is raised: the question waiting for the developer. Everything else is a quiet group separated by a hairline. It does not apply in Focus: there the ask is the whole screen and its options are tiles, each raised like a Card on the Board (elev-1).
 
 ## Shapes
 
@@ -141,9 +147,16 @@ Layered, not flat. Shadows always carry an offset and a soft blur, tinted by `--
 - **Sticky heads:** Board column heads, Waiting on me group heads and Done's To look at and day heads stay while their Cards scroll; day heads stick under the column head (`--stick`). The sidebar and Repo counts are Waiting on me only (blockers), To look at is not counted.
 - **Selection bar:** one raised (elev-3) bar floating centred above the bottom edge of the content, never inside a column; the single primary button is Move to Backlog. At 1100px and below it drops the picker label and key caps to stay one row. While dragging, only the columns where the dragged Cards would move are drop targets (`accent-soft` when under the pointer); every other column dims and says why on hover (the reason `moveBlocked` gives: an agent-owned Phase, "Not applicable: Build", "Already in Inbox"). Held within 56px of the Board's edge (below the sticky head row grouped by repo) the drag scrolls it, faster the closer to the edge.
 - **Row (Waiting):** 26px kind glyph box, title with the age at its right, then repo and the one-line ask across the full width. The glyph carries the kind by shape and colour; its name is in the row for assistive tech only (no chip: it cost the ask half its width). Selected is `active` fill only.
-- **Start (Waiting, nothing open):** the right pane says how much waits, by kind, and holds the view's one primary button: Go through them one by one (Focus).
-- **Feedback panel:** every kind reads the same way: the question as the heading, one quiet line of facts and links (id, "waiting 3h", Open prototype), numbered options (`1`-`9` pick, never send), the note, then Push and the single primary Send with its `⌘↵` cap. A PR's verdicts are options like a decision's, each with what it sets off. A design round is one block per variant (name, summary, Pick, Reject, its screenshots), hairlines between; a rejected variant dims.
-- **Focus:** a recessed stage (`sidebar` surface) with one raised sheet (elev-3, 12px): the Card with its tabs, without triage and status. Above it a row of pips (done: `ink-faint`, current: accent, ahead: hairline) and "5 of 25"; left and right round step buttons; below, the keys and Up next. The sheet's width never changes between Cards; its height follows the content. The open question lies flat on the sheet (One Raised Thing). A success toast per answer is not shown here: the next Card and the pips say it. The sheet comes in from the side it was called from (240ms); the end draws a check once.
+- **Start (Waiting, nothing open):** the right pane says how much waits, by kind, and holds the view's one primary button: Go through them one by one (Focus). Focus has a start of its own: the count as a cover-size headline ("16 Cards wait on you", or "3 new since 14:20" after an earlier visit), the kinds in one line, the primary Start beside it, then every ask as a row (kind glyph, kind, title, the one-line ask, repo, age); older open asks follow under "Still waiting".
+- **Feedback panel (Card pane: the list and the Board):** every kind reads the same way: the question as the heading, one quiet line of facts and links (id, "waiting 3h", Open prototype), numbered options (`1`-`9` pick, never send), the note, then Push and the single primary Send with its `⌘↵` cap. A PR's verdicts are options like a decision's, each with what it sets off. A design round is one block per variant (name, summary, Pick, Reject, its screenshots), hairlines between; a rejected variant dims.
+- **Focus ("Covers"):** Focus takes the window: the sidebar and the top bar step aside, the `sidebar` surface is the ground. One ask per screen, composed for its kind (a cover), not the Card pane. Top strip: "Focus", one pip per Card with a gap where the kind changes (done: `ink-faint`, current: accent, not sent: `danger`, ahead: hairline; a pip jumps to its Card), "2 of 9", Card `e`, Overview `esc`. The Card's chrome is one line (kind, repo and number, title, how long it waits); Phase, issue text, agent decisions and earlier answers are in a drawer (a dialog on the right edge, elev-3, the Card pane without its Now tab).
+  - *Decision:* the question in the cover size, the options as tiles side by side (panel surface, elev-1, 10px; an accent ring and `accent-soft` when picked): key cap, option key, its text, the comment it writes as a mono chip, the agent's recommendation as a quiet line with an accent dot.
+  - *PR approval:* the question, then up to three fact columns (Why it stopped, Verification, Review; a 6px tone dot per line, "Nothing reported" when the PR body has no such section) and the link to the diff, then three verdict tiles.
+  - *Design round:* the question at the display size with the tools at its right (Side by side `t`, viewport `v`, Open prototype), variant tabs, then the stage (`active` surface, 10px): the shown variant's screenshot at its real size, never scaled up, scaled down only to the width there is. The two reactions float over the image (the one primary: Send pick); side by side shows every variant with its own.
+  - *Look:* the stage (its states as tabs) and a 320px side column (256px at 1100px and below): headline, What to check, viewport and Open preview.
+  - *Send bar and key line* (panel surface, a hairline above): what a click does here, or with a note open "Writes on app#127" and the comment as a mono chip, Push, Cancel and the primary Send with note; a failed send shows "Not sent." and the reason in `danger-soft` and offers Send again. Under it one line of the keys that apply now, and Up next.
+  - *Rules:* in Focus an option sends on a click or its digit (`1`-`9` send, they do not pick), and every option shows beforehand the comment it will write; with the note open options only pick and ⌘↵ sends. The ask stays, saying "Sending…", until the write is through. A held key acts once. An ask that leaves the queue any other way than by the developer's own answer (answered elsewhere, withdrawn) is never replaced under their hands: the screen says "This ask is no longer open" and waits for Go on. An unchecked item of a PR's Verification or Review list reads "Not done:" with a hollow `danger` mark, never like the filled `ok` dot beside it. A success toast per answer is not shown: the next ask and the pips say it; a failure is said in the Send bar, not in a toast. Motion: one 220ms entrance per ask, and the end draws its check once.
+  - *End:* "All clear", the tally, and the receipt: one row per Card with the comment that was written (mono chip) and what it set off, or "Marked Seen". Nothing waiting: the same check, "Nothing waits on you", Open the Board and Agent activity.
 - **Inputs:** `edge` ring, accent ring plus 4px soft halo on focus.
 - **Icons:** drawn SVG, 1.4-1.5px stroke, one family (`bits.tsx`). No unicode arrows or glyphs as icons.
 - **Browser surfaces:** selection, caret, checkbox (`accent-color`), scrollbars and placeholders are themed from the tokens.

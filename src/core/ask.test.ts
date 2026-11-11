@@ -40,6 +40,23 @@ describe("kindOf / askOf", () => {
   });
 });
 
+describe("splitNew (the start of Focus after an earlier visit)", () => {
+  it("splits the asks into those that began after Focus was last left and those open before, keeping the order", async () => {
+    const { splitNew } = await import("./ask.ts");
+    const cards = [card(106), card(127), card(105), card(108)]; // waiting 2h, 19h, 3h; the Look closed 4h before `now`
+    const since = new Date(now - 5 * 3_600_000).toISOString();
+    const { fresh, older } = splitNew(cards, since);
+    expect(fresh.map((c) => c.number)).toEqual([106, 105, 108]);
+    expect(older.map((c) => c.number)).toEqual([127]);
+  });
+  it("calls nothing new on the first visit, or when the kept time is unreadable", async () => {
+    const { splitNew } = await import("./ask.ts");
+    const cards = [card(106), card(127)];
+    expect(splitNew(cards, null)).toEqual({ fresh: [], older: cards });
+    expect(splitNew(cards, "not a date")).toEqual({ fresh: [], older: cards });
+  });
+});
+
 describe("tally (the end of Focus)", () => {
   it("counts Looks as marked Seen and every other kind as answered", async () => {
     const { tally } = await import("./ask.ts");

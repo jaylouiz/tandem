@@ -1,12 +1,14 @@
 // One panel per kind of Feedback (brief jobs 2-5, 10). Each writes what the workflow writes and Pushes
 // unless the developer unticks Push for this piece of Feedback. Every panel is pick-then-send, by mouse and by keys:
 // a click or a digit only picks, the Send button or ⌘↵ writes. What was typed and picked is a draft in the store
-// (per Card + request, `useDraft`): it survives Card switches and snapshots, goes when the send succeeded.
+// (per Card + request, `useDraft`): it survives Card switches and snapshots, goes when the send succeeded. What an answer is and how
+// it is sent lives in `feedback/answers.ts`, shared with the covers of Focus (where a click on an option sends).
 import { useEffect, useRef, useState } from "react";
 import { buildNav, type ShotGroup, type ShotNav } from "../../core/gallery.ts";
 import type { Card, DesignRound, LookNote, Screenshot } from "../../core/types.ts";
-import { AGENT_DRAFT_ID, draftKey, prDraftId, roundDraftId } from "../../core/drafts.ts";
-import { panelKeys, type PanelChoice, type PanelExtra, type PanelKeys } from "../panelKeys.ts";
+import { AGENT_DRAFT_ID, draftKey } from "../../core/drafts.ts";
+import { VERDICTS, useDecisionAnswer, usePrVerdict, useRoundReaction } from "../feedback/answers.ts";
+import { useRegisterPanel, type PanelSpec } from "../feedback/panel.ts";
 import { giveFeedback, useDraft, useStore, type Tab } from "../store.ts";
 import { Gallery, ShotImg, type Reaction } from "./Gallery.tsx";
 import { keyOf } from "../keys.ts";
@@ -14,8 +16,6 @@ import { Btn, Ext, Markdown, ago } from "./bits.tsx";
 
 /** The key cap of ⌘↵ inside every panel's Send button: the one way to send is always in view. */
 const SendKey = () => <kbd aria-hidden>{keyOf("send-feedback")}</kbd>;
-
-const done: Partial<Card> = { waiting: null, awaitingPickup: true };
 
 function PushToggle({ push, setPush }: { push: boolean; setPush: (p: boolean) => void }) {
   return (
@@ -25,41 +25,10 @@ function PushToggle({ push, setPush }: { push: boolean; setPush: (p: boolean) =>
   );
 }
 
-/** What a panel tells the keys and the palette about itself. */
-interface PanelSpec {
-  pick: (n: number) => void;
-  send: () => void;
-  choices: PanelChoice[];
-  canSend: boolean;
-  /** buttons without a key besides Push (Reject a variant) */
-  extras?: PanelExtra[];
-  push: boolean;
-  setPush: (p: boolean) => void;
-}
-
 /** Register this panel's number keys (`1`-`9`), ⌘↵ and its other actions for the window handler and the palette while it is mounted and its tab is open. */
 function usePanelKeys(cardKey: string, spec: PanelSpec, tabId: Tab = "now") {
-  const latest = useRef(spec);
-  latest.current = spec;
   const open = useStore((s) => s.tab === tabId);
-  useEffect(() => {
-    if (!open) return;
-    const keys: PanelKeys = {
-      cardKey,
-      pick: (n) => latest.current.pick(n),
-      send: () => latest.current.send(),
-      choices: () => latest.current.choices,
-      extras: () => [
-        ...(latest.current.extras ?? []),
-        { id: "push", label: latest.current.push ? "Push this Feedback: turn off" : "Push this Feedback: turn on", run: () => latest.current.setPush(!latest.current.push) },
-      ],
-      canSend: () => latest.current.canSend,
-    };
-    panelKeys.current = keys;
-    return () => {
-      if (panelKeys.current === keys) panelKeys.current = null;
-    };
-  }, [cardKey, open]);
+  useRegisterPanel(cardKey, spec, open);
 }
 
 const submitKeys = (e: React.KeyboardEvent, go: () => void) => {
@@ -87,14 +56,7 @@ function PanelHead({ question, id, since, children }: { question: string; id?: s
 }
 
 export function DecisionPanel({ card }: { card: Card }) {
-  const req = card.requests.find((r) => r.id === card.waiting?.requestId);
-  const dKey = draftKey(card.key, req?.id ?? "");
-  const [{ choice, text, push }, edit] = useDraft(dKey, { choice: null as string | null, text: "", push: true });
-  const answer = [choice?.split(":")[0]?.trim(), text.trim()].filter(Boolean).join(". ");
-  const send = async () => {
-    if (!req || !answer) return;
-    if (await giveFeedback(card, "answer", { requestId: req.id, answer, push }, done)) useStore.getState().clearDraft(dKey);
-  };
+  const { req, choice, text, push, edit, canSend, send } = useDecisionAnswer(card);
   const clip = (o: string) => (o.length > 60 ? `${o.slice(0, 59)}…` : o);
   usePanelKeys(card.key, {
     pick: (n) => {
@@ -103,7 +65,7 @@ export function DecisionPanel({ card }: { card: Card }) {
     },
     send: () => void send(),
     choices: (req?.options ?? []).map((o, i) => ({ n: i + 1, label: `Choose ${clip(o)}`, on: choice === o })),
-    canSend: !!answer,
+    canSend,
     push,
     setPush: (p) => edit({ push: p }),
   });
@@ -136,12 +98,12 @@ export function DecisionPanel({ card }: { card: Card }) {
         placeholder="Answer or add a note (⌘↵ to send)"
         value={text}
         onChange={(e) => edit({ text: e.target.value })}
-        onKeyDown={(e) => submitKeys(e, send)}
+        onKeyDown={(e) => submitKeys(e, () => void send())}
       />
       <div className="actions">
         <PushToggle push={push} setPush={(p) => edit({ push: p })} />
         <span className="spacer" />
-        <Btn className="btn primary" why={answer ? null : req.options.length ? "Pick an option or write an answer" : "Write an answer"} onClick={send}>
+        <Btn className="btn primary" why={canSend ? null : req.options.length ? "Pick an option or write an answer" : "Write an answer"} onClick={() => void send()}>
           Answer <SendKey />
         </Btn>
       </div>
@@ -311,25 +273,19 @@ function ThumbRow({ nav, group, set, src, onOpen }: { nav: ShotNav; group: ShotG
 const roundSet = (r: DesignRound): ShotSet => ({ commentId: r.commentId, commentUrl: r.url, shots: r.screenshots });
 
 export function RoundPanel({ card, round, src, openSignal }: { card: Card; round: DesignRound; src: ShotSources; openSignal?: number }) {
-  const dKey = draftKey(card.key, roundDraftId(round.round));
-  const [{ picks, rejects, text, push }, edit] = useDraft(dKey, { picks: [] as string[], rejects: [] as string[], text: "", push: true });
+  const { picks, rejects, text, push, edit, toggle, canSend, send } = useRoundReaction(card, round);
   const gallery = useGallery(openSignal, round.screenshots.length);
-  const toggle = (list: string[], field: "picks" | "rejects", k: string) => edit({ [field]: list.includes(k) ? list.filter((x) => x !== k) : [...list, k] });
-  const canSend = !!(picks.length || rejects.length || text.trim());
-  const send = async () => {
-    if (canSend && (await giveFeedback(card, "round", { round: round.round, picks, rejects, comment: text, push }, done))) useStore.getState().clearDraft(dKey);
-  };
   usePanelKeys(card.key, {
     pick: (n) => {
       const v = round.variants[n - 1];
-      if (v) toggle(picks, "picks", v.key);
+      if (v) toggle("picks", v.key);
     },
     send: () => void send(),
     choices: round.variants.map((v, i) => ({ n: i + 1, label: `Pick variant ${v.key}`, on: picks.includes(v.key) })),
     extras: round.variants.map((v) => ({
       id: `reject-${v.key}`,
       label: `${rejects.includes(v.key) ? "Unreject" : "Reject"} variant ${v.key}`,
-      run: () => toggle(rejects, "rejects", v.key),
+      run: () => toggle("rejects", v.key),
     })),
     canSend,
     push,
@@ -338,7 +294,7 @@ export function RoundPanel({ card, round, src, openSignal }: { card: Card; round
   const reaction: Reaction = {
     picks,
     rejects,
-    toggle: (list, k) => (list === "pick" ? toggle(picks, "picks", k) : toggle(rejects, "rejects", k)),
+    toggle: (list, k) => toggle(list === "pick" ? "picks" : "rejects", k),
     canSend,
     send: () => void send(),
   };
@@ -373,10 +329,10 @@ export function RoundPanel({ card, round, src, openSignal }: { card: Card; round
                 <span className="variant-sum faint" title={v.summary}>
                   {v.summary}
                 </span>
-                <button className={`btn ${picks.includes(v.key) ? "selected" : ""}`} aria-pressed={picks.includes(v.key)} aria-label={`Pick variant ${v.key}`} onClick={() => toggle(picks, "picks", v.key)}>
+                <button className={`btn ${picks.includes(v.key) ? "selected" : ""}`} aria-pressed={picks.includes(v.key)} aria-label={`Pick variant ${v.key}`} onClick={() => toggle("picks", v.key)}>
                   Pick
                 </button>
-                <button className={`btn ${rejects.includes(v.key) ? "selected" : ""}`} aria-pressed={rejects.includes(v.key)} aria-label={`Reject variant ${v.key}`} onClick={() => toggle(rejects, "rejects", v.key)}>
+                <button className={`btn ${rejects.includes(v.key) ? "selected" : ""}`} aria-pressed={rejects.includes(v.key)} aria-label={`Reject variant ${v.key}`} onClick={() => toggle("rejects", v.key)}>
                   Reject
                 </button>
               </div>
@@ -480,24 +436,10 @@ export function EarlierRounds({
   );
 }
 
-/** The three verdicts in key order, each with what it sets off (`prVerdictComment`; Hold also labels the issue do-not-merge). */
-const VERDICTS: ["approve" | "hold" | "send-back", string, string][] = [
-  ["approve", "Approve", "The agent may merge"],
-  ["hold", "Hold merge", "The PR stays open and is labelled do-not-merge"],
-  ["send-back", "Send back", "Back to the agent, with your note"],
-];
-
 export function PrPanel({ card }: { card: Card }) {
   const pr = card.pullRequest!;
-  const dKey = draftKey(card.key, prDraftId(card.waiting?.requestId ?? null));
-  const [{ chosen, text, push }, edit] = useDraft(dKey, { chosen: null as "approve" | "hold" | "send-back" | null, text: "", push: true });
   // a click or a digit only picks; Send (or ⌘↵) writes. Send back needs the note.
-  const canSend = !!chosen && (chosen !== "send-back" || !!text.trim());
-  const send = async () => {
-    if (!chosen || !canSend) return;
-    if (await giveFeedback(card, "pr", { verdict: chosen, text, requestId: card.waiting?.requestId ?? null, push }, chosen === "hold" ? { ...done, onHold: true } : done))
-      useStore.getState().clearDraft(dKey);
-  };
+  const { chosen, text, push, edit, canSend, send } = usePrVerdict(card);
   const pick = (v: "approve" | "hold" | "send-back") => edit({ chosen: chosen === v ? null : v });
   usePanelKeys(card.key, {
     pick: (n) => {

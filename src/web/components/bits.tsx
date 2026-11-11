@@ -43,6 +43,13 @@ export function PhaseDot({ phase }: { phase: Phase }) {
   return <span className="phase-dot" style={{ background: PHASE_COLOR[phase] }} aria-hidden />;
 }
 
+/** A point in time as the developer reads it: `14:20` today, `11 Nov 14:20` otherwise. */
+export const clock = (iso: string) => {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
+};
+
 export function ago(iso: string | null): string {
   if (!iso) return "";
   const s = (Date.now() - Date.parse(iso)) / 1000;

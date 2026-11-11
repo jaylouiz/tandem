@@ -54,6 +54,8 @@ export interface ActionCtx {
   repoFilter: string | null;
   /** the Feedback panel of the open Card, when its tab is open */
   panel: PanelKeys | null;
+  /** Focus: its keys that do something on what is on screen (`focus/keys.ts`); empty outside Focus */
+  focusKeys: { id: string; label: string; key?: string }[];
   /** the triage entries that do something for the targets (marked Cards, else the open Card) */
   triage: { targets: number; moves: MoveEntry[]; entries: TriageEntry[]; seen: boolean; unseen: boolean };
   setTheme: (t: "light" | "dark" | null) => void;
@@ -78,8 +80,16 @@ export function paletteActions(c: ActionCtx): PaletteAction[] {
 
   add({ id: "focus", group: "Go to", label: c.focus ? "Leave Focus: back to the list" : "Focus: Waiting on me, one Card at a time", binding: "focus", search: "focus one by one slideshow guided go through", run: () => s().setFocus(!c.focus) });
 
+  // Focus: what its own keys do on the ask that is on screen (the start, a note, a design round's variants, a Look)
+  for (const k of c.focusKeys) add({ id: `${k.id}${k.key ?? ""}`, group: "Focus", label: k.label, binding: k.id, ...(k.key ? { keys: k.key } : k.id === "escape" ? { keys: "esc" } : {}), search: "focus", run: run(k.id, k.key) });
+
   const card = c.card;
-  if (card) {
+  if (card && c.focus) {
+    // the ask is on the cover: the Card behind it is reached through its details (`e`), not through tabs, marks or triage
+    add({ id: "next", group: "Card", label: "Skip to the next Card", binding: "next", run: run("next", "j") });
+    add({ id: "previous", group: "Card", label: "Back to the previous Card", binding: "previous", run: run("previous", "k") });
+    add({ id: "open", group: "Card", label: "Open on GitHub", binding: "open", run: () => void window.open(card.url, "_blank") });
+  } else if (card) {
     const at = TABS.findIndex((t) => t.id === c.tab);
     const next = TABS[(at + 1) % TABS.length]!.id;
     const previous = TABS[(at + TABS.length - 1) % TABS.length]!.id;
@@ -129,7 +139,7 @@ export function paletteActions(c: ActionCtx): PaletteAction[] {
 
   // the Selection: marks and the keys that extend them (marked Cards, else the open Card, are what triage acts on)
   if (c.marked) add({ id: "clear-marks", group: "Selection", label: "Clear the selection", binding: "escape", keys: "esc", run: () => s().clearMarks() });
-  if (card && cards) {
+  if (card && cards && !c.focus) {
     add({ id: "select-all", group: "Selection", label: "Select all Cards of this column or group", binding: "select-all", run: run("select-all") });
     if (c.view === "board") {
       add({ id: "extend-down", group: "Selection", label: "Extend the selection down", binding: "extend-down", run: run("extend-down") });

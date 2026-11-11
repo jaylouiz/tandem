@@ -52,6 +52,17 @@ export function askOf(card: Card, kind: Kind | null = kindOf(card)): string {
 /** When the ask began: the wait, the close (Look) or the last move (pickup). */
 export const sinceOf = (card: Card, kind: Kind | null = kindOf(card)): string | null => card.waiting?.since ?? (kind === "look" ? card.closedAt : card.updatedAt);
 
+/**
+ * Focus, coming back: which of the asks began after `since` (when Focus was last left) and which were open before. Order is kept.
+ * Without a `since` (the first visit) nothing is "new": everything is in `older`.
+ */
+export function splitNew(cards: Card[], since: string | null): { fresh: Card[]; older: Card[] } {
+  const at = since ? Date.parse(since) : NaN;
+  if (Number.isNaN(at)) return { fresh: [], older: cards };
+  const isNew = (c: Card) => Date.parse(sinceOf(c) ?? "") > at;
+  return { fresh: cards.filter(isNew), older: cards.filter((c) => !isNew(c)) };
+}
+
 /** What the developer got through in Focus, in their words: "3 answered and 2 marked Seen". A Look is marked Seen, every other kind is answered. */
 export function tally(done: Kind[]): string {
   const seen = done.filter((k) => k === "look").length;

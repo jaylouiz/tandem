@@ -191,8 +191,9 @@ export const useStore = create<State>((set) => ({
   setFocus: (focus) => {
     if (focus) localStorage.setItem(VIEW_KEY, "waiting");
     navigation.hint = focus ? "push" : "replace";
-    // Focus lives in Waiting on me: from another view it goes there first (nothing open, nothing marked, like any view change)
-    set((s) => (focus === s.focus ? {} : focus && s.view !== "waiting" ? { focus, view: "waiting", selected: null, tab: "now", linger: null, marked: [] } : { focus, linger: null, marked: s.marked.length ? [] : s.marked }));
+    // Focus lives in Waiting on me: from another view it goes there first. It starts on its own start screen with nothing open and nothing
+    // marked (like any view change); leaving it keeps the Card it was on open in the list.
+    set((s) => (focus === s.focus ? {} : focus ? { focus, view: "waiting", selected: null, tab: "now", linger: null, marked: s.marked.length ? [] : s.marked } : { focus, linger: null, marked: s.marked.length ? [] : s.marked }));
   },
   tab: start.tab,
   setTab: (tab) => set({ tab }),
@@ -532,18 +533,23 @@ function advanceAfterAnswer(was: ReturnType<typeof waitingNow>) {
   else s.setTab("decided");
 }
 
-/** Run a Feedback action: patch the Card at once, write, then report the Push outcome. Resolves to whether the write went through. */
-export async function giveFeedback(card: Card, action: string, body: Record<string, unknown>, patch: Partial<Card>): Promise<boolean> {
+/** Run a Feedback action: patch the Card at once, write, then report the Push outcome. Resolves to whether the write went through. `opts.cover`: sent from the ask's cover in Focus. */
+export async function giveFeedback(card: Card, action: string, body: Record<string, unknown>, patch: Partial<Card>, opts: { cover?: boolean } = {}): Promise<boolean> {
   const { setNotice } = useStore.getState();
   useStore.getState().clearFailure(card.key);
   const was = waitingNow(useStore.getState());
   const write = writeCard(card, patch, () => api.post(`${api.cardPath(card)}/${action}`, body)); // the optimistic patch is applied by now
-  advanceAfterAnswer(was);
+  // an ask of Focus moves on by itself, and only once the write is through (`components/focus/Focus.tsx`): the list's own advance stays out of it
+  if (!opts.cover) advanceAfterAnswer(was);
   const res = await write;
   if (!res.ok) {
     // the Card is back in the list; bring it back into view and say why on the Card itself
     useStore.getState().fail(card.key, res.error);
-    useStore.getState().select(card.key, "now"); // "now" also when it is still the open Card on Decided (the last blocker)
+    // In Focus the developer stays where they are. While the ask is still on screen its Send bar says it (Not sent, the reason, Send
+    // again) and no toast is raised beside it; once they have moved on (another ask, the overview) the toast is the only place that can.
+    const now = useStore.getState();
+    if (opts.cover && now.focus && now.selected === card.key) return false;
+    if (!now.focus) now.select(card.key, "now"); // "now" also when it is still the open Card on Decided (the last blocker)
     setNotice({ key: card.key, text: `Failed: ${res.error}`, canStart: false, failed: true });
     return false;
   }

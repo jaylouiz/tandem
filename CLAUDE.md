@@ -16,7 +16,7 @@ Issue and PR numbers `#n` up to 70 in code, docs and commit history refer to the
 
 - `src/core`: pure domain shared by server and web: `contract.ts` (agent-workflow comment markers: read and write), `card.ts` (Phase, Next step, Waiting on me, Look/Seen), `config.ts` (Phase rules), `fixtures.ts` (demo threads in the exact agent-workflow shapes)
 - `src/server`: `github.ts` (gh token, ETag poll, GraphQL), `fixture.ts`, `board.ts` (cache + snapshots), `push.ts` (Orca), `notifier.ts` (desktop notifications when no page), `launchd.ts` + `version.ts` (agent, build stamp), `store.ts` (`~/.tandem`), `app.ts` (API + SSE)
-- `src/web`: React SPA; `store.ts` (zustand: SSE snapshot + optimistic patches), `route.ts` + `routing.ts` (URL sync, #48), `components/`, `ui/` (Base UI wrappers, the only importers of `@base-ui/react`; ADR 0005)
+- `src/web`: React SPA; `store.ts` (zustand: SSE snapshot + optimistic patches), `route.ts` + `routing.ts` (URL sync, #48), `components/` (`focus/`: the covers of Focus, where an option sends on a click), `feedback/` (what an answer is and how it is sent, shared by the Card pane's panels and Focus), `focus/` (one Focus visit: stage, receipt, its keys), `ui/` (Base UI wrappers, the only importers of `@base-ui/react`; ADR 0005)
 
 ## Invariants
 

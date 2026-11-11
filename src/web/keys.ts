@@ -8,6 +8,8 @@ import { markSelectionSeen, openFromList } from "./seen.ts";
 import { anyDialogOpen, keyFromDialog } from "./ui/Dialog.tsx";
 import { keyFromToast, undoLatest } from "./ui/Toast.tsx";
 import { TABS, showsCards, useStore, type View } from "./store.ts";
+import { runFocusKey, type FocusKeyId } from "./focus/keys.ts";
+import { useFocus } from "./focus/session.ts";
 import { MOVE_ENTRIES, TRIAGE_ENTRIES, runMove, runTriage } from "./triage.ts";
 
 /** What the current view shows, for the bindings that walk or mark Cards. */
@@ -19,7 +21,7 @@ export interface KeyCtx {
 }
 
 /** The headings of the shortcut overview. */
-export const KEY_GROUPS = ["Anywhere", "Go to", "Cards", "Selection", "Triage", "Feedback"] as const;
+export const KEY_GROUPS = ["Anywhere", "Go to", "Cards", "Selection", "Triage", "Feedback", "Focus"] as const;
 export type KeyGroup = (typeof KEY_GROUPS)[number];
 
 export interface Binding {
@@ -47,6 +49,27 @@ export interface Binding {
 /** The Feedback panel of the open Card, when its number keys and ⌘↵ are live (the panel registers only while its tab is open; the bindings are scoped to Card views, so never on Maps or Settings). */
 const livePanel = () => (panelKeys.current && panelKeys.current.cardKey === useStore.getState().selected ? panelKeys.current : null);
 
+const inFocus = () => useStore.getState().focus;
+/** Focus shows an ask (not its start or its end): only then j / k and the arrows have a Card to step from. */
+const asking = () => useFocus.getState().stage === "ask";
+
+/**
+ * A key that is Focus's own while Focus is on. What it does depends on what is on screen (`focus/keys.ts`); when that is nothing, the key
+ * is still spent, so it never reaches the Card behind the ask (`x` would mark it, `[` `]` would turn its tabs). Outside Focus it hands the key on.
+ */
+const focusKey = (id: FocusKeyId, keys: string[], label: string): Binding => ({
+  id,
+  group: "Focus",
+  when: "Focus",
+  keys,
+  label,
+  scope: "cards",
+  run: (e) => {
+    if (!inFocus()) return false;
+    runFocusKey(id, e);
+  },
+});
+
 /** j / k: open the neighbour; in Waiting on me a To look at Card is marked Seen by the open (the developer's own, unlike an automatic selection). */
 function step(card: Card) {
   const s = useStore.getState();
@@ -62,7 +85,10 @@ function step(card: Card) {
 function move({ order }: KeyCtx, dir: 1 | -1) {
   const s = useStore.getState();
   if (!order.length) return false;
-  const i = order.findIndex((c) => c.key === s.selected);
+  let i = order.findIndex((c) => c.key === s.selected);
+  // Focus: the ask on screen may have left the queue (it is being written, or was answered elsewhere). The Card that took its place
+  // is the next one and the one before it the previous, as Up next says: step from where it was, not from the top.
+  if (i < 0 && s.focus && s.selected) i = useFocus.getState().at - (dir === 1 ? 1 : 0);
   const to = order[Math.max(0, Math.min(order.length - 1, i + dir))]!;
   if (to.key === s.selected) return false;
   step(to);
@@ -106,9 +132,10 @@ export const BINDINGS: Binding[] = [
     mod: true,
     label: "Send the chosen Feedback",
     scope: "cards",
-    run: () => {
+    run: (e) => {
       const panel = livePanel();
       if (!panel) return false;
+      if (e.repeat) return; // a held key writes once
       panel.send();
     },
   },
@@ -122,6 +149,9 @@ export const BINDINGS: Binding[] = [
     run: (e) => {
       const panel = livePanel(); // digits belong to the open Feedback panel; priority keys stay for Cards without one
       if (!panel) return false;
+      // A held digit acts once. In Focus a digit sends, and the next ask takes the screen as soon as the write is through: without
+      // this, the key's auto-repeat would answer that one too (and the one after), each a comment that cannot be taken back.
+      if (e.repeat) return;
       panel.pick(Number(e.key));
     },
   },
@@ -148,10 +178,19 @@ export const BINDINGS: Binding[] = [
     },
   },
   // Focus reads left to right like a deck: the arrows step it too (elsewhere they keep their scrolling)
-  { id: "focus-next", group: "Cards", when: "Focus", keys: ["ArrowRight"], label: "Next Card in Focus", scope: "cards", run: (_, ctx) => (useStore.getState().focus ? move(ctx, 1) : false) },
-  { id: "focus-previous", group: "Cards", when: "Focus", keys: ["ArrowLeft"], label: "Previous Card in Focus", scope: "cards", run: (_, ctx) => (useStore.getState().focus ? move(ctx, -1) : false) },
-  { id: "next", group: "Cards", keys: ["j", "ArrowDown"], label: "Next Card", scope: "cards", run: (_, ctx) => move(ctx, 1) },
-  { id: "previous", group: "Cards", keys: ["k", "ArrowUp"], label: "Previous Card", scope: "cards", run: (_, ctx) => move(ctx, -1) },
+  { id: "focus-next", group: "Focus", when: "Focus", keys: ["ArrowRight"], label: "Skip to the next Card", scope: "cards", run: (_, ctx) => (inFocus() && asking() ? move(ctx, 1) : false) },
+  { id: "focus-previous", group: "Focus", when: "Focus", keys: ["ArrowLeft"], label: "Back to the previous Card", scope: "cards", run: (_, ctx) => (inFocus() && asking() ? move(ctx, -1) : false) },
+  // Enter on a button or a link stays that control's own (the act passes); elsewhere on the start screen it starts
+  { id: "focus-start", group: "Focus", when: "Focus", keys: ["Enter"], label: "Start with the first Card", scope: "cards", run: (e) => inFocus() && runFocusKey("focus-start", e) },
+  focusKey("focus-note", ["n"], "Answer with a note (a design round: react with a comment)"),
+  focusKey("focus-details", ["e"], "Card details: Decided, Activity, Issue"),
+  focusKey("focus-side", ["t"], "Design round: all variants side by side"),
+  focusKey("focus-viewport", ["v"], "Switch the screenshot between desktop and mobile"),
+  focusKey("focus-step", ["[", "]"], "Previous / next variant of a design round, or state of a Look"),
+  focusKey("focus-reject", ["x"], "Design round: reject the shown variant"),
+  // in Focus the up and down arrows scroll the ask (a screenshot at real size is taller than the window); j / k and ← → step
+  { id: "next", group: "Cards", keys: ["j", "ArrowDown"], label: "Next Card", scope: "cards", run: (e, ctx) => (inFocus() && (!asking() || e.key === "ArrowDown") ? false : move(ctx, 1)) },
+  { id: "previous", group: "Cards", keys: ["k", "ArrowUp"], label: "Previous Card", scope: "cards", run: (e, ctx) => (inFocus() && (!asking() || e.key === "ArrowUp") ? false : move(ctx, -1)) },
   {
     id: "extend-down",
     group: "Selection",
@@ -161,6 +200,7 @@ export const BINDINGS: Binding[] = [
     scope: "cards",
     run: () => (useStore.getState().view === "board" ? extendSelection(1) : false),
   },
+  // Focus has no Selection: the Cards behind the ask are not in view, so nothing marks them (`x` is Focus's own, above)
   {
     id: "extend-up",
     group: "Selection",
@@ -177,7 +217,7 @@ export const BINDINGS: Binding[] = [
     mod: true,
     label: "Select all Cards of the open Card's column or group",
     scope: "cards",
-    run: (_, ctx) => selectGroup(ctx.groups),
+    run: (_, ctx) => (inFocus() ? undefined : selectGroup(ctx.groups)),
   },
   {
     id: "mark",
@@ -190,7 +230,8 @@ export const BINDINGS: Binding[] = [
       if (s.selected) s.toggleMark(s.selected);
     },
   },
-  { id: "seen", group: "Cards", keys: ["l"], label: "Mark Seen", scope: "cards", run: () => void markSelectionSeen() },
+  // in Focus only the Look on screen is marked, by the developer's own key; on any other ask the key does nothing
+  { id: "seen", group: "Cards", keys: ["l"], label: "Mark Seen", scope: "cards", run: (e) => void (inFocus() ? !e.repeat && runFocusKey("seen", e) : markSelectionSeen()) },
   {
     id: "tab",
     group: "Cards",
@@ -214,7 +255,8 @@ export const BINDINGS: Binding[] = [
       if (c) window.open(c.url, "_blank");
     },
   },
-  ...MOVE_ENTRIES.map((m): Binding => ({ id: m.id, group: "Triage", keys: [m.key], label: m.label, scope: "cards", run: () => void runMove(m.to) })),
+  // triage acts on the open Card: not in Focus, where the Card behind the ask is not what the developer is looking at
+  ...MOVE_ENTRIES.map((m): Binding => ({ id: m.id, group: "Triage", keys: [m.key], label: m.label, scope: "cards", run: () => (inFocus() ? false : void runMove(m.to)) })),
   ...TRIAGE_ENTRIES.map((t): Binding => ({
     id: t.id,
     group: "Triage",
@@ -222,7 +264,7 @@ export const BINDINGS: Binding[] = [
     keys: [t.key],
     label: t.label,
     scope: "cards",
-    run: () => void runTriage(t),
+    run: () => (inFocus() ? false : void runTriage(t)),
   })),
   // the Undo a toast offers, while it is offered: older ones too, newest first (a later toast does not take an earlier Undo away). In a text field ⌘Z stays the field's own.
   { id: "undo", group: "Anywhere", keys: ["z"], mod: true, label: "Undo the last change a toast offers", scope: "anywhere", run: () => undoLatest() },
@@ -232,12 +274,15 @@ export const BINDINGS: Binding[] = [
     id: "escape",
     group: "Anywhere",
     keys: ["Escape"],
-    label: "Clear the selection, leave Focus, then close the Card",
+    label: "Clear the selection; in Focus cancel the note, back to the overview, then leave; close the Card",
     scope: "anywhere",
-    run: () => {
+    run: (e) => {
       const s = useStore.getState();
       if (s.marked.length) s.clearMarks();
-      else if (s.focus) s.setFocus(false); // back to the list, the Card stays open
+      else if (s.focus) {
+        // Focus steps back one layer at a time: the note, then the overview (the drawer is a dialog and closed itself); from the overview, out
+        if (!runFocusKey("escape", e)) s.setFocus(false);
+      }
       else if (s.view === "waiting") {
         const list = document.querySelector<HTMLElement>('[data-testid="waiting-list"]');
         if (!s.selected || !list || document.activeElement === list) return false; // nothing open, or Esc has taken the list's focus already: on to the next layer

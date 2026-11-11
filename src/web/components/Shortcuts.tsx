@@ -40,13 +40,14 @@ export function Shortcuts() {
               <h3 className="group-head">
                 {g}
                 {ON_CARDS.includes(g) && <span className="faint"> · Waiting on me and Board</span>}
+                {g === "Focus" && <span className="faint"> · one ask at a time; an option's digit sends it</span>}
               </h3>
               <ul className="keys-list">
                 {rowsOf(g).map((b) => (
                   <li key={b.id} data-binding={b.id}>
                     <span>
                       {b.label}
-                      {b.when && <span className="faint"> · {b.when}</span>}
+                      {b.when && b.when !== g && <span className="faint"> · {b.when}</span>}
                     </span>
                     <Caps caps={keyCaps(b)} />
                   </li>

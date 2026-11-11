@@ -26,10 +26,14 @@ const HUES: Record<number, [string, string, string]> = {
   20: ["#f5ebe6", "#e3c6b8", "#6b3f2f"],
   260: ["#ebe8f5", "#c9c0e6", "#3f356b"],
 };
+/** A stand-in screenshot at a real size (1280x800 desktop, 390x844 mobile): a top bar, a side column on desktop and a few rows, so a stage that shows it at real size can be judged. */
 const svg = (label: string, hue: number, w = 1280, h = 800) => {
   const [bg, bar, ink] = HUES[hue]!;
+  const side = w > 600 ? 260 : 0;
+  const x = 40 + (side ? side + 24 : 0);
+  const rows = Array.from({ length: 6 }, (_, i) => `<rect x="${x}" y="${220 + i * 84}" width="${w - x - 40}" height="60" rx="8" fill="#ffffff" stroke="${bar}"/><rect x="${x + 20}" y="${242 + i * 84}" width="${Math.round((w - x - 80) * (0.3 + ((i * 7) % 5) / 10))}" height="14" rx="7" fill="${bar}"/>`).join("");
   return `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${bg}"/><rect x="40" y="40" width="${w - 80}" height="60" rx="8" fill="${bar}"/><text x="50%" y="55%" font-family="sans-serif" font-size="${Math.round(w / 18)}" text-anchor="middle" fill="${ink}">${label}</text></svg>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${bg}"/><rect x="40" y="40" width="${w - 80}" height="60" rx="8" fill="${bar}"/>${side ? `<rect x="40" y="124" width="${side}" height="${h - 164}" rx="8" fill="${bar}" opacity="0.5"/>` : ""}<text x="${x}" y="176" font-family="sans-serif" font-size="${w > 600 ? 40 : 28}" font-weight="600" fill="${ink}">${label}</text>${rows}</svg>`,
   )}`;
 };
 

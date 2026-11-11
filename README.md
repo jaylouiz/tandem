@@ -48,7 +48,7 @@ A static demo that runs entirely in the browser (the API over demo data lives in
 
 ## Keys
 
-`⌘K` command palette · `f` Focus (Waiting on me, one Card at a time; `j`/`k` or `←`/`→` step, `esc` back to the list) · `j`/`k` move (the open Card follows) · `[` `]` Card tabs (Now, Decided, Activity, Issue) · `1`-`9` pick a choice of the open Feedback, `⌘↵` send it (the next blocker opens) · `esc` back to the list (closes the pane on the Board) · `c` capture an idea · `o` open on GitHub · `x` mark · `g w` Waiting on me · `g b` Board · `g m` maps · `g s` settings · `g a` Agent activity · `←`/`→` in the screenshot gallery. Triage keys (`d s b h a w`, priority `1`-`3`/`0` on Cards without a numbered Feedback) are in the palette.
+`⌘K` command palette · `f` Focus (Waiting on me, one ask per screen: `↵` starts, an option's digit sends it, `n` answers with a note, `e` Card details, `t` variants side by side, `v` desktop / mobile, `l` Mark Seen, `j`/`k` or `←`/`→` step, `esc` back) · `j`/`k` move (the open Card follows) · `[` `]` Card tabs (Now, Decided, Activity, Issue) · `1`-`9` pick a choice of the open Feedback, `⌘↵` send it (the next blocker opens) · `esc` back to the list (closes the pane on the Board) · `c` capture an idea · `o` open on GitHub · `x` mark · `g w` Waiting on me · `g b` Board · `g m` maps · `g s` settings · `g a` Agent activity · `←`/`→` in the screenshot gallery. Triage keys (`d s b h a w`, priority `1`-`3`/`0` on Cards without a numbered Feedback) are in the palette.
 
 ## Docs
 
