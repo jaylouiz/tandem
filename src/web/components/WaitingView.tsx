@@ -9,9 +9,11 @@ import { keyOf } from "../keys.ts";
 import { clickRow } from "../select.ts";
 import { useScrollMemory } from "../scroll.ts";
 import { blockerCount, groupsOf, useAllCards, useStore } from "../store.ts";
+import { Focus } from "./Focus.tsx";
 import { Tooltip } from "../ui/Tooltip.tsx";
 import { CardPane } from "./CardPane.tsx";
 import { Age, KindChip, KindGlyph, RepoTag, shortRepo } from "./bits.tsx";
+import { KIND_LABEL } from "../../core/ask.ts";
 
 /** The Cards of the list in on-screen order: blockers, To look at, Awaiting pickup. `keep`: the Seen Card that is still open in To look at. */
 export function queueOf(cards: Card[], keep: string | null = null) {
@@ -48,14 +50,15 @@ function Row({ card, group, kind }: { card: Card; group: Card[]; kind: Kind }) {
         <span className="q-main">
           <span className="q-title">
             <span className="title">{card.title}</span>
+            <Age iso={sinceOf(card, kind)} />
           </span>
           <span className="q-sub">
             <RepoTag repo={card.repo} number={card.number} />
             <span className="ask">{failed ? "Not sent, try again" : askOf(card, kind)}</span>
           </span>
         </span>
+        {/* the glyph says the kind by shape and colour; its name is here for assistive tech, so the ask keeps the row's width */}
         <KindChip kind={kind} />
-        <Age iso={sinceOf(card, kind)} />
       </button>
       {unseen && (
         <Tooltip label="Mark Seen">
@@ -93,7 +96,55 @@ function GroupHead({ label, count }: { label: string; count: number }) {
   );
 }
 
+const KIND_ORDER: Kind[] = ["pr-approval", "decision", "design-round"];
+const KIND_MANY: Record<Kind, string> = { ...KIND_LABEL, decision: "Decisions", "design-round": "Design rounds", "pr-approval": "PR approvals", look: "Looks" };
+
+/** Nothing open yet: what waits, by kind, and the one button that goes through it (Focus). */
+function Start({ waiting, look }: { waiting: Card[]; look: Card[] }) {
+  const setFocus = useStore((s) => s.setFocus);
+  const kinds = KIND_ORDER.map((k) => [k, waiting.filter((c) => kindOf(c) === k).length] as const).filter(([, n]) => n > 0);
+  const unseen = look.filter((c) => !c.seenAt).length;
+  const total = waiting.length + unseen;
+  return (
+    <div className="empty pane-empty start" data-testid="waiting-start">
+      {total > 0 ? (
+        <>
+          <h2 className="start-title">{waiting.length ? `${waiting.length} ${waiting.length === 1 ? "Card waits" : "Cards wait"} on you` : `${unseen} to look at`}</h2>
+          <ul className="start-kinds">
+            {kinds.map(([k, n]) => (
+              <li key={k} data-kind={k}>
+                <KindGlyph kind={k} box />
+                <b>{n}</b> {n === 1 ? KIND_LABEL[k] : KIND_MANY[k]}
+              </li>
+            ))}
+            {unseen > 0 && (
+              <li data-kind="look">
+                <KindGlyph kind="look" box />
+                <b>{unseen}</b> to look at
+              </li>
+            )}
+          </ul>
+          <button className="btn primary big" data-testid="focus-start" onClick={() => setFocus(true)}>
+            Go through them one by one <kbd>{keyOf("focus")}</kbd>
+          </button>
+        </>
+      ) : null}
+      <div className="start-alt">
+        Select a Card
+        <span className="faint">
+          Agent activity <kbd>{keyOf("go-agents")}</kbd>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function WaitingView({ cards }: { cards: Card[] }) {
+  const focus = useStore((s) => s.focus);
+  return focus ? <Focus cards={cards} /> : <WaitingList cards={cards} />;
+}
+
+function WaitingList({ cards }: { cards: Card[] }) {
   const linger = useStore((s) => s.linger);
   const { waiting, look, pickup, order } = queueOf(cards, linger);
   const selected = useStore((s) => s.selected);
@@ -128,12 +179,7 @@ export function WaitingView({ cards }: { cards: Card[] }) {
       {selected && cards.some((c) => c.key === selected) ? (
         <CardPane key={selected} cardKey={selected} mode="split" />
       ) : (
-        <div className="empty pane-empty">
-          Select a Card
-          <div className="faint">
-            Agent activity <kbd>{keyOf("go-agents")}</kbd>
-          </div>
-        </div>
+        <Start waiting={waiting} look={look} />
       )}
     </div>
   );

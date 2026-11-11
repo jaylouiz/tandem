@@ -18,13 +18,17 @@ import { InfoPopover } from "./ui/Tooltip.tsx";
 import { handleKey, keyCtxRef, keyOf, type KeyCtx } from "./keys.ts";
 import { useNoticeToasts } from "./notices.ts";
 import { useScrollMemory } from "./scroll.ts";
-import { blockerCount, openCard, reconnect, syncProgress, useAllCards, useCards, useLaneView, useStore, type LaneView, type View } from "./store.ts";
+import { blockerCount, groupsOf, openCard, reconnect, syncProgress, useAllCards, useCards, useLaneView, useStore, type LaneView, type View } from "./store.ts";
 import { ToastRegion } from "./ui/Toast.tsx";
 
 const TITLES: Record<View, string> = { waiting: "Waiting on me", board: "Board", maps: "Wayfinder maps", settings: "Settings" };
 
 /** The Cards of the view in on-screen order, split into the lists a ⌘A marks (Board columns, Waiting on me groups). */
-function navGroups(view: View, cards: Card[], openDays: Record<string, boolean>, linger: string | null, lanes: LaneView | null): Card[][] {
+function navGroups(view: View, cards: Card[], openDays: Record<string, boolean>, linger: string | null, lanes: LaneView | null, focus: boolean): Card[][] {
+  if (view === "waiting" && focus) {
+    const g = groupsOf(cards); // Focus walks the blockers and the unseen Looks only
+    return [g.waiting, g.look];
+  }
   if (view === "waiting") {
     const q = queueOf(cards, linger);
     return [q.waiting, q.look, q.pickup];
@@ -114,10 +118,12 @@ export function App() {
   const openDays = useStore((s) => s.openDays);
   const lanes = useLaneView();
   const linger = useStore((s) => s.linger);
+  const focus = useStore((s) => s.focus);
+  const setFocus = useStore((s) => s.setFocus);
   const keyCtx = useMemo<KeyCtx>(() => {
-    const groups = navGroups(view, cards, openDays, linger, lanes);
+    const groups = navGroups(view, cards, openDays, linger, lanes, focus);
     return { groups, order: groups.flat() };
-  }, [view, cards, openDays, linger, lanes]);
+  }, [view, cards, openDays, linger, lanes, focus]);
   const filter = useStore((s) => s.repoFilter);
   const everyCard = useAllCards();
   /** the Waiting on me count, and the same over every repo: a filtered count reads "3 of 7", so it is clear it is filtered and what the filter hides */
@@ -204,6 +210,15 @@ export function App() {
           <h1>{TITLES[view]}</h1>
           <RepoFilterChip />
           {view === "board" && <LaneToggle />}
+          {split && (
+            <button className="lane-toggle" data-testid="focus-toggle" aria-pressed={focus} onClick={() => setFocus(!focus)}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="4.5" y="3" width="7" height="10" rx="1.5" />
+                <path d="M2 5v6M14 5v6" />
+              </svg>
+              {focus ? "Back to the list" : "Focus"} <kbd>{focus ? keyOf("escape") : keyOf("focus")}</kbd>
+            </button>
+          )}
           <span style={{ flex: 1 }} />
           {version?.pending && version.reason && (
             <button className="chip accent" data-testid="update-pending" title={UPDATE_TEXT[version.reason]} onClick={() => setNotice({ key: "", text: UPDATE_TEXT[version.reason!], canStart: false })}>

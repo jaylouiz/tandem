@@ -20,6 +20,7 @@ beforeAll(async () => {
 /** Every context action applies: an open Card that waits on Feedback, a selection, an Undo on offer, several repos, a Repo filter. */
 const fullest = (): import("./actions.ts").ActionCtx => ({
   view: "board",
+  focus: false,
   card: { key: "o/r#1", url: "https://github.com/o/r/issues/1", number: 1, fog: true } as Card,
   startable: true,
   failed: true,

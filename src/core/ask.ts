@@ -51,3 +51,10 @@ export function askOf(card: Card, kind: Kind | null = kindOf(card)): string {
 
 /** When the ask began: the wait, the close (Look) or the last move (pickup). */
 export const sinceOf = (card: Card, kind: Kind | null = kindOf(card)): string | null => card.waiting?.since ?? (kind === "look" ? card.closedAt : card.updatedAt);
+
+/** What the developer got through in Focus, in their words: "3 answered and 2 marked Seen". A Look is marked Seen, every other kind is answered. */
+export function tally(done: Kind[]): string {
+  const seen = done.filter((k) => k === "look").length;
+  const answered = done.length - seen;
+  return [answered ? `${answered} answered` : "", seen ? `${seen} marked Seen` : ""].filter(Boolean).join(" and ");
+}

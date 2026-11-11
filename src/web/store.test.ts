@@ -312,4 +312,23 @@ describe("blockerCount (sidebar and Repo counts, #46 D1)", () => {
     // the To look at group still lists the Looks, separately
     expect(store.groupsOf(cards).look).toHaveLength(2);
   });
+
+  it("focusQueue: the blockers first, then the unseen Looks; a Seen Look and a Card awaiting pickup are not in it", () => {
+    const cards = [
+      c("o/a", { key: "o/a#2", needsLook: true, phase: "Done" }),
+      c("o/a", { waiting }),
+      c("o/a", { key: "o/a#4", needsLook: true, seenAt: "2026-01-02T00:00:00Z", phase: "Done" }),
+      c("o/a", { key: "o/a#5", awaitingPickup: true }),
+    ];
+    expect(store.focusQueue(cards).map((x) => x.key)).toEqual(["o/a#1", "o/a#2"]);
+  });
+
+  it("Focus starts in Waiting on me from any view, and leaving the view ends it", () => {
+    vi.stubGlobal("localStorage", { setItem: (k: string, v: string) => void mem.set(k, v) });
+    store.useStore.getState().setView("board");
+    store.useStore.getState().setFocus(true);
+    expect(store.useStore.getState()).toMatchObject({ view: "waiting", focus: true, selected: null });
+    store.useStore.getState().setView("board");
+    expect(store.useStore.getState().focus).toBe(false);
+  });
 });

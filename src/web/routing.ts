@@ -60,7 +60,7 @@ function applyUrl() {
   storeFilter(repoFilter);
   unverified = r.selected;
   // the reset #30's setView gives a page, without its "close the Card": the URL names the Card
-  useStore.setState({ view, selected: r.selected, tab: r.tab, repoFilter, linger: null, marked: [] });
+  useStore.setState({ view, selected: r.selected, tab: r.tab, repoFilter, linger: null, marked: [], ...(view === "waiting" ? {} : { focus: false }) });
 }
 
 /** Call once before the first render. */

@@ -87,6 +87,7 @@
   --fs-md: 13px;
   --fs-lg: 15px;
   --fs-xl: 18px;
+  --fs-2xl: 24px; /* display: the one Card of Focus, and its end */
 
   /* space (4px base) and shape */
   --s-1: 4px;
@@ -737,11 +738,11 @@ a:has(> .ext) {
 }
 .option {
   display: flex;
-  gap: var(--s-2);
+  gap: 10px;
   align-items: flex-start;
   border: 0;
   border-radius: var(--radius);
-  padding: 7px 10px;
+  padding: 8px 10px;
   background: var(--bg-panel);
   box-shadow: inset 0 0 0 1px var(--border);
   text-align: left;
@@ -756,11 +757,109 @@ a:has(> .ext) {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
-.option.recommended::after {
-  content: "recommended";
-  margin-left: auto;
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.option > kbd {
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+.option-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--s-2);
+}
+.option-text b {
+  font-weight: 500;
+}
+.option-rec {
+  flex-shrink: 0;
   font-size: var(--fs-sm);
+  font-weight: 500;
   color: var(--accent);
+}
+/* the head of a raised Feedback panel: the question is the heading, one quiet line of facts and links under it */
+.panel-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.panel-head .section-title {
+  display: block;
+  text-wrap: balance;
+}
+.panel-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 18px;
+  font-size: var(--fs-sm);
+}
+.panel-meta .spacer {
+  flex: 1;
+}
+.panel-meta a {
+  color: var(--text-muted);
+}
+.panel-meta a:hover {
+  color: var(--text);
+}
+.checks {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+/* a design round: one block per variant (what it is, its two reactions, its screenshots), a hairline between them */
+.variants {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.variant {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.variant + .variant,
+.variants > .thumb-group:not(:first-child) {
+  border-top: 1px solid var(--border);
+  padding-top: var(--s-3);
+}
+.variant-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.variant-name {
+  white-space: nowrap;
+  font-weight: 500;
+}
+.variant-name b {
+  font-weight: 600;
+}
+.variant-sum {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.variant .thumbs,
+.variants .thumbs {
+  grid-template-columns: repeat(auto-fill, minmax(168px, 232px));
+}
+.variant[data-state="rejected"] .thumbs {
+  opacity: 0.5;
+}
+.variant[data-state="rejected"] .variant-name {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-faint);
 }
 .actions {
   display: flex;
@@ -1257,17 +1356,26 @@ body[data-dragging], body[data-dragging] .card { cursor: grabbing; user-select: 
   background: var(--bg);
 }
 .split-list .group-head { background: var(--bg-sidebar); }
+.start { gap: var(--s-4); }
+.start-title { margin: 0; font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+.start-kinds { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-2) var(--s-5); }
+.start-kinds li { display: inline-flex; align-items: center; gap: var(--s-2); }
+.start-kinds b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.start-alt { display: flex; align-items: center; gap: var(--s-3); font-size: var(--fs-sm); }
+.start-alt .faint { display: inline-flex; align-items: center; gap: 6px; }
+.btn.big { height: 36px; padding: 0 14px; border-radius: 8px; }
 .pane-empty { flex: 1; display: flex; flex-direction: column; gap: var(--s-2); align-items: center; justify-content: center; }
 .empty.tight { padding: var(--s-5) 20px; }
 
-.qrow { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; width: 100%; padding: var(--s-2) 14px; border: 0; background: none; font: inherit; color: inherit; text-align: left; min-height: 52px; box-sizing: border-box; }
+.qrow { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; padding: var(--s-2) 14px; border: 0; background: none; font: inherit; color: inherit; text-align: left; min-height: 52px; box-sizing: border-box; }
 .qrow:hover { background: var(--bg-hover); }
 .qrow[aria-selected="true"] { background: var(--bg-active); }
 .qrow:focus-visible { outline-offset: -2px; }
 .qrow[data-failed] .ask { color: var(--danger); }
 .arow { grid-template-columns: 26px minmax(0, 1fr) auto; }
 .q-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.q-title .title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.q-title { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; }
+.q-title .title { flex: 1; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .q-sub { display: flex; align-items: center; gap: var(--s-2); min-width: 0; font-size: var(--fs-sm); color: var(--text-muted); }
 .q-sub .ask { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; color: var(--text-muted); }
 .arow[data-state="stuck"] .ask { color: var(--danger); }
@@ -1402,3 +1510,53 @@ button.done-head:hover { background: var(--bg-hover); color: var(--text); }
   gap: 2px;
   overflow-wrap: anywhere;
 }
+
+/* ---- Focus: Waiting on me, one Card at a time (components/Focus.tsx). A recessed stage, one raised sheet. ---- */
+.focus { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg-sidebar); --sheet: 880px; }
+.focus-top { display: flex; align-items: center; gap: var(--s-3); width: min(100% - 128px, var(--sheet)); margin: 0 auto; padding-top: var(--s-4); }
+.focus-pips { flex: 1; display: flex; gap: 3px; height: 4px; }
+.focus-pips i { flex: 1; min-width: 2px; border-radius: 2px; background: var(--border-strong); }
+.focus-pips i[data-state="done"] { background: var(--text-faint); }
+.focus-pips i[data-state="now"] { background: var(--accent); }
+.focus-count { font-size: var(--fs-sm); font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.focus-stage { flex: 1; min-height: 0; display: grid; grid-template-columns: 64px minmax(0, var(--sheet)) 64px; grid-template-rows: minmax(0, 1fr); justify-content: center; align-items: center; padding: var(--s-4) 0 var(--s-3); }
+.focus-sheet { align-self: start; max-height: 100%; min-height: 0; display: flex; flex-direction: column; border-radius: 12px; outline: none; }
+.pane.focus { flex: 0 1 auto; min-height: 0; border-radius: 12px; box-shadow: var(--elev-3); }
+.pane.focus .pane-head { padding: var(--s-4) var(--s-5) 0; gap: var(--s-3); }
+.pane.focus .pane-head h2 { font-size: var(--fs-2xl); line-height: 1.2; letter-spacing: -0.025em; }
+.pane.focus .pane-body { padding: var(--s-5); }
+/* the sheet is the one raised thing here: the open question lies flat on it */
+.pane.focus .section.waiting { padding: 0; border-radius: 0; background: none; box-shadow: none; }
+.focus-nav { justify-self: center; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 50%; background: var(--bg-raised); color: var(--text-muted); box-shadow: var(--elev-1); }
+.focus-nav:hover:not([aria-disabled="true"]) { color: var(--text); box-shadow: var(--elev-2); }
+.focus-nav:active:not([aria-disabled="true"]) { background: var(--bg-active); }
+.focus-nav[aria-disabled="true"] { background: none; box-shadow: none; color: var(--border-strong); }
+.focus-nav .flip { display: inline-flex; transform: scaleX(-1); }
+.focus-foot { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--s-4); width: min(100% - 128px, var(--sheet)); margin: 0 auto; padding-bottom: var(--s-4); min-height: 36px; }
+.focus-hint { grid-column: 1; display: flex; align-items: center; gap: 5px; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; }
+.focus-hint kbd { background: var(--bg-active); }
+.focus-hint kbd:not(:first-child) { margin-left: var(--s-2); }
+.focus-next { grid-column: 2; justify-self: end; max-width: 100%; min-width: 0; display: inline-flex; align-items: center; gap: var(--s-2); height: 32px; padding: 0 10px; border: 0; border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: var(--fs-sm); }
+button.focus-next:hover { background: var(--bg-hover); }
+.focus-next .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.focus-next > .faint { flex-shrink: 0; }
+.focus-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-3); padding: var(--s-5); text-align: center; }
+.focus-done h2 { margin: var(--s-2) 0 0; font-size: var(--fs-2xl); font-weight: 600; letter-spacing: -0.025em; }
+.focus-done p { margin: 0 0 var(--s-2); max-width: 44ch; }
+.focus-check { color: var(--ok); }
+@media (max-width: 1100px) {
+  .focus-hint { visibility: hidden; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .focus-nav, .focus-next { transition: background-color 120ms var(--ease), box-shadow 160ms var(--ease), color 120ms var(--ease); }
+  .focus-pips i { transition: background-color 180ms var(--ease); }
+  .focus-sheet { animation: deal 240ms var(--ease); }
+  .focus-sheet[data-dir="back"] { animation-name: deal-back; }
+  .focus-done { animation: rise 240ms var(--ease); }
+  .focus-check circle { stroke-dasharray: 120; animation: draw 520ms var(--ease) both; }
+  .focus-check path { stroke-dasharray: 26; animation: draw 360ms 260ms var(--ease) both; }
+  .variant .thumbs { transition: opacity 160ms var(--ease); }
+}
+@keyframes deal { from { opacity: 0; transform: translateX(28px) scale(0.985); } }
+@keyframes deal-back { from { opacity: 0; transform: translateX(-28px) scale(0.985); } }
+@keyframes draw { from { stroke-dashoffset: var(--len, 120); } }

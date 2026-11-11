@@ -15,7 +15,7 @@ test("waiting on me lists blockers closest to Done first, then To look at", asyn
   await page.goto("/");
   const rows = page.getByTestId("waiting-list").locator(".qrow");
   await expect(rows.first()).toContainText("Due date picker");
-  await expect(page.getByText("To look at")).toBeVisible();
+  await expect(page.getByTestId("waiting-list").getByText("To look at")).toBeVisible();
   await expect(page.getByTestId("waiting")).toContainText("Theme switch in settings");
 });
 

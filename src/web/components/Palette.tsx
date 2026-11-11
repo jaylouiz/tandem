@@ -43,6 +43,7 @@ function PaletteBody() {
   const moveStep = useStore((s) => s.moveStep);
   const view = useStore((s) => s.view);
   const tab = useStore((s) => s.tab);
+  const focus = useStore((s) => s.focus);
   const marked = useStore((s) => s.marked.length);
   const lanes = useStore((s) => s.lanes);
   const repoCount = useStore((s) => s.board?.repos.length ?? 0);
@@ -54,6 +55,7 @@ function PaletteBody() {
     () =>
       paletteActions({
         view,
+        focus,
         card: selected,
         startable: !!selected?.awaitingPickup && !coordinators[selected.repo],
         failed,

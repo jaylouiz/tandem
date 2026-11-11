@@ -3,13 +3,17 @@
 // a click or a digit only picks, the Send button or ⌘↵ writes. What was typed and picked is a draft in the store
 // (per Card + request, `useDraft`): it survives Card switches and snapshots, goes when the send succeeded.
 import { useEffect, useRef, useState } from "react";
-import { buildNav } from "../../core/gallery.ts";
+import { buildNav, type ShotGroup, type ShotNav } from "../../core/gallery.ts";
 import type { Card, DesignRound, LookNote, Screenshot } from "../../core/types.ts";
 import { AGENT_DRAFT_ID, draftKey, prDraftId, roundDraftId } from "../../core/drafts.ts";
 import { panelKeys, type PanelChoice, type PanelExtra, type PanelKeys } from "../panelKeys.ts";
 import { giveFeedback, useDraft, useStore, type Tab } from "../store.ts";
 import { Gallery, ShotImg, type Reaction } from "./Gallery.tsx";
-import { Btn, Ext, Markdown } from "./bits.tsx";
+import { keyOf } from "../keys.ts";
+import { Btn, Ext, Markdown, ago } from "./bits.tsx";
+
+/** The key cap of ⌘↵ inside every panel's Send button: the one way to send is always in view. */
+const SendKey = () => <kbd aria-hidden>{keyOf("send-feedback")}</kbd>;
 
 const done: Partial<Card> = { waiting: null, awaitingPickup: true };
 
@@ -65,6 +69,23 @@ const submitKeys = (e: React.KeyboardEvent, go: () => void) => {
   }
 };
 
+/** The top of a raised Feedback panel: the question as its heading, how long it has waited, and the links that open it elsewhere. */
+function PanelHead({ question, id, since, children }: { question: string; id?: string; since: string | null; children?: React.ReactNode }) {
+  return (
+    <div className="panel-head">
+      <div className="section-title">{question}</div>
+      <div className="panel-meta">
+        {id && <span className="did">{id}</span>}
+        {since && (
+          <span className="faint">waiting {ago(since)}</span>
+        )}
+        <span className="spacer" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function DecisionPanel({ card }: { card: Card }) {
   const req = card.requests.find((r) => r.id === card.waiting?.requestId);
   const dKey = draftKey(card.key, req?.id ?? "");
@@ -90,20 +111,26 @@ export function DecisionPanel({ card }: { card: Card }) {
   const recommended = (opt: string) => !!req.recommendation && opt.split(":")[0]!.trim().toLowerCase() === req.recommendation.split(/[\s(]/)[0]!.toLowerCase();
   return (
     <div className="section waiting" data-testid="panel-decision">
-      <div className="section-title">Decision needed · {req.id}</div>
-      <div style={{ fontWeight: 500 }}>{req.question}</div>
-      {req.preview && (
-        <a href={req.preview} target="_blank" rel="noreferrer">
-          Open preview
-          <Ext />
-        </a>
+      <PanelHead question={req.question} id={req.id} since={card.waiting?.since ?? null}>
+        {req.preview && (
+          <a href={req.preview} target="_blank" rel="noreferrer">
+            Open preview
+            <Ext />
+          </a>
+        )}
+      </PanelHead>
+      {req.options.length > 0 && (
+        <div className="options" role="group" aria-label="Options">
+          {req.options.map((o, i) => (
+            <button key={o} className={`option ${choice === o ? "selected" : ""} ${recommended(o) ? "recommended" : ""}`} aria-pressed={choice === o} onClick={() => edit({ choice: choice === o ? null : o })}>
+              <kbd>{i + 1}</kbd>
+              <span className="option-text">{o}</span>
+              {recommended(o) && <span className="option-rec">Recommended</span>}
+            </button>
+          ))}
+        </div>
       )}
-      {req.options.map((o, i) => (
-        <button key={o} className={`option ${choice === o ? "selected" : ""} ${recommended(o) ? "recommended" : ""}`} onClick={() => edit({ choice: choice === o ? null : o })}>
-          <kbd>{i + 1}</kbd> {o}
-        </button>
-      ))}
-      {req.recommendation && <div className="muted">Recommendation: {req.recommendation}</div>}
+      {req.recommendation && <div className="muted">The agent recommends {req.recommendation}</div>}
       <textarea
         className="input"
         placeholder="Answer or add a note (⌘↵ to send)"
@@ -115,7 +142,7 @@ export function DecisionPanel({ card }: { card: Card }) {
         <PushToggle push={push} setPush={(p) => edit({ push: p })} />
         <span className="spacer" />
         <Btn className="btn primary" why={answer ? null : req.options.length ? "Pick an option or write an answer" : "Write an answer"} onClick={send}>
-          Answer
+          Answer <SendKey />
         </Btn>
       </div>
     </div>
@@ -257,19 +284,26 @@ export function Thumbs({
       {nav.groups.map((g, gi) => (
         <div key={g.key ?? `none${gi}`} className="thumb-group" data-testid={`thumb-group-${g.key ?? "none"}`}>
           {g.title && <div className="thumb-group-title">{g.title}</div>}
-          <div className="thumbs">
-            {g.indices.map((i) => {
-              const s = nav.flat[i]!;
-              return (
-                <button key={s.alt + i} className="thumb" onClick={() => (src.ensure(set.commentId), onOpen(i))} title={s.alt}>
-                  <ShotImg shot={s} commentUrl={set.commentUrl} onRetry={() => src.retry(set.commentId)} loading="lazy" />
-                  <span>{[s.viewport, s.state].filter(Boolean).join(" · ") || s.alt}</span>
-                </button>
-              );
-            })}
-          </div>
+          <ThumbRow nav={nav} group={g} set={set} src={src} onOpen={onOpen} />
         </div>
       ))}
+    </div>
+  );
+}
+
+/** The thumbnails of one group, desktop first. */
+function ThumbRow({ nav, group, set, src, onOpen }: { nav: ShotNav; group: ShotGroup; set: ShotSet; src: ShotSources; onOpen: (i: number) => void }) {
+  return (
+    <div className="thumbs">
+      {group.indices.map((i) => {
+        const s = nav.flat[i]!;
+        return (
+          <button key={s.alt + i} className="thumb" onClick={() => (src.ensure(set.commentId), onOpen(i))} title={s.alt}>
+            <ShotImg shot={s} commentUrl={set.commentUrl} onRetry={() => src.retry(set.commentId)} loading="lazy" />
+            <span>{[s.viewport, s.state].filter(Boolean).join(" · ") || s.alt}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -309,34 +343,54 @@ export function RoundPanel({ card, round, src, openSignal }: { card: Card; round
     send: () => void send(),
   };
   const set = roundSet(round);
+  // one block per variant: what it is, its screenshots and the two reactions, so nothing about a variant is read in two places
+  const nav = buildNav(set.shots, round.variants, "variant");
+  const declared = round.variants.map((v) => v.key);
+  const loose = nav.groups.filter((g) => g.key === null || !declared.includes(g.key));
   return (
     <div className="section waiting" data-testid="panel-design-round">
-      <div className="section-title">
-        Design round R{round.round}
+      <PanelHead question={round.question || `Design round ${round.round}`} id={`R${round.round}`} since={card.waiting?.since ?? null}>
         {round.preview && (
-          <a href={round.preview} target="_blank" rel="noreferrer" style={{ marginLeft: "auto", fontWeight: 400 }}>
+          <a href={round.preview} target="_blank" rel="noreferrer">
             Open prototype
             <Ext />
           </a>
         )}
+      </PanelHead>
+      {!nav.flat.length && <div className="muted">No screenshots in this round.</div>}
+      <div className="variants">
+        {round.variants.map((v, i) => {
+          const group = nav.groups.find((g) => g.key === v.key);
+          const state = picks.includes(v.key) ? "picked" : rejects.includes(v.key) ? "rejected" : undefined;
+          return (
+            <div key={v.key} className="variant" data-state={state} data-testid={`thumb-group-${v.key}`}>
+              <div className="variant-head">
+                <kbd>{i + 1}</kbd>
+                <span className="variant-name">
+                  <b>{v.key}</b>
+                  {v.name && v.name !== v.key ? ` ${v.name}` : ""}
+                </span>
+                <span className="variant-sum faint" title={v.summary}>
+                  {v.summary}
+                </span>
+                <button className={`btn ${picks.includes(v.key) ? "selected" : ""}`} aria-pressed={picks.includes(v.key)} aria-label={`Pick variant ${v.key}`} onClick={() => toggle(picks, "picks", v.key)}>
+                  Pick
+                </button>
+                <button className={`btn ${rejects.includes(v.key) ? "selected" : ""}`} aria-pressed={rejects.includes(v.key)} aria-label={`Reject variant ${v.key}`} onClick={() => toggle(rejects, "rejects", v.key)}>
+                  Reject
+                </button>
+              </div>
+              {group && <ThumbRow nav={nav} group={group} set={set} src={src} onOpen={gallery.open} />}
+            </div>
+          );
+        })}
+        {loose.map((g, gi) => (
+          <div key={g.key ?? `none${gi}`} className="thumb-group" data-testid={`thumb-group-${g.key ?? "none"}`}>
+            {g.title && <div className="thumb-group-title">{g.title}</div>}
+            <ThumbRow nav={nav} group={g} set={set} src={src} onOpen={gallery.open} />
+          </div>
+        ))}
       </div>
-      {round.question && <div style={{ fontWeight: 500 }}>{round.question}</div>}
-      <Thumbs set={set} variants={round.variants} src={src} onOpen={gallery.open} />
-      {round.variants.map((v, i) => (
-        <div key={v.key} className="actions" style={{ flexWrap: "nowrap" }}>
-          <kbd>{i + 1}</kbd>
-          <strong>{v.key}</strong> {v.name}
-          <span className="faint" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={v.summary}>
-            {v.summary}
-          </span>
-          <button className={`btn ${picks.includes(v.key) ? "selected" : ""}`} onClick={() => toggle(picks, "picks", v.key)}>
-            Pick
-          </button>
-          <button className={`btn ${rejects.includes(v.key) ? "selected" : ""}`} onClick={() => toggle(rejects, "rejects", v.key)}>
-            Reject
-          </button>
-        </div>
-      ))}
       <textarea
         className="input"
         placeholder='Comment, e.g. "header from a, list from b" (⌘↵)'
@@ -348,7 +402,7 @@ export function RoundPanel({ card, round, src, openSignal }: { card: Card; round
         <PushToggle push={push} setPush={(p) => edit({ push: p })} />
         <span className="spacer" />
         <Btn className="btn primary" why={canSend ? null : "Pick or reject a variant, or write a comment"} onClick={() => void send()}>
-          Send reaction
+          Send reaction <SendKey />
         </Btn>
       </div>
       {gallery.index !== null && (
@@ -426,6 +480,13 @@ export function EarlierRounds({
   );
 }
 
+/** The three verdicts in key order, each with what it sets off (`prVerdictComment`; Hold also labels the issue do-not-merge). */
+const VERDICTS: ["approve" | "hold" | "send-back", string, string][] = [
+  ["approve", "Approve", "The agent may merge"],
+  ["hold", "Hold merge", "The PR stays open and is labelled do-not-merge"],
+  ["send-back", "Send back", "Back to the agent, with your note"],
+];
+
 export function PrPanel({ card }: { card: Card }) {
   const pr = card.pullRequest!;
   const dKey = draftKey(card.key, prDraftId(card.waiting?.requestId ?? null));
@@ -440,7 +501,7 @@ export function PrPanel({ card }: { card: Card }) {
   const pick = (v: "approve" | "hold" | "send-back") => edit({ chosen: chosen === v ? null : v });
   usePanelKeys(card.key, {
     pick: (n) => {
-      const v = (["approve", "hold", "send-back"] as const)[n - 1];
+      const v = VERDICTS[n - 1]?.[0];
       if (v) pick(v);
     },
     send: () => void send(),
@@ -456,18 +517,27 @@ export function PrPanel({ card }: { card: Card }) {
   const req = card.requests.find((r) => r.id === card.waiting?.requestId);
   return (
     <div className="section waiting" data-testid="panel-pr-approval">
-      <div className="section-title">
-        PR #{pr.number} awaits approval
-        <a href={`${pr.url}/files`} target="_blank" rel="noreferrer" style={{ marginLeft: "auto", fontWeight: 400 }}>
+      <PanelHead question={req?.question ?? `PR #${pr.number} awaits approval`} id={`PR #${pr.number}`} since={card.waiting?.since ?? null}>
+        <a href={`${pr.url}/files`} target="_blank" rel="noreferrer">
           Diff on GitHub
           <Ext />
         </a>
-      </div>
-      {req && <div style={{ fontWeight: 500 }}>{req.question}</div>}
+      </PanelHead>
       <details open>
         <summary className="muted">Summary, verification and review</summary>
         <Markdown text={pr.body} />
       </details>
+      <div className="options" role="group" aria-label="Verdict">
+        {VERDICTS.map(([v, label, what], i) => (
+          <button key={v} className={`option ${chosen === v ? "selected" : ""}`} aria-pressed={chosen === v} onClick={() => pick(v)}>
+            <kbd>{i + 1}</kbd>
+            <span className="option-text">
+              <b>{label}</b>
+              <span className="muted">{what}</span>
+            </span>
+          </button>
+        ))}
+      </div>
       <textarea
         className="input"
         placeholder="Note (required to send back, ⌘↵ to send)"
@@ -478,17 +548,8 @@ export function PrPanel({ card }: { card: Card }) {
       <div className="actions">
         <PushToggle push={push} setPush={(p) => edit({ push: p })} />
         <span className="spacer" />
-        <button className={`btn ${chosen === "send-back" ? "selected" : ""}`} aria-pressed={chosen === "send-back"} onClick={() => pick("send-back")}>
-          Send back <kbd>3</kbd>
-        </button>
-        <button className={`btn ${chosen === "hold" ? "selected" : ""}`} aria-pressed={chosen === "hold"} onClick={() => pick("hold")}>
-          Hold merge <kbd>2</kbd>
-        </button>
-        <button className={`btn ${chosen === "approve" ? "selected" : ""}`} aria-pressed={chosen === "approve"} onClick={() => pick("approve")}>
-          Approve <kbd>1</kbd>
-        </button>
         <Btn className="btn primary" why={canSend ? null : !chosen ? "Pick Approve, Hold merge or Send back first" : "Send back needs a note"} onClick={() => void send()}>
-          Send
+          Send <SendKey />
         </Btn>
       </div>
     </div>
@@ -500,18 +561,22 @@ export function LookPanel({ card, look, src, openSignal }: { card: Card; look: L
   const seen = !!card.seenAt;
   return (
     <div className={`section ${seen ? "" : "waiting"}`} data-testid="panel-look">
-      <div className="section-title">
-        Look{look ? `: ${look.headline}` : ""}
-        {look?.preview && (
-          <a href={look.preview} target="_blank" rel="noreferrer" style={{ marginLeft: "auto", fontWeight: 400 }}>
-            Open preview
-            <Ext />
-          </a>
-        )}
+      <div className="panel-head">
+        <div className="section-title">{look ? look.headline : "Look"}</div>
+        <div className="panel-meta">
+          <span className="faint">{card.closedAt ? `Done ${ago(card.closedAt)} ago` : "Done"}</span>
+          <span className="spacer" />
+          {look?.preview && (
+            <a href={look.preview} target="_blank" rel="noreferrer">
+              Open preview
+              <Ext />
+            </a>
+          )}
+        </div>
       </div>
       {!look && <div className="muted">No Look comment on this issue.</div>}
       {look?.checks.length ? (
-        <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>
+        <ul className="checks">
           {look.checks.map((c) => (
             <li key={c}>{c}</li>
           ))}

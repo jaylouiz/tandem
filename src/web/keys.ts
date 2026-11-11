@@ -50,7 +50,8 @@ const livePanel = () => (panelKeys.current && panelKeys.current.cardKey === useS
 /** j / k: open the neighbour; in Waiting on me a To look at Card is marked Seen by the open (the developer's own, unlike an automatic selection). */
 function step(card: Card) {
   const s = useStore.getState();
-  if (s.view === "waiting") openFromList(card, !!card.needsLook && !card.waiting);
+  if (s.focus) s.select(card.key); // Focus only shows the Card: a Look is marked Seen by the developer's own Mark Seen, not by passing it
+  else if (s.view === "waiting") openFromList(card, !!card.needsLook && !card.waiting);
   else {
     keyFocus.key = card.key;
     s.select(card.key);
@@ -135,6 +136,20 @@ export const BINDINGS: Binding[] = [
   })),
   { id: "go-agents", group: "Go to", keys: ["a"], chord: "g", label: "Agent activity", scope: "anywhere", run: () => useStore.getState().setAgentsOpen(true) },
   { id: "chord-g", group: "Go to", prefix: true, keys: ["g"], label: "Go to…", scope: "anywhere", run: () => startChord("g") },
+  {
+    id: "focus",
+    group: "Go to",
+    keys: ["f"],
+    label: "Focus: Waiting on me, one Card at a time",
+    scope: "anywhere",
+    run: () => {
+      const s = useStore.getState();
+      s.setFocus(!s.focus);
+    },
+  },
+  // Focus reads left to right like a deck: the arrows step it too (elsewhere they keep their scrolling)
+  { id: "focus-next", group: "Cards", when: "Focus", keys: ["ArrowRight"], label: "Next Card in Focus", scope: "cards", run: (_, ctx) => (useStore.getState().focus ? move(ctx, 1) : false) },
+  { id: "focus-previous", group: "Cards", when: "Focus", keys: ["ArrowLeft"], label: "Previous Card in Focus", scope: "cards", run: (_, ctx) => (useStore.getState().focus ? move(ctx, -1) : false) },
   { id: "next", group: "Cards", keys: ["j", "ArrowDown"], label: "Next Card", scope: "cards", run: (_, ctx) => move(ctx, 1) },
   { id: "previous", group: "Cards", keys: ["k", "ArrowUp"], label: "Previous Card", scope: "cards", run: (_, ctx) => move(ctx, -1) },
   {
@@ -217,11 +232,12 @@ export const BINDINGS: Binding[] = [
     id: "escape",
     group: "Anywhere",
     keys: ["Escape"],
-    label: "Clear the selection, then close the Card",
+    label: "Clear the selection, leave Focus, then close the Card",
     scope: "anywhere",
     run: () => {
       const s = useStore.getState();
       if (s.marked.length) s.clearMarks();
+      else if (s.focus) s.setFocus(false); // back to the list, the Card stays open
       else if (s.view === "waiting") {
         const list = document.querySelector<HTMLElement>('[data-testid="waiting-list"]');
         if (!s.selected || !list || document.activeElement === list) return false; // nothing open, or Esc has taken the list's focus already: on to the next layer

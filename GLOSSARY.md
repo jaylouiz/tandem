@@ -52,6 +52,10 @@ _Avoid_: review, comment
 The set of Cards blocked on the developer's Feedback (decision request, design round, PR approval), ordered by closeness to Done first, then by age. An agent decision never puts a Card here: the agent does not wait on it.
 _Avoid_: notifications, queue
 
+**Focus**:
+Waiting on me, one Card at a time: the list steps aside and each ask is shown alone, the blockers first, then the unseen Looks. Giving Feedback or marking Seen moves on to the next Card; passing a Look does not mark it Seen. Started from the list (key `f`), left with `esc`.
+_Avoid_: review mode, slideshow, wizard
+
 **Agent decision**:
 A choice an agent made on its own and recorded on the issue ("Agent decision (D<k>): not blocking"). The Card carries `agent-decided` until the developer accepts. States: new, accepted, challenged. It never blocks, so it is not Waiting on me.
 _Avoid_: blocker, approval
