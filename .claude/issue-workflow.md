@@ -51,7 +51,7 @@ Own components in `src/web/components/`; `cmdk` for the command palette (https:/
 - host: `TANDEM_SOURCE=fixture TANDEM_PORT=<port> TANDEM_WEB_PORT=<port+100> npm run dev`, then `http://localhost:<port+100>/?variant=<key>` (HMR); demo data, fake Push
 - switcher: `src/web/prototype/Switcher.tsx`, created on the first proto branch (fixed bottom pill, ← key →, updates `?variant=`); not on main
 - branch: `proto/<n>-<slug>`, own worktree, never merged
-- share: none (no preview deploys); give the local URL and the start command
+- share: the local URL and the start command; when a preview deploy is asked for, `npm run build:demo` and deploy `dist/demo` to a static host (demo data only, runs in the page)
 - data: fixtures only (`src/core/fixtures.ts`); extend them on the proto branch when a variant needs more states; numbers stay unique (unit-tested). Fixture moves live in the dev server's memory: `curl -X POST localhost:<port>/api/fixture/reset` (or a restart) before each screenshot
 - look (Build's Look comment): `Preview:` is the local start command plus URL; `Path:` the route and query
 

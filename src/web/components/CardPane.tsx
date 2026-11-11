@@ -5,6 +5,7 @@ import type { Card, DesignRound } from "../../core/types.ts";
 import type { ShotsTarget } from "../../core/gallery.ts";
 import { NO_COORDINATORS, TABS, api, useActivity, useCard, useNow, useStore } from "../store.ts";
 import { useSigned } from "../signed.ts";
+import { markSeen } from "../seen.ts";
 import { handedValid, startNotice, startRequests } from "../../core/triage.ts";
 import { TRIAGE_ENTRIES, actionBlocked, runTriage } from "../triage.ts";
 import { BINDINGS, keyCaps, keyOf } from "../keys.ts";
@@ -207,7 +208,8 @@ function Decided({ card, rounds, roundWaits, src, signal }: { card: Card; rounds
   );
 }
 
-export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "aside" }) {
+/** `focus`: the Card as the one sheet of Focus (Waiting on me, one at a time): the ask and its tabs, without triage and status. */
+export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "aside" | "focus" }) {
   const card = useCard(cardKey);
   const select = useStore((s) => s.select);
   const tab = useStore((s) => s.tab);
@@ -256,6 +258,9 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
   // a Card that changes afterwards (Send moves the round to "earlier") never re-targets the panel
   const signalFor = (who: ShotsTarget) => (shotsRequest?.key === card.key && shotsRequest.target === who ? shotsRequest.id : undefined);
   const kind = kindOf(card);
+  const focus = mode === "focus";
+  // the Feedback panels lead with their own question: only an ask without a panel (Awaiting pickup) is spelled out in the head
+  const headAsk = kind === "pickup";
 
   return (
     <aside className={`pane ${mode}`} data-testid="detail" aria-label={`Card ${card.key}`}>
@@ -279,7 +284,7 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
           <RepoTag repo={card.repo} number={card.number} />
           <CardChips card={card} />
         </div>
-        {kind && (
+        {kind && headAsk && (
           <div className="pane-ask" data-kind={kind}>
             <KindGlyph kind={kind} box />
             <div>
@@ -323,6 +328,15 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
           {roundWaits && round && <RoundPanel key={`${card.key}-${round.round}`} card={card} round={round} src={signed} openSignal={signalFor("round")} />}
           {card.waiting?.kind === "pr-approval" && card.pullRequest && <PrPanel card={card} />}
           {lookShown && <LookPanel key={`look-${card.key}`} card={card} look={look} src={signed} openSignal={signalFor("look")} />}
+          {/* Focus shows a Look without marking it: Seen is the developer's own reaction here, and it moves on to the next Card */}
+          {lookShown && focus && !card.seenAt && (
+            <div className="actions">
+              <span className="spacer" />
+              <button className="btn primary" data-testid="focus-seen" onClick={() => void markSeen([card], true, { quiet: true })}>
+                Mark Seen <kbd>{keyOf("seen")}</kbd>
+              </button>
+            </div>
+          )}
 
           {card.awaitingPickup && (
             <div className="section" data-testid="awaiting-pickup">
@@ -341,7 +355,7 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
             </div>
           )}
 
-          {card.phase !== "Done" && (
+          {card.phase !== "Done" && !focus && (
             <div className="section">
               <Triage key={card.key} card={card} />
               {card.phase === "Backlog" && !card.waiting && (
@@ -372,7 +386,7 @@ export function CardPane({ cardKey, mode }: { cardKey: string; mode: "split" | "
               )}
             </div>
           )}
-          <Status key={`status-${card.key}`} card={card} act={act} expanded={false} />
+          {!focus && <Status key={`status-${card.key}`} card={card} act={act} expanded={false} />}
         </div>
         <div className="tab-body" role="tabpanel" hidden={tab !== "decided"} data-testid="tab-decided">
           <Decided card={card} rounds={rounds} roundWaits={roundWaits} src={signed} signal={signalFor("earlier")} />

@@ -162,7 +162,7 @@ export function NavIcon({ view }: { view: View }) {
 
 export function KindChip({ kind }: { kind: Kind }) {
   return (
-    <span className="kind-chip" data-kind={kind}>
+    <span className="kind-chip sr-only" data-kind={kind}>
       {KIND_LABEL[kind]}
     </span>
   );

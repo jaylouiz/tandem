@@ -1,7 +1,7 @@
 // The store and the URL, kept equal both ways (#48). The store stays the source of truth: the page's initial state comes from the URL
 // (`startingPlace` in store.ts), a change of view, open Card, tab or Repo filter writes the URL, and Back/Forward apply a URL to the store.
 // Whether a change adds a history entry is decided where it happens (`navigation.hint`, see `Nav`): deliberate opens push, the rest replaces.
-import { formatRoute, navigation, parseRoute, type Nav } from "./route.ts";
+import { BASE, appPath, formatRoute, navigation, parseRoute, type Nav } from "./route.ts";
 import { storeFilter, storedView, useStore, validFilter } from "./store.ts";
 
 let started = false;
@@ -10,7 +10,7 @@ let unverified: string | null = null;
 /** The history mode of the write due at the end of this tick; changes made in one tick (palette: lift the filter, switch view, open the Card) share one entry. */
 let due: Nav | null = null;
 
-const here = () => location.pathname + location.search;
+const here = () => appPath(location.pathname) + location.search;
 
 function flush() {
   const mode = due;
@@ -18,7 +18,7 @@ function flush() {
   if (!mode) return;
   const url = formatRoute(useStore.getState());
   if (url === here()) return;
-  history[mode === "push" ? "pushState" : "replaceState"](null, "", url);
+  history[mode === "push" ? "pushState" : "replaceState"](null, "", BASE + url);
 }
 
 function schedule(mode: Nav) {
@@ -50,7 +50,7 @@ function verifyCard() {
 
 /** Back/Forward (and the first load): the URL's place becomes the store's. Opening a Card here is a restore, not a visit: nothing is marked Seen, nothing is written. */
 function applyUrl() {
-  const r = parseRoute(location.pathname, location.search);
+  const r = parseRoute(appPath(location.pathname), location.search);
   const view = r.view ?? storedView();
   const board = useStore.getState().board;
   const repoFilter = board ? validFilter(r.repoFilter, board.repos) : r.repoFilter;
@@ -60,7 +60,7 @@ function applyUrl() {
   storeFilter(repoFilter);
   unverified = r.selected;
   // the reset #30's setView gives a page, without its "close the Card": the URL names the Card
-  useStore.setState({ view, selected: r.selected, tab: r.tab, repoFilter, linger: null, marked: [] });
+  useStore.setState({ view, selected: r.selected, tab: r.tab, repoFilter, linger: null, marked: [], ...(view === "waiting" ? {} : { focus: false }) });
 }
 
 /** Call once before the first render. */

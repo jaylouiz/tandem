@@ -5,6 +5,12 @@
 //   ?repo=<owner/repo>                                  the Repo filter (All repos = no parameter)
 import type { Tab, View } from "./store.ts";
 
+/** Where the app is mounted: "" at the root (the local app), `/tandem/pr-4` for a demo served from a sub-path (Vite's `base`). */
+export const BASE = ((import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/").replace(/\/$/, "");
+
+/** The page's path as the routes know it: without the mount point. */
+export const appPath = (pathname: string, base = BASE): string => (base && (pathname === base || pathname.startsWith(`${base}/`)) ? pathname.slice(base.length) || "/" : pathname);
+
 export const VIEWS: readonly View[] = ["waiting", "board", "maps", "settings"];
 const TAB_PARAMS: readonly Tab[] = ["decided", "activity", "issue"];
 

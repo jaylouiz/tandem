@@ -39,3 +39,13 @@ describe("kindOf / askOf", () => {
     expect(askOf(card(103))).toBe("");
   });
 });
+
+describe("tally (the end of Focus)", () => {
+  it("counts Looks as marked Seen and every other kind as answered", async () => {
+    const { tally } = await import("./ask.ts");
+    expect(tally(["decision", "pr-approval", "look"])).toBe("2 answered and 1 marked Seen");
+    expect(tally(["look", "look"])).toBe("2 marked Seen");
+    expect(tally(["design-round"])).toBe("1 answered");
+    expect(tally([])).toBe("");
+  });
+});

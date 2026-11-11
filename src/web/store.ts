@@ -5,7 +5,7 @@ import { toLookAt, waitingOnMe } from "../core/card.ts";
 import { pruneDrafts, type Draft } from "../core/drafts.ts";
 import type { ShotsTarget } from "../core/gallery.ts";
 import { nextAfterAnswer } from "./answered.ts";
-import { navigation, parseRoute, VIEWS, type Nav } from "./route.ts";
+import { appPath, navigation, parseRoute, VIEWS, type Nav } from "./route.ts";
 import { closeToast } from "./ui/Toast.tsx";
 import { pruneHanded, type HandedRecord } from "../core/triage.ts";
 import { NO_COORDINATOR, type ActivityEntry, type BoardView, type Card, type Coordinator, type NextStep, type Phase, type WayfinderMap } from "../core/types.ts";
@@ -122,6 +122,9 @@ interface State {
   /** Waiting on me: the Card the developer opened out of To look at (and so marked Seen); it stays listed until another Card is opened or the view changes */
   linger: string | null;
   setLinger: (key: string | null) => void;
+  /** Waiting on me, Focus: the list steps aside and the asks come one at a time (`components/Focus.tsx`). Per session, never in the URL; leaving the view ends it */
+  focus: boolean;
+  setFocus: (on: boolean) => void;
   /** switching view starts the page with nothing open and nothing marked (#30); a new history entry unless `nav` says "replace" (#48) */
   setView: (v: View, nav?: Nav) => void;
   /** Open (or close, null) a Card. `opts.nav`: the history entry a deliberate open pushes ("push"), anything automatic replaces (default); `opts.view` opens it in another view in the same step (#48) */
@@ -165,7 +168,7 @@ export function storeFilter(repo: string | null) {
  * The URL's own filter wins even when empty: `/board` shows every repo (#48).
  */
 function startingPlace(): { view: View; selected: string | null; tab: Tab; repoFilter: string | null } {
-  const r = typeof location === "undefined" ? null : parseRoute(location.pathname, location.search);
+  const r = typeof location === "undefined" ? null : parseRoute(appPath(location.pathname), location.search);
   const remembered = localStorage.getItem(FILTER_KEY);
   if (!r?.view) return { view: storedView(), selected: null, tab: "now", repoFilter: r?.repoFilter ?? remembered };
   return { view: r.view, selected: r.selected, tab: r.tab, repoFilter: r.repoFilter };
@@ -184,6 +187,13 @@ export const useStore = create<State>((set) => ({
   selected: start.selected,
   linger: null,
   setLinger: (linger) => set({ linger }),
+  focus: false,
+  setFocus: (focus) => {
+    if (focus) localStorage.setItem(VIEW_KEY, "waiting");
+    navigation.hint = focus ? "push" : "replace";
+    // Focus lives in Waiting on me: from another view it goes there first (nothing open, nothing marked, like any view change)
+    set((s) => (focus === s.focus ? {} : focus && s.view !== "waiting" ? { focus, view: "waiting", selected: null, tab: "now", linger: null, marked: [] } : { focus, linger: null, marked: s.marked.length ? [] : s.marked }));
+  },
   tab: start.tab,
   setTab: (tab) => set({ tab }),
   modal: null,
@@ -243,7 +253,7 @@ export const useStore = create<State>((set) => ({
     localStorage.setItem(VIEW_KEY, view);
     navigation.hint = nav;
     // every page starts with the Card pane closed; the same view again keeps what is open
-    set((s) => (view === s.view ? {} : { view, selected: null, tab: "now", linger: null, marked: s.marked.length ? [] : s.marked }));
+    set((s) => (view === s.view ? {} : { view, focus: false, selected: null, tab: "now", linger: null, marked: s.marked.length ? [] : s.marked }));
   },
   select: (selected, tab, opts = {}) => {
     navigation.hint = opts.nav ?? "replace";
@@ -255,7 +265,7 @@ export const useStore = create<State>((set) => ({
       const repo = selected ? s.board?.cards.find((c) => c.key === selected)?.repo : undefined;
       const lane = repo && s.collapsedLanes[repo] ? { collapsedLanes: { ...s.collapsedLanes, [repo]: false } } : {};
       // another view starts without marks and lingering Cards, as in setView
-      const fresh = view ? { view, linger: null, marked: s.marked.length ? [] : s.marked } : { linger: s.linger === selected ? s.linger : null };
+      const fresh = view ? { view, focus: false, linger: null, marked: s.marked.length ? [] : s.marked } : { linger: s.linger === selected ? s.linger : null };
       return { ...lane, ...fresh, selected, tab: tab ?? "now" };
     });
   },
@@ -391,6 +401,12 @@ export function useMaps(): WayfinderMap[] {
 export const blockerCount = (cards: Card[]): number => waitingOnMe(cards).length;
 
 export const groupsOf = (cards: Card[], keep: string | null = null) => ({ waiting: waitingOnMe(cards), look: toLookAt(cards, keep) });
+
+/** What Focus goes through, in order: the blockers, then the unseen Looks. Awaiting pickup asks nothing of the developer, so it is not in it. */
+export const focusQueue = (cards: Card[]): Card[] => {
+  const { waiting, look } = groupsOf(cards);
+  return [...waiting, ...look];
+};
 
 export function useCard(key: string | null): Card | null {
   const cards = useCards();
@@ -537,6 +553,8 @@ export async function giveFeedback(card: Card, action: string, body: Record<stri
     // only an answered "nobody is there" offers a start; a Push that failed says why (starting a coordinator would not fix it)
     const none = push.reason === NO_COORDINATOR;
     setNotice({ key: card.key, text: `Feedback given, awaiting pickup: ${none ? NO_COORDINATOR : `could not push (${push.reason})`}`, canStart: none });
+  } else if (useStore.getState().focus) {
+    // Focus: the next Card and the progress say it went through; a toast per answer would pile up over the sheet. What needs the developer (above) still shows.
   } else if (push?.delivered) {
     setNotice({ key: card.key, text: "Feedback given and pushed to the coordinator", canStart: false });
   } else {

@@ -29,6 +29,8 @@ export interface PaletteAction {
 export const NO_ENTRY: Record<string, string> = {
   palette: "the palette is the place these entries are listed in",
   "leave-field": "Esc inside a text field is not a command",
+  "focus-next": "the same step as Next Card (j), which has its entry",
+  "focus-previous": "the same step as Previous Card (k), which has its entry",
 };
 
 /** The state the entries depend on. Collected by the Palette from the store; a test passes the fullest one. */
@@ -41,6 +43,8 @@ export interface ActionCtx {
   /** its last Feedback was not sent (the Not sent message shows) */
   failed: boolean;
   tab: Tab;
+  /** Waiting on me is in Focus (one Card at a time) */
+  focus: boolean;
   /** how many Cards are marked */
   marked: number;
   shots: ShotsTarget | null;
@@ -71,6 +75,8 @@ export function paletteActions(c: ActionCtx): PaletteAction[] {
   ] as const)
     add({ id, group: "Go to", label, binding: id, run: () => s().setView(view) });
   add({ id: "go-agents", group: "Go to", label: "Agent activity", binding: "go-agents", run: () => s().setAgentsOpen(true) });
+
+  add({ id: "focus", group: "Go to", label: c.focus ? "Leave Focus: back to the list" : "Focus: Waiting on me, one Card at a time", binding: "focus", search: "focus one by one slideshow guided go through", run: () => s().setFocus(!c.focus) });
 
   const card = c.card;
   if (card) {
