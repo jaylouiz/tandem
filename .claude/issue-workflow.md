@@ -69,7 +69,7 @@ none
 ## Branches
 
 - name: `<type>/<n>-<kebab-slug>`, type `fix|feat|test|docs|chore`
-- worktree notes: run `npm ci` in a new worktree (no symlinked node_modules). In an EnterWorktree session the shell refuses compound commands (heredocs, inline scripts, pipes or loops around `git`/`gh`): one plain command per call, scripts and long bodies as files in the scratchpad
+- worktree notes: run `npm ci` in a new worktree (no symlinked node_modules). In an EnterWorktree session the shell refuses compound commands (heredocs, inline scripts, pipes or loops around `git`/`gh`): one plain command per call, scripts and long bodies as files in the scratchpad. Git in another repo (e.g. an agent-workflow skill edit) is refused too: name it a user step in the report. No formatter is configured (long lines are kept by hand): never run `prettier`, it reflows whole files
 
 ## Verification
 

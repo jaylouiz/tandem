@@ -63,7 +63,7 @@ export interface Marker {
 export interface Screenshot {
   src: string;
   alt: string;
-  variant: string | null; // R<k> · <variant> · <viewport>; look · <viewport> · <state>
+  variant: string | null; // R<k> · <variant> · <viewport> (`slide a` for a further axis); look · <viewport> · <state>
   viewport: "desktop" | "mobile" | null;
   state: string | null;
 }
@@ -96,7 +96,10 @@ export interface DesignRound {
   round: number;
   title: string;
   preview: string | null;
-  variants: { key: string; name: string; summary: string }[];
+  /** main variants first, then each further axis's (`axis`: its name, `key`: `<axis>=<option>`; core/axes.ts) */
+  variants: { key: string; name: string; summary: string; axis: string | null }[];
+  /** further questions shown in the same prototype, combined freely with the main variants (`Axis <name>: <keys> (<about>)`) */
+  axes: { name: string; about: string }[];
   question: string | null;
   screenshots: Screenshot[];
   createdAt: string;

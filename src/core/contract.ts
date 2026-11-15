@@ -10,6 +10,7 @@ import type {
   RawComment,
   Screenshot,
 } from "./types.ts";
+import { axisKey, byAxis } from "./axes.ts";
 
 const MARKER = /<!--\s*decision-([a-z]+)(?:\s+([^>]*?))?\s*-->/;
 
@@ -195,28 +196,110 @@ function legacyRound(body: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/** `a, b, c (samples)` -> the keys; a parenthesis is a note for the reader, a part with a space is prose, not a key. */
+const keyList = (text: string) =>
+  text
+    .replace(/\([^)]*\)/g, "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter((k) => /^[\w-]+$/.test(k));
+
+const parenthesis = (text: string) => /\(([^)]*)\)\s*$/.exec(text)?.[1]?.trim() ?? "";
+
+/**
+ * The keys a round declares. Main: `Variants: a, b, c`. A further axis (a round that asks more than one question in one
+ * prototype): `Axis slide: o, a (how the steps move)`, one line each. Also read, from rounds written before that line existed:
+ * axes after a `·` on the Variants line (`Variants: a, b, c · slide: o, a`, `· m=a (menu content)`).
+ */
+function declaredKeys(lines: string[]) {
+  const main: string[] = [];
+  const axes: { name: string; about: string; options: string[] }[] = [];
+  const axis = (name: string, about: string, options: string[]) => {
+    const known = axes.find((a) => a.name === name);
+    if (known) known.options.push(...options.filter((o) => !known.options.includes(o)));
+    else axes.push({ name, about, options });
+  };
+  const [first = "", ...more] = (field(lines, "Variants") ?? "").split("·");
+  main.push(...keyList(first));
+  for (const part of more) {
+    const named = /^\s*([\w-]+)\s*:\s*(.*)$/.exec(part);
+    const one = /^\s*([\w-]+)=([\w-]+)/.exec(part);
+    if (named) axis(named[1]!, parenthesis(named[2]!), keyList(named[2]!));
+    else if (one) axis(one[1]!, parenthesis(part), [one[2]!]);
+  }
+  for (const l of lines) {
+    const m = /^Axis\s+([\w-]+)\s*:\s*(.*)$/.exec(l);
+    if (m) axis(m[1]!, parenthesis(m[2]!), keyList(m[2]!));
+  }
+  return { main, axes };
+}
+
+/** A heading's or an alt text's variant (`a`, `slide a`, `slide=a`, `slide-a`, or a whole axis `slide`) against the declared axes. */
+function resolveKey(raw: string, axes: string[], main: string[]): { key: string; axis: string | null } | { axisOnly: string } | null {
+  const t = raw.trim();
+  const lower = (s: string) => s.toLowerCase();
+  const axisNamed = (n: string) => axes.find((a) => lower(a) === lower(n));
+  const two = /^([\w-]+?)(?:\s+|=|-)([\w-]+)$/.exec(t);
+  if (two) {
+    const a = axisNamed(two[1]!) ?? (t.includes("=") ? two[1]! : undefined);
+    if (a) return { key: axisKey(a, two[2]!), axis: a };
+  }
+  if (!t.includes(" ") && axisNamed(t) && !main.some((k) => lower(k) === lower(t))) return { axisOnly: axisNamed(t)! };
+  return /^[\w-]+$/.test(t) ? { key: t, axis: null } : null;
+}
+
 function parseRound(c: RawComment, round: number): DesignRound {
   const lines = visibleLines(c.body);
   const title = lines.find((l) => l.startsWith("## "))?.slice(3).trim() ?? `Design round ${round}`;
-  const keys = (field(lines, "Variants") ?? "").split(",").map((k) => k.trim()).filter(Boolean);
-  const variants: DesignRound["variants"] = [];
+  const declared = declaredKeys(lines);
+  const axisNames = declared.axes.map((a) => a.name);
+  const about = new Map(declared.axes.map((a) => [a.name, a.about]));
+  const found: DesignRound["variants"] = [];
   lines.forEach((l, i) => {
     const h = /^###\s+([^:]+):\s*(.*)$/.exec(l);
-    if (h) variants.push({ key: h[1]!.trim(), name: h[2]!.trim(), summary: (lines[i + 1] ?? "").trim() });
+    if (!h) return;
+    const summary = (lines[i + 1] ?? "").trim();
+    const r = resolveKey(h[1]!, axisNames, declared.main);
+    if (r && "axisOnly" in r) {
+      // an older round describes a whole axis under one heading (`### slide: o fade (today) vs a sideways slide`)
+      about.set(r.axisOnly, h[2]!.trim());
+      return;
+    }
+    const key = r?.key ?? h[1]!.trim();
+    const axis = r?.axis ?? null;
+    if (axis && !axisNames.includes(axis)) axisNames.push(axis);
+    if (!found.some((v) => v.key === key)) found.push({ key, name: h[2]!.trim(), summary, axis });
   });
-  for (const k of keys) if (!variants.some((v) => v.key === k)) variants.push({ key: k, name: k, summary: "" });
+  for (const k of declared.main) if (!found.some((v) => v.key === k)) found.push({ key: k, name: k, summary: "", axis: null });
+  for (const a of declared.axes)
+    for (const o of a.options) if (!found.some((v) => v.key === axisKey(a.name, o))) found.push({ key: axisKey(a.name, o), name: o, summary: "", axis: a.name });
+  // main first, then each axis in the order it was declared
+  const variants = [...found.filter((v) => v.axis === null), ...axisNames.flatMap((a) => found.filter((v) => v.axis === a))];
+  const keys = variants.map((v) => v.key);
   const question = lines.find((l) => l.startsWith("**Question:**"))?.replace("**Question:**", "").trim() ?? null;
+  const screenshots = parseScreenshots(c.body, { variants: keys }).map((s) => (s.variant && !keys.includes(s.variant) ? { ...s, ...shotKey(s.variant, axisNames, keys) } : s));
   return {
     round,
     title,
     preview: field(lines, "Preview"),
     variants,
+    axes: axisNames.map((name) => ({ name, about: about.get(name) ?? "" })),
     question,
-    screenshots: parseScreenshots(c.body, { variants: variants.map((v) => v.key) }),
+    screenshots,
     createdAt: c.createdAt,
     url: c.url,
     commentId: c.id,
   };
+}
+
+/** An alt text's variant that is not a declared key as written: `slide a` / `slide-a` for `slide=a`, `a-step2` for variant a in state step2. */
+function shotKey(raw: string, axes: string[], keys: string[]): Pick<Screenshot, "variant"> | Pick<Screenshot, "variant" | "state"> {
+  const lower = (s: string) => s.toLowerCase();
+  const r = resolveKey(raw, axes, keys);
+  if (r && "key" in r && keys.some((k) => lower(k) === lower(r.key))) return { variant: r.key };
+  const m = /^(\w+)[-\s](.+)$/.exec(raw.trim());
+  if (m && keys.some((k) => lower(k) === lower(m[1]!))) return { variant: m[1]!, state: m[2]! };
+  return { variant: raw };
 }
 
 function parseLook(c: RawComment): LookNote {
@@ -260,10 +343,11 @@ export interface RoundReaction {
   comment: string;
 }
 
+/** `R1:` then the picks and the rejects, one line per axis: `- pick: b`, `- pick slide: a` (core/axes.ts). */
 export function roundReactionComment(r: RoundReaction): string {
   const lines = [`R${r.round}:`];
-  if (r.picks.length) lines.push(`- pick: ${r.picks.join(", ")}`);
-  if (r.rejects.length) lines.push(`- reject: ${r.rejects.join(", ")}`);
+  for (const [verb, keys] of [["pick", r.picks], ["reject", r.rejects]] as const)
+    for (const [axis, options] of byAxis(keys)) lines.push(`- ${verb}${axis ? ` ${axis}` : ""}: ${options.join(", ")}`);
   if (r.comment.trim()) lines.push("", r.comment.trim());
   return lines.join("\n");
 }

@@ -1,13 +1,14 @@
 // Screenshot grouping and gallery navigation, pure so the keyboard model is unit-testable (job 4, job 10).
 // A round groups by variant, a Look by state; inside a group desktop comes before mobile.
+import { keyLabel, splitKey } from "./axes.ts";
 import type { Card, DesignRound, Screenshot } from "./types.ts";
 
 export type Viewport = "desktop" | "mobile";
-type Variant = DesignRound["variants"][number];
+type Variant = Pick<DesignRound["variants"][number], "key" | "name" | "summary">;
 
 export interface ShotGroup {
   key: string | null;
-  /** header text: `Variant a · Grouped list`, the Look state, or "" for shots without a group */
+  /** header text: `Variant a · Grouped list` (`slide a · Sideways` on a further axis), the Look state, or "" for shots without a group */
   title: string;
   summary: string;
   /** indices into `ShotNav.flat`, desktop first */
@@ -44,7 +45,8 @@ export function buildNav(shots: Screenshot[], variants: Variant[] = [], by: "var
     const members = shots.map((s, i) => ({ s, i })).filter(({ s }) => keyOf(s) === key).sort((a, b) => viewRank(a.s) - viewRank(b.s) || a.i - b.i);
     if (!members.length) continue;
     const v = key === null ? undefined : declared.get(key.toLowerCase());
-    const title = key === null ? "" : by === "state" ? key : v && v.name && v.name !== v.key ? `Variant ${key} · ${v.name}` : `Variant ${key}`;
+    const label = key === null || by === "state" ? key ?? "" : key.includes("=") ? keyLabel(key) : `Variant ${key}`;
+    const title = by === "variant" && v && v.name && v.name !== splitKey(v.key).option ? `${label} · ${v.name}` : label;
     const indices = members.map(({ s }) => {
       flat.push(s);
       groupOf.push(groups.length);

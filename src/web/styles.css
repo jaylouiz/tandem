@@ -825,7 +825,20 @@ a:has(> .ext) {
   flex-direction: column;
   gap: var(--s-2);
 }
+/* a further axis of the round (`slide`, `back`): its name and what it decides, then its variants, picked alongside the ones above */
+.variant-axis {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.variant-axis b {
+  font-weight: 600;
+  color: var(--text);
+}
 .variant + .variant,
+.variant + .variant-axis,
 .variants > .thumb-group:not(:first-child) {
   border-top: 1px solid var(--border);
   padding-top: var(--s-3);
@@ -1621,6 +1634,9 @@ button.done-head:hover { background: var(--bg-hover); color: var(--text); }
 .vtabs [role="tab"][data-state="rejected"] b { text-decoration: line-through; color: var(--text-faint); }
 .vtabs .tile-check { margin-left: 0; }
 .vtab-note { font-size: var(--fs-xs); color: var(--text-faint); }
+/* a further axis of the round (`slide`, `back`): its name opens its run of tabs, after a hairline */
+.vtabs:has(.vtabs-axis) { flex-wrap: wrap; row-gap: 4px; }
+.vtabs-axis { flex-shrink: 0; display: inline-flex; align-items: center; height: 30px; margin-left: var(--s-2); padding: 0 var(--s-1) 0 var(--s-3); border-left: 1px solid var(--border); color: var(--text-faint); font-size: var(--fs-sm); font-weight: 500; }
 .vtabs-keys { flex-shrink: 0; display: inline-flex; gap: 2px; margin-left: var(--s-1); }
 .vtabs-sum { min-width: 0; margin-left: var(--s-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
 

@@ -95,7 +95,7 @@ describe("waiting on me", () => {
   });
 
   it("orders closest to Done first, then oldest", () => {
-    expect(waitingOnMe(cards()).map((c) => c.number)).toEqual([106, 173, 177, 180, 170, 127, 171, 172, 117, 105, 118, 175, 178, 179, 110, 104]);
+    expect(waitingOnMe(cards()).map((c) => c.number)).toEqual([106, 173, 177, 180, 170, 127, 171, 172, 117, 105, 118, 175, 178, 179, 110, 104, 182]);
   });
 
   it("an answered request is awaiting pickup, not waiting", () => {
