@@ -3,7 +3,8 @@
 // a click or a digit only picks, the Send button or ⌘↵ writes. What was typed and picked is a draft in the store
 // (per Card + request, `useDraft`): it survives Card switches and snapshots, goes when the send succeeded. What an answer is and how
 // it is sent lives in `feedback/answers.ts`, shared with the covers of Focus (where a click on an option sends).
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { keyLabel, splitKey } from "../../core/axes.ts";
 import { buildNav, type ShotGroup, type ShotNav } from "../../core/gallery.ts";
 import type { Card, DesignRound, LookNote, Screenshot } from "../../core/types.ts";
 import { AGENT_DRAFT_ID, draftKey } from "../../core/drafts.ts";
@@ -281,10 +282,10 @@ export function RoundPanel({ card, round, src, openSignal }: { card: Card; round
       if (v) toggle("picks", v.key);
     },
     send: () => void send(),
-    choices: round.variants.map((v, i) => ({ n: i + 1, label: `Pick variant ${v.key}`, on: picks.includes(v.key) })),
+    choices: round.variants.map((v, i) => ({ n: i + 1, label: `Pick variant ${keyLabel(v.key)}`, on: picks.includes(v.key) })),
     extras: round.variants.map((v) => ({
       id: `reject-${v.key}`,
-      label: `${rejects.includes(v.key) ? "Unreject" : "Reject"} variant ${v.key}`,
+      label: `${rejects.includes(v.key) ? "Unreject" : "Reject"} variant ${keyLabel(v.key)}`,
       run: () => toggle("rejects", v.key),
     })),
     canSend,
@@ -318,26 +319,36 @@ export function RoundPanel({ card, round, src, openSignal }: { card: Card; round
         {round.variants.map((v, i) => {
           const group = nav.groups.find((g) => g.key === v.key);
           const state = picks.includes(v.key) ? "picked" : rejects.includes(v.key) ? "rejected" : undefined;
+          const option = splitKey(v.key).option;
+          const axis = v.axis !== null && round.variants[i - 1]?.axis !== v.axis ? round.axes.find((a) => a.name === v.axis) : undefined;
           return (
-            <div key={v.key} className="variant" data-state={state} data-testid={`thumb-group-${v.key}`}>
-              <div className="variant-head">
-                <kbd>{i + 1}</kbd>
-                <span className="variant-name">
-                  <b>{v.key}</b>
-                  {v.name && v.name !== v.key ? ` ${v.name}` : ""}
-                </span>
-                <span className="variant-sum faint" title={v.summary}>
-                  {v.summary}
-                </span>
-                <button className={`btn ${picks.includes(v.key) ? "selected" : ""}`} aria-pressed={picks.includes(v.key)} aria-label={`Pick variant ${v.key}`} onClick={() => toggle("picks", v.key)}>
-                  Pick
-                </button>
-                <button className={`btn ${rejects.includes(v.key) ? "selected" : ""}`} aria-pressed={rejects.includes(v.key)} aria-label={`Reject variant ${v.key}`} onClick={() => toggle("rejects", v.key)}>
-                  Reject
-                </button>
+            <Fragment key={v.key}>
+              {axis && (
+                <div className="variant-axis" data-testid={`axis-${axis.name}`}>
+                  <b>{axis.name}</b>
+                  {axis.about && <span className="faint">{axis.about}</span>}
+                </div>
+              )}
+              <div className="variant" data-state={state} data-testid={`thumb-group-${v.key}`}>
+                <div className="variant-head">
+                  <kbd>{i + 1}</kbd>
+                  <span className="variant-name">
+                    <b>{option}</b>
+                    {v.name && v.name !== option ? ` ${v.name}` : ""}
+                  </span>
+                  <span className="variant-sum faint" title={v.summary}>
+                    {v.summary}
+                  </span>
+                  <button className={`btn ${picks.includes(v.key) ? "selected" : ""}`} aria-pressed={picks.includes(v.key)} aria-label={`Pick variant ${keyLabel(v.key)}`} onClick={() => toggle("picks", v.key)}>
+                    Pick
+                  </button>
+                  <button className={`btn ${rejects.includes(v.key) ? "selected" : ""}`} aria-pressed={rejects.includes(v.key)} aria-label={`Reject variant ${keyLabel(v.key)}`} onClick={() => toggle("rejects", v.key)}>
+                    Reject
+                  </button>
+                </div>
+                {group && <ThumbRow nav={nav} group={group} set={set} src={src} onOpen={gallery.open} />}
               </div>
-              {group && <ThumbRow nav={nav} group={group} set={set} src={src} onOpen={gallery.open} />}
-            </div>
+            </Fragment>
           );
         })}
         {loose.map((g, gi) => (

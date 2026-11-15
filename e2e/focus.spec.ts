@@ -220,6 +220,37 @@ test("a design round shows its screenshot at real size; a pick sends at once, a 
   for (const n of [118, 175, 178]) await expect(page.locator(`[data-card="acme/app#${n}"]`)).toHaveAttribute("data-kind", "pickup");
 });
 
+test("a round with further axes takes one pick per row, and the pick that completes them sends them together", async ({ page }) => {
+  await start(page);
+  await expect(row(page, 182)).toContainText("Round 1, 2 variants plus slide, back");
+  await row(page, 182).click();
+  const round = page.getByTestId("cover-design-round");
+  await expect(round.getByTestId("axis-slide")).toHaveText("slide");
+  await expect(round.getByTestId("axis-back")).toHaveText("back");
+  await expect(round.getByRole("tab")).toHaveCount(6); // digits run on across the rows: a b | slide o a | back o a
+  await expect(bar(page)).toContainText("One pick per row: variant, slide, back.");
+  await expect(page.getByTestId("pick-a")).toHaveText(/^Pick a/); // one row alone does not send
+
+  await page.keyboard.press("2"); // b: marked, nothing sent
+  await on(page, 182);
+  await expect(round.getByTestId("variant-b")).toHaveAttribute("data-state", "picked");
+  await expect(bar(page)).toContainText("Picked b. Pick slide and back and they are sent together.");
+  await page.keyboard.press("Escape"); // clears the picks, stays on the ask
+  await on(page, 182);
+  await expect(round.getByTestId("variant-b")).not.toHaveAttribute("data-state", "picked");
+
+  await page.keyboard.press("2");
+  await page.keyboard.press("3"); // slide o
+  await page.keyboard.press("4"); // slide a: gives way on its row
+  await expect(round.getByTestId("variant-slide=o")).not.toHaveAttribute("data-state", "picked");
+  await expect(bar(page)).toContainText("Picked b · slide a. Pick back and they are sent together.");
+  await expect(page.getByTestId("stage").locator("img")).toHaveAttribute("alt", "R1 · slide a · desktop"); // the stage shows what was picked
+  await round.getByTestId("variant-back=a").click();
+  await expect(page.getByTestId("pick-back=a")).toHaveText(/Send pick back a/); // this one completes the rows
+  await page.getByTestId("pick-back=a").click();
+  await expect.poll(async () => (await answers(page, 182)).answers).toEqual(["R1:\n- pick: b\n- pick slide: a\n- pick back: a"]);
+});
+
 test("Focus does not mark a Look Seen by passing it; l and Mark Seen do, and move on; its screenshot steps by state", async ({ page }) => {
   await page.goto("/waiting");
   await loaded(page);
@@ -379,12 +410,12 @@ test("the end is a receipt: every Card answered in this Focus with the comment w
   expect(rows.length).toBeGreaterThan(20);
   await page.keyboard.press("f");
   await page.keyboard.press("Enter");
-  // one key per Card, in the list's order: each answer brings the next open ask
+  // one key per Card, in the list's order: each answer brings the next open ask (a round with further axes: one pick per row)
   for (const [key, kind] of rows) {
     await on(page, Number(key.split("#")[1]));
     await expect(focus(page)).toHaveAttribute("data-kind", kind);
     await expect(bar(page)).not.toHaveAttribute("data-state", "sending");
-    await page.keyboard.press(kind === "look" ? "l" : "1");
+    for (const k of key === "acme/app#182" ? ["1", "3", "5"] : [kind === "look" ? "l" : "1"]) await page.keyboard.press(k);
   }
   const done = page.getByTestId("focus-done");
   await expect(done.getByRole("heading", { level: 1 })).toHaveText("All clear");

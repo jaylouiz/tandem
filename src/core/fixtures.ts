@@ -61,6 +61,37 @@ Dropped: timeline: too sparse
 ![R${k} · c · desktop](${svg(`R${k} c desktop`, 20)})
 ![R${k} · c · mobile](${svg(`R${k} c mobile`, 20, 390, 844)})`;
 
+/** A round that asks two more questions in the same prototype (design batch): the main variants plus the axes `slide` and `back`. */
+export const axesRoundBody = (k: number, title: string) => `<!-- decision-note round R${k} -->
+## Design round ${k}: ${title}
+Preview: http://localhost:5317/welcome?seed=demo&variant=a&slide=a&back=a
+Variants: a, b
+Axis slide: o, a (how one step gives way to the next)
+Axis back: o, a (the way back to the choice)
+Samples become a third start option; how steps move and how to go back are open too, and combine freely with either layout.
+### a: Three equal rows
+All three answers carry the same weight · tech check: S
+<details><summary>Details</summary>The start keeps its rule that no answer is primary.</details>
+### b: Explore row set apart
+Two rows, then a third one under a question · tech check: S
+<details><summary>Details</summary>Samples read as a trial, not a place.</details>
+### slide o: Fade and lift
+Today's transition · tech check: S
+### slide a: Sideways slide
+Forward leaves left, back mirrors it · tech check: S
+### back o: Text link
+Today's plain link · tech check: S
+### back a: Arrow button
+A ghost button with an arrow · tech check: S
+**Question:** Which layout (a or b), which slide (o or a) and which way back (o or a)?
+
+![R${k} · a · desktop](${svg(`R${k} a desktop`, 210)})
+![R${k} · a · mobile](${svg(`R${k} a mobile`, 210, 390, 844)})
+![R${k} · b · desktop](${svg(`R${k} b desktop`, 140)})
+![R${k} · slide a · desktop](${svg(`R${k} slide a desktop`, 20)})
+![R${k} · back o · desktop](${svg(`R${k} back o desktop`, 260)})
+![R${k} · back a · desktop](${svg(`R${k} back a desktop`, 260)})`;
+
 export const lookBody = () => `<!-- decision-note look -->
 ### Look: Settings page shows the new theme switch
 Preview: http://localhost:5317/settings?seed=demo
@@ -302,6 +333,17 @@ export function demoIssues(now = Date.now()): RawIssue[] {
       labels: ["needs-design", "phase:design", "needs-decision"],
       body: "Fixture for drafts of a design round.",
       comments: [comment(roundBody(1, "Stability demo"), ago(now, 10)), comment(requestBody("D1", "Which layout?\n- a: Grouped list\n- b: Split pane\n- c: Cards grid\nRecommendation: b (confidence medium)"), ago(now, 10))],
+    }),
+    // A round with further axes (design batch: slide and back beside the layout); its request is the newest design round, so it waits last
+    issue(A, 182, "Axes demo: welcome samples", {
+      now,
+      ageH: 30,
+      labels: ["needs-design", "phase:design", "needs-decision"],
+      body: "Samples become a third start option on the welcome screen.",
+      comments: [
+        comment(axesRoundBody(1, "Axes demo: welcome samples"), ago(now, 5.5)),
+        comment(requestBody("D1", "Which layout, slide and way back?\nPreview: http://localhost:5317/welcome?seed=demo&variant=a&slide=a&back=a\nRecommendation: a, slide a, back a"), ago(now, 5.5)),
+      ],
     }),
     // Dialog keys E2E (dialogs.spec.ts owns 178-179): two design rounds, so a key sent from one Card's Gallery can be checked against the Card that opens next
     ...[178, 179].map((n) =>
