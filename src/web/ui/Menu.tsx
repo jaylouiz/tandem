@@ -61,8 +61,9 @@ export function Menu({ label, trigger, onKey, testId, children }: MenuProps) {
 interface ItemProps {
   /** the key cap shown at the item's end */
   keys?: string;
-  /** why the item does nothing right now: it is disabled and says so under its label */
+  /** why the item does nothing right now: it is disabled and says so under its label (`quiet`: disabled only, its group's note says why) */
   why?: string | null;
+  quiet?: boolean;
   onSelect: () => void;
   testId?: string;
   children: ReactNode;
@@ -89,9 +90,17 @@ export function MenuItem({ keys, why, onSelect, testId, children }: ItemProps) {
   );
 }
 
-/** A group of items under a small heading; with `value` its items are radio items and the one whose `value` matches is checked. */
-export function MenuGroup({ label, value, children }: { label: string; value?: string | null; children: ReactNode }) {
-  const head = <Base.GroupLabel className="menu-head">{label}</Base.GroupLabel>;
+/**
+ * A group of items under a small heading; with `value` its items are radio items and the one whose `value` matches is checked.
+ * `note`: one line under the heading (why none of its items applies, said once instead of under each).
+ */
+export function MenuGroup({ label, value, note, children }: { label: string; value?: string | null; note?: string | null; children: ReactNode }) {
+  const head = (
+    <Base.GroupLabel className="menu-head">
+      {label}
+      {note && <span className="menu-note">{note}</span>}
+    </Base.GroupLabel>
+  );
   return value === undefined ? (
     <Base.Group>
       {head}
@@ -106,7 +115,7 @@ export function MenuGroup({ label, value, children }: { label: string; value?: s
   );
 }
 
-export function MenuRadio({ value, keys, why, onSelect, testId, children }: ItemProps & { value: string }) {
+export function MenuRadio({ value, keys, why, quiet, onSelect, testId, children }: ItemProps & { value: string }) {
   const close = useContext(CloseCtx);
   const run = () => (onSelect(), close());
   return (
@@ -116,7 +125,7 @@ export function MenuRadio({ value, keys, why, onSelect, testId, children }: Item
           <Tick />
         </Base.RadioItemIndicator>
       </span>
-      {body(children, why, keys)}
+      {body(children, quiet ? null : why, keys)}
     </Base.RadioItem>
   );
 }

@@ -9,7 +9,7 @@ import { useFocusKeys } from "../../focus/keys.ts";
 import { focusSend } from "../../focus/session.ts";
 import { keyOf } from "../../keys.ts";
 import type { Signed } from "../../signed.ts";
-import { AskLink, QuestionGallery, QuestionView, Review, Steps, sendBlocked, useAskKeys, useAskShots, writtenComment } from "../Questions.tsx";
+import { AskLink, QuestionGallery, QuestionView, Review, StepPanel, Steps, sendBlocked, useAskKeys, useAskShots, useStepFocus, writtenComment } from "../Questions.tsx";
 import { Btn, Inline, shortRepo } from "../bits.tsx";
 import { KeyLine, Meta, useCover } from "./parts.tsx";
 
@@ -21,8 +21,10 @@ export function QuestionsCover({ card, ask, signed }: { card: Card; ask: Ask; si
   // one question and no note on it: the pick is the answer, sent at once (kept if the send fails, so ⌘↵ sends it again)
   const [noted, setNoted] = useState(false);
   const sendsOnPick = !a.multi && !noted && !a.notes[ask.questions[0]!.n]?.trim();
+  const focus = useStepFocus(a.at);
   const onPick = (x: Question, letter: string) => {
     if (sending) return;
+    focus.mark();
     a.pick(x.n, letter);
     if (sendsOnPick) void a.sendWith({ ...a.picks, [x.n]: letter }, a.notes);
   };
@@ -40,7 +42,7 @@ export function QuestionsCover({ card, ask, signed }: { card: Card; ask: Ask; si
   return (
     <>
       <div className="cover-scroll">
-        <div className="cover-col qcover" data-testid="cover-questions">
+        <div className="cover-col qcover" data-testid="cover-questions" ref={focus.root}>
           <Meta card={card} kind={ask.round !== null ? "design-round" : "decision"} />
           <div className="qcover-head">
             <h1 className="cover-q">
@@ -50,7 +52,9 @@ export function QuestionsCover({ card, ask, signed }: { card: Card; ask: Ask; si
           </div>
           {a.multi && <Steps ask={ask} a={a} />}
           <div className="qcover-step" onFocusCapture={(e) => e.target instanceof HTMLInputElement && setNoted(true)}>
-            {q ? <QuestionView key={q.n} ask={ask} q={q} a={a} keys onPick={onPick} shots={g.forQuestion} big /> : <Review ask={ask} a={a} big />}
+            <StepPanel ask={ask} a={a} className="qcover-panel">
+              {q ? <QuestionView key={q.n} ask={ask} q={q} a={a} keys onPick={onPick} shots={g.forQuestion} big /> : <Review ask={ask} a={a} big />}
+            </StepPanel>
           </div>
         </div>
       </div>

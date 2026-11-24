@@ -106,6 +106,30 @@ test("a digit or a click picks and moves to the next question, the last pick lan
   expect(sent).toHaveLength(1);
 });
 
+test("by keyboard alone: the arrows move between the options and stay in the ask, Space picks and the focus follows to the next question", async ({ page }) => {
+  await open(page, 183, "board");
+  await option(page, "B").focus(); // Tab lands on the picked option: one stop for the group
+  await expect(option(page, "A")).toHaveAttribute("tabindex", "-1");
+  await page.keyboard.press("ArrowDown");
+  await expect(option(page, "C")).toBeFocused();
+  await page.keyboard.press("ArrowDown"); // the last one: stays
+  await expect(option(page, "C")).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(option(page, "A")).toBeFocused();
+  await expect(detail(page)).toHaveAttribute("aria-label", "Card acme/app#183"); // ↓ did not open the next Card
+  await expect(option(page, "B")).toHaveAttribute("aria-checked", "true"); // the arrows move, they do not pick
+  await page.keyboard.press("Space");
+  // the pick moved on: the keyboard is on the picked option of question 2, not lost
+  await expect(step(page, 2)).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("question-2").getByRole("radio", { checked: true })).toBeFocused();
+  await expect(steps(page).getByRole("status")).toHaveText("Question 2 of 3: Heading");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // the last pick lands on Review, with the keyboard on its step
+  await expect(step(page, "review")).toBeFocused();
+  await expect(page.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", await step(page, "review").getAttribute("id") ?? "");
+  await expect(writes(page)).toHaveText("Decision D1: ok. 1A");
+});
+
 test("a note on a question travels with its letter: one line per question; ⌘↵ sends from the note", async ({ page }) => {
   await open(page, 183);
   await page.keyboard.press("3"); // 1 Shell: C
@@ -219,6 +243,7 @@ test("a question's screenshot opens the screenshot view on that question: digits
   await expect(g.getByTestId("gallery-count")).toHaveText("2 / 3");
   await expect(g.getByRole("radio")).toHaveText(["1A Hidden", "2B Small, visible"]);
   await expect(g.getByTestId("gallery-option-A")).toHaveAttribute("aria-checked", "true");
+  await expect(g).toBeFocused(); // its keys are the popup's: they need the focus in it
   await page.keyboard.press("2"); // picks B and stays on this question
   await expect(g.getByTestId("gallery-option-B")).toHaveAttribute("aria-checked", "true");
   await expect(g.getByTestId("gallery-title")).toHaveText("2. Heading");

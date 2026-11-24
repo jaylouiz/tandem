@@ -219,7 +219,9 @@ test("the sheet works in the 400px pane beside the Board at 1024: no horizontal 
   const steps = detail(page).getByTestId("steps");
   const tops = await steps.getByRole("tab").evaluateAll((els) => [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().top)))]);
   expect(tops).toHaveLength(1);
-  await expect(steps.getByTestId("step-1").locator(".qstep-label")).toBeHidden();
+  // the label is out of sight but still in the step's name for assistive tech
+  expect((await steps.getByTestId("step-1").locator(".qstep-label").boundingBox())!.width).toBeLessThanOrEqual(1);
+  await expect(steps.getByTestId("step-1")).toHaveAccessibleName(/1\s*Backoff/);
   await expect(steps.getByTestId("step-1")).toContainText("1B");
 });
 

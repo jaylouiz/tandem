@@ -27,6 +27,9 @@ export function MoreMenu({ card }: { card: Card }) {
   const blocked = (id: string) => actionBlocked(entry(id).action, [card], handed);
   const holdWhy = heldByWorkflow ? "On hold through a workflow label. Remove that label on GitHub to release it." : blocked("hold");
   const run = (id: string) => void runTriage(entry(id), [card]);
+  // a Card in UX Design or Build takes no Next step: said once under the group's heading, not under each of the three
+  const reasons = STEPS.map((s) => blocked(`next-${s}`));
+  const allBlocked = reasons.every((r) => r && r === reasons[0]) ? reasons[0]! : null;
   /** the items on screen and their keys, so a key pressed in the open menu does what its cap says */
   const live: Record<string, () => void> = { [keyOf("open")]: () => void window.open(card.url, "_blank") };
   if (open && !card.fog) for (const s of STEPS) if (!blocked(`next-${s}`)) live[entry(`next-${s}`).key] = () => run(`next-${s}`);
@@ -49,9 +52,9 @@ export function MoreMenu({ card }: { card: Card }) {
     >
       {open && !card.fog && (
         <>
-          <MenuGroup label="Next step" value={card.nextStep}>
+          <MenuGroup label="Next step" value={card.nextStep} note={allBlocked}>
             {STEPS.map((s) => (
-              <MenuRadio key={s} value={s} keys={entry(`next-${s}`).key} why={blocked(`next-${s}`)} onSelect={() => run(`next-${s}`)} testId={`more-next-${s}`}>
+              <MenuRadio key={s} value={s} keys={entry(`next-${s}`).key} why={blocked(`next-${s}`)} quiet={!!allBlocked} onSelect={() => run(`next-${s}`)} testId={`more-next-${s}`}>
                 {s}
               </MenuRadio>
             ))}

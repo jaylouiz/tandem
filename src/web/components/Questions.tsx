@@ -58,6 +58,9 @@ export function useAskKeys(card: Card, ask: Ask, a: AskAnswer, on: boolean, opts
 }
 
 /** The steps of an ask with several questions: one per question with its number, label and picked letter, then Review. A tab list: one step is on screen. */
+export const stepId = (ask: Ask, i: number) => `ask-${ask.id}-step-${i}`;
+export const STEP_PANEL = (ask: Ask) => `ask-${ask.id}-panel`;
+
 export function Steps({ ask, a }: { ask: Ask; a: AskAnswer }) {
   const review = ask.questions.length;
   const onKey = (e: KeyboardEvent) => {
@@ -72,7 +75,7 @@ export function Steps({ ask, a }: { ask: Ask; a: AskAnswer }) {
   return (
     <div className="qsteps" role="tablist" aria-label="Questions" data-testid="steps" onKeyDown={onKey}>
       {ask.questions.map((q, i) => (
-        <button key={q.n} role="tab" aria-selected={a.at === i} tabIndex={a.at === i ? 0 : -1} data-testid={`step-${q.n}`} title={`${q.n} ${q.label}`} onClick={() => a.go(i)}>
+        <button key={q.n} id={stepId(ask, i)} role="tab" aria-selected={a.at === i} aria-controls={STEP_PANEL(ask)} tabIndex={a.at === i ? 0 : -1} data-testid={`step-${q.n}`} title={`${q.n} ${q.label}`} onClick={() => a.go(i)}>
           <span className="qnum">{q.n}</span>
           <span className="qstep-label">{q.label}</span>
           <b className="qstep-pick" aria-label={a.eff[q.n] ? `picked ${a.eff[q.n]}` : "nothing picked"}>
@@ -80,9 +83,57 @@ export function Steps({ ask, a }: { ask: Ask; a: AskAnswer }) {
           </b>
         </button>
       ))}
-      <button role="tab" aria-selected={a.at === review} tabIndex={a.at === review ? 0 : -1} data-testid="step-review" onClick={() => a.go(review)}>
+      <button id={stepId(ask, review)} role="tab" aria-selected={a.at === review} aria-controls={STEP_PANEL(ask)} tabIndex={a.at === review ? 0 : -1} data-testid="step-review" onClick={() => a.go(review)}>
         Review
       </button>
+      {/* said when the step changes (a pick moves on): where the developer is now */}
+      <span className="sr-only" role="status">
+        {a.at === review ? "Review" : `Question ${a.at + 1} of ${review}: ${ask.questions[a.at]!.label}`}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The arrow keys of a group of radio rows: they move the keyboard between the options (Home and End to the ends) and stay in the group, so
+ * they never reach the window's keys (↓ would open the next Card, → skip the ask in Focus). They move only: Space or Enter picks, because a pick
+ * moves on to the next question.
+ */
+export function radioArrows(e: KeyboardEvent<HTMLElement>) {
+  const step = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : e.key === "Home" ? "first" : e.key === "End" ? "last" : null;
+  if (step === null || e.metaKey || e.ctrlKey || e.altKey) return;
+  const radios = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]')];
+  const at = radios.indexOf(document.activeElement as HTMLElement);
+  if (at < 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  radios[step === "first" ? 0 : step === "last" ? radios.length - 1 : Math.max(0, Math.min(radios.length - 1, at + step))]?.focus();
+}
+
+/**
+ * Keeps the keyboard in the ask when a pick replaces the question on screen: a pick made from a focused option puts the focus on the picked
+ * (else the first) option of the question that follows, or on the Review step after the last one. A pick by digit leaves the focus where it was.
+ */
+export function useStepFocus(at: number) {
+  const root = useRef<HTMLDivElement>(null);
+  const carry = useRef(false);
+  useEffect(() => {
+    if (!carry.current) return;
+    carry.current = false;
+    const el = root.current;
+    (el?.querySelector<HTMLElement>('.qopts [role="radio"][aria-checked="true"]') ?? el?.querySelector<HTMLElement>('.qopts [role="radio"]') ?? el?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]'))?.focus();
+  }, [at]);
+  /** call before a pick that may move on */
+  const mark = () => void (carry.current = !!document.activeElement?.closest(".qopts"));
+  return { root, mark };
+}
+
+/** The step on screen as the tab list's panel (an ask with one question has no steps: its question stands alone). */
+export function StepPanel({ ask, a, className, children }: { ask: Ask; a: AskAnswer; className?: string; children: ReactNode }) {
+  if (!a.multi) return className ? <div className={className}>{children}</div> : <>{children}</>;
+  return (
+    <div className={className} role="tabpanel" id={STEP_PANEL(ask)} aria-labelledby={stepId(ask, a.at)}>
+      {children}
     </div>
   );
 }
@@ -139,13 +190,15 @@ export function QuestionView({ ask, q, a, keys, onPick, shots, big }: { ask: Ask
           {addNote}
         </header>
       )}
-      <div className="qopts" role="radiogroup" aria-label={q.label || "Options"}>
+      <div className="qopts" role="radiogroup" aria-label={q.label || "Options"} onKeyDown={radioArrows}>
         {q.options.map((o, i) => (
           <button
             key={o.letter}
             className="qopt"
             role="radio"
             aria-checked={picked === o.letter}
+            // one stop for Tab (the picked option, else the first), the arrows move inside
+            tabIndex={picked === o.letter || (i === 0 && !q.options.some((x) => x.letter === picked)) ? 0 : -1}
             data-plain={!o.name || undefined}
             data-testid={`option-${o.letter}`}
             // one question may be answered in words alone: its pick can be taken back. Several questions each keep one pick.
@@ -311,6 +364,7 @@ export function QuestionGallery({ ask, a, shots, index, onIndex, onClose, commen
           <ShotImg key={shot.alt + here.i} shot={shot} commentUrl={commentUrl} onRetry={onRetry} />
         </span>
       </div>
+      {/* here ← → change the question (the dialog's keys), so the options are plain Tab stops */}
       <div className="gallery-picks" role="radiogroup" aria-label={`${q.n}. ${q.label}`}>
         {q.options.map((o, i) => (
           <button key={o.letter} className="btn gallery-pick" role="radio" aria-checked={a.eff[q.n] === o.letter} data-testid={`gallery-option-${o.letter}`} onClick={() => a.pick(q.n, o.letter, true)}>
@@ -388,8 +442,9 @@ export function AskPanel({ card, ask, signed, openSignal }: { card: Card; ask: A
   useAskKeys(card, ask, a, g.index === null);
   const q = current(ask, a);
   const why = sendBlocked(ask, a);
+  const focus = useStepFocus(a.at);
   return (
-    <div className="section waiting askp" data-testid={ask.round !== null ? "panel-design-round" : "panel-decision"} data-questions={ask.questions.length}>
+    <div className="section waiting askp" ref={focus.root} data-testid={ask.round !== null ? "panel-design-round" : "panel-decision"} data-questions={ask.questions.length}>
       <div className="panel-head">
         <div className="section-title">
           <Inline text={ask.title} />
@@ -399,7 +454,9 @@ export function AskPanel({ card, ask, signed, openSignal }: { card: Card; ask: A
         </AskMeta>
       </div>
       {a.multi && <Steps ask={ask} a={a} />}
-      {q ? <QuestionView key={q.n} ask={ask} q={q} a={a} keys onPick={(x, letter) => a.pick(x.n, letter)} shots={g.forQuestion} /> : <Review ask={ask} a={a} />}
+      <StepPanel ask={ask} a={a}>
+        {q ? <QuestionView key={q.n} ask={ask} q={q} a={a} keys onPick={(x, letter) => (focus.mark(), a.pick(x.n, letter))} shots={g.forQuestion} /> : <Review ask={ask} a={a} />}
+      </StepPanel>
       <div className="qsend" data-testid="send-row">
         <div className="qsend-what">
           {a.summary && (

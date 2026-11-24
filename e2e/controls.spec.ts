@@ -11,11 +11,11 @@ const card = (page: Page, n: number) => page.locator(`[data-card="acme/app#${n}"
 test("a disabled control carries its reason as title and aria-describedby, stays focusable, and does nothing", async ({ page }) => {
   await toBoard(page);
   await card(page, 117).click(); // a Build Card: Next step does not apply
-  // a menu item that does nothing is disabled, says why under its label, and stays reachable by the arrow keys
+  // menu items that do nothing are disabled, the menu says why (once, under the group's heading), and they stay reachable by the arrow keys
   await page.getByTestId("detail").getByTestId("more").click();
   const next = page.getByTestId("more-next-design");
   await expect(next).toHaveAttribute("aria-disabled", "true");
-  await expect(next).toContainText("Not applicable: Build");
+  await expect(page.getByTestId("more-menu").getByText("Not applicable: Build")).toHaveCount(1);
   await page.keyboard.press("ArrowDown");
   await expect(next).toBeFocused(); // the reason is reachable by keyboard
   await page.keyboard.press("Enter");

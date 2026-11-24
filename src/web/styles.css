@@ -405,8 +405,9 @@ button.chip:active,
 .btn kbd {
   margin-right: -3px;
 }
+/* a key cap on the accent fill is darker than the fill, so its text keeps 4.5:1 in both themes (a lighter cap fell to 3.3:1 in dark) */
 .btn.primary kbd {
-  background: oklch(1 0 0 / 0.2);
+  background: color-mix(in oklch, var(--ink) 30%, var(--accent-fill));
   color: inherit;
 }
 select.btn {
@@ -1685,7 +1686,7 @@ button.focus-next:hover { background: var(--bg-hover); }
 .sheet-ask:empty { display: none; }
 .sheet-line { display: flex; align-items: center; gap: var(--s-2); min-height: 28px; flex-wrap: wrap; }
 .sheet-line .spacer { flex: 1; }
-.sheet-line code { font-family: var(--mono); font-size: 0.92em; padding: 1px 5px; border-radius: 4px; background: var(--bg-active); }
+.sheet-line code { font-family: var(--mono); font-size: var(--fs-sm); padding: 1px 5px; border-radius: 4px; background: var(--bg-active); }
 .sheet-line .handed { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; outline-offset: 2px; }
 .sheet-line .handed .muted { font-size: var(--fs-sm); }
 /* folds: a name, one line of what is inside, the content in place when open */
@@ -1702,7 +1703,7 @@ button.focus-next:hover { background: var(--bg-hover); }
 .issue-text { max-width: 72ch; overflow-wrap: anywhere; }
 .issue-text .markdown :where(pre, table) { max-width: 100%; overflow-x: auto; }
 .act-line { display: inline-flex; align-items: center; gap: 0; min-width: 0; max-width: 100%; vertical-align: bottom; }
-.act-line .act-dot { margin-right: 6px; }
+.act-line .act-mark { display: inline-flex; margin-right: 6px; }
 .act-line b { font-weight: 500; color: var(--text); flex-shrink: 0; }
 .act-sep { white-space: pre; }
 .act-line[data-state="stuck"] b { color: var(--danger); }
@@ -1715,10 +1716,11 @@ button.focus-next:hover { background: var(--bg-hover); }
 /* ---- the menu (src/web/ui/Menu.tsx) ---- */
 .menu-pos { z-index: 60; }
 .menu { min-width: 216px; max-width: 320px; padding: 4px; border-radius: var(--radius-lg); background: var(--bg-raised); color: var(--text); box-shadow: var(--elev-3); display: flex; flex-direction: column; outline: 0; font-size: var(--fs-md); }
-.menu-head { padding: 6px 8px 2px; font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.menu-head { padding: 6px 8px 2px; font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); display: flex; flex-direction: column; gap: 1px; }
+.menu-note { font-size: var(--fs-sm); font-weight: 400; }
 .menu-sep { height: 1px; margin: 4px 0; background: var(--border); }
 .menu-item { display: flex; align-items: center; gap: var(--s-2); min-height: 28px; padding: 3px 8px; border-radius: var(--radius); color: var(--text); text-decoration: none; cursor: default; outline: 0; }
-.menu-item[data-highlighted] { background: var(--bg-hover); }
+.menu-item[data-highlighted] { background: var(--bg-active); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .menu-item:active:not([data-disabled]) { background: var(--bg-active); }
 .menu-item[data-disabled] { color: var(--text-muted); }
 .menu-item[data-disabled] kbd { opacity: 0.5; }
@@ -1727,7 +1729,7 @@ button.focus-next:hover { background: var(--bg-hover); }
 .menu-why { flex-basis: 100%; font-size: var(--fs-sm); color: var(--text-muted); text-wrap: pretty; }
 
 /* ==== An ask with questions (#13): steps, the question on screen, Review, the row that says what is written ==== */
-.markdown-inline code { font-family: var(--mono); font-size: 0.92em; padding: 1px 4px; border-radius: 4px; background: var(--bg-active); }
+.markdown-inline code { font-family: var(--mono); font-size: var(--fs-sm); padding: 1px 4px; border-radius: 4px; background: var(--bg-active); }
 .markdown-inline strong { font-weight: 600; }
 .markdown-inline a { color: var(--accent); }
 .star { flex-shrink: 0; color: var(--accent); }
@@ -1739,14 +1741,14 @@ button.focus-next:hover { background: var(--bg-hover); }
 .askp .panel-meta > * { white-space: nowrap; }
 .qlegend { display: inline-flex; align-items: center; gap: 4px; }
 .qnum { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 4px; font-size: var(--fs-xs); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--border-strong); flex-shrink: 0; align-self: center; }
-.qnum[data-on] { color: var(--accent-text); background: var(--accent-fill); box-shadow: none; }
+.qnum[data-on] { color: var(--text); background: var(--bg-active); box-shadow: none; }
 /* the steps: one per question (number, label, picked letter), then Review; one row at every width */
 .qsteps { display: flex; gap: 2px; border-bottom: 1px solid var(--border); min-width: 0; }
 .qsteps [role="tab"] { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 7px 10px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; font: inherit; font-weight: 500; color: var(--text-muted); white-space: nowrap; }
 .qsteps [role="tab"]:hover { color: var(--text); }
 .qsteps [role="tab"][aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
 .qsteps [role="tab"]:focus-visible { outline-offset: -2px; }
-.qsteps [role="tab"][aria-selected="true"] .qnum { color: var(--accent-text); background: var(--accent-fill); box-shadow: none; }
+.qsteps [role="tab"][aria-selected="true"] .qnum { color: var(--text); background: var(--bg-active); box-shadow: none; }
 .qstep-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .qstep-pick { font-weight: 600; color: var(--accent); }
 .qgroup { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
@@ -1795,10 +1797,11 @@ button.focus-next:hover { background: var(--bg-hover); }
   .qopt-short { flex-basis: 100%; }
   .qopt-rec { align-self: flex-start; }
   .qsteps [role="tab"] { padding-inline: 7px; }
-  .qsteps [role="tab"]:not([data-testid="step-review"]) .qstep-label { display: none; }
+  /* the label stays in the step's name for assistive tech */
+  .qsteps [role="tab"]:not([data-testid="step-review"]) .qstep-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .sheet-top { flex-wrap: wrap; row-gap: var(--s-1); }
   .qsend-what { flex-basis: 100%; }
   .qsend .toggle { margin-left: auto; }
-  .qreview-label { flex-basis: 72px; }
   .qabout { display: none; }
 }
 /* Focus: the same parts, larger, on a panel of their own */
@@ -1819,6 +1822,8 @@ button.focus-next:hover { background: var(--bg-hover); }
 .gallery-picks { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-2); padding: 0 var(--s-4) var(--s-3); }
 .gallery .btn.gallery-pick { height: 34px; padding: 0 12px; gap: 6px; }
 .gallery .btn.gallery-pick[aria-checked="true"] { background: var(--accent-fill); color: var(--accent-text); }
+/* a key cap on the accent fill: a darker cap, so its text keeps 4.5:1 (a lighter one fell to 3.3:1 in dark) */
+.gallery .btn.gallery-pick[aria-checked="true"] kbd { background: color-mix(in oklch, var(--ink) 30%, var(--accent-fill)); color: var(--accent-text); }
 .gallery .btn.gallery-pick .star { color: currentColor; }
 .gallery-legend { display: flex; justify-content: center; gap: var(--s-4); padding: 6px var(--s-4) 12px; font-size: var(--fs-sm); color: color-mix(in oklch, var(--on-stage) 78%, transparent); white-space: nowrap; }
 .legend-group { display: inline-flex; align-items: center; gap: var(--s-3); }
