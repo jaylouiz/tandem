@@ -129,7 +129,7 @@ test("buttons have a pressed state, one step below hover", async ({ page }) => {
 test("column heads stick while the column scrolls, and the Done day heads stick under them", async ({ page }) => {
   await toBoard(page);
   const scroll = page.locator(".scroll");
-  await scroll.evaluate((el) => (el.scrollTop = 800));
+  await scroll.evaluate((el) => (el.scrollTop = 300)); // inside the To look at group, so its head is still stuck
   const top = await scroll.evaluate((el) => el.getBoundingClientRect().top);
   const heads = page.locator(".board .column-head");
   for (let i = 0; i < 5; i++) expect(await heads.nth(i).evaluate((el) => Math.round(el.getBoundingClientRect().top))).toBe(Math.round(top));

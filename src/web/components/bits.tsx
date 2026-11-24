@@ -58,11 +58,11 @@ export function CardChips({ card }: { card: Card }) {
   const workflow = useStore((s) => s.board?.workflow);
   const next = nextStepNote(card, workflow);
   // no "Selected" chip: marking must not add a line to a Card (#29); the mark is the outline and background (`data-marked`)
+  // no "New · Look" chip: an unseen Look only ever stands under Done's "To look at" head, which says it
   return (
     <>
       {card.waiting && <span className="chip waiting">{WAITING_LABEL[card.waiting.kind]}</span>}
       {card.awaitingPickup && <span className="chip accent">Awaiting pickup</span>}
-      {card.needsLook && !card.seenAt && <span className="chip accent">New · Look</span>}
       {card.priority && <span className="chip">P{card.priority}</span>}
       {card.fog && <span className="chip accent">Needs wayfinder</span>}
       {card.onHold && <span className="chip danger">On hold</span>}
