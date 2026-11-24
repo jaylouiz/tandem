@@ -41,6 +41,10 @@ export function nextStepOf(labels: string[], cfg: WorkflowConfig): NextStep | nu
   return null;
 }
 
+/** The Next step worth saying on a Board Card: none in Done, none when it only restates what the Phase does (`phaseStep`). */
+export const nextStepNote = (c: Pick<Card, "phase" | "nextStep">, cfg: Pick<WorkflowConfig, "phaseStep"> | undefined): NextStep | null =>
+  !c.nextStep || c.phase === "Done" || cfg?.phaseStep?.[c.phase] === c.nextStep ? null : c.nextStep;
+
 /** The PR that matters: an open one first, then the latest merged one. */
 function mainPr(prs: RawPullRequest[]): RawPullRequest | null {
   const sorted = [...prs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

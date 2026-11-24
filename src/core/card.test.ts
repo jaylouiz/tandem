@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCard, onBoard, toLookAt, waitingId, waitingOnMe } from "./card.ts";
+import { buildCard, nextStepNote, onBoard, toLookAt, waitingId, waitingOnMe } from "./card.ts";
 import { DEFAULT_WORKFLOW as cfg } from "./config.ts";
 import { answerComment, challengeComment, digestThread, parseMarker, prVerdictComment, roundReactionComment } from "./contract.ts";
 import { demoIssues, requestBody } from "./fixtures.ts";
@@ -95,6 +95,22 @@ describe("priority and fog", () => {
     expect(buildCard(odd, cfg, null).priority).toBe(1);
     expect(card(116)).toMatchObject({ fog: true, phase: "Inbox", nextStep: null });
     expect(card(101).fog).toBe(false);
+  });
+});
+
+describe("the Next step a Board Card says", () => {
+  it("in Backlog and Inbox always, in UX Design and Build only when it is not the Phase's own step, never in Done", () => {
+    expect(nextStepNote(card(103), cfg)).toBe("specify"); // Backlog
+    expect(nextStepNote(card(130), cfg)).toBe("build"); // Backlog
+    expect(nextStepNote(card(104), cfg)).toBeNull(); // UX Design, design
+    expect(nextStepNote(card(107), cfg)).toBeNull(); // Build, build
+    expect(nextStepNote(card(105), cfg)).toBe("specify"); // Build, still to specify
+    expect(nextStepNote({ phase: "Done", nextStep: "build" }, cfg)).toBeNull();
+    expect(nextStepNote({ phase: "Inbox", nextStep: null }, cfg)).toBeNull();
+  });
+  it("follows the configuration, not the Phase names", () => {
+    expect(nextStepNote(card(107), { phaseStep: {} })).toBe("build");
+    expect(nextStepNote(card(105), { phaseStep: { Build: "specify" } })).toBeNull();
   });
 });
 
