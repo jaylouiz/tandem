@@ -92,6 +92,82 @@ A ghost button with an arrow · tech check: S
 ![R${k} · back o · desktop](${svg(`R${k} back o desktop`, 260)})
 ![R${k} · back a · desktop](${svg(`R${k} back a desktop`, 260)})`;
 
+/** proto #17. One image per question, its options side by side with their letters on them (decision-format.md). */
+const montage = (label: string, letters: string[], hue: number) => {
+  const [bg, bar, ink] = HUES[hue]!;
+  const w = 1280;
+  const h = 520;
+  const cw = Math.floor((w - 40 * (letters.length + 1)) / letters.length);
+  const cells = letters
+    .map((l, i) => {
+      const x = 40 + i * (cw + 40);
+      const rows = Array.from({ length: 4 }, (_, r) => `<rect x="${x + 20}" y="${170 + r * 62}" width="${cw - 40}" height="44" rx="6" fill="${bg}" stroke="${bar}"/>`).join("");
+      const variant = i === 0 ? `<rect x="${x + 20}" y="100" width="90" height="30" rx="6" fill="${bar}"/>` : i === 1 ? `<rect x="${x + 20}" y="430" width="90" height="30" rx="6" fill="${bar}"/><rect x="${x + cw - 110}" y="430" width="90" height="30" rx="6" fill="${ink}"/>` : `<rect x="${x + 20}" y="100" width="${cw - 40}" height="10" rx="5" fill="${bar}"/>`;
+      return `<rect x="${x}" y="70" width="${cw}" height="410" rx="10" fill="#ffffff" stroke="${bar}"/>${rows}${variant}<circle cx="${x + 26}" cy="44" r="18" fill="${ink}"/><text x="${x + 26}" y="51" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="700" fill="#ffffff">${l}</text>`;
+    })
+    .join("");
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${bg}"/>${cells}<text x="${w - 40}" y="50" text-anchor="end" font-family="sans-serif" font-size="20" font-weight="600" fill="${ink}">${label}</text></svg>`)}`;
+};
+
+/** proto #17. A round in the question format: one `###` section per question, a table of lettered options, one ★ each. */
+export const questionRoundBody = (k: number, title: string) => `<!-- decision-note round R${k} -->
+## Design round ${k}: ${title}
+Preview: http://localhost:5317/setup?seed=demo&variant=1A
+Variants: 1A, 1B, 1C, 2A, 2B, 3A, 3B
+One sheet for Notion and Reminders. Open: where back sits, the step heading, and how wide the form runs.
+
+### 1. Shell: where back and next sit
+
+| | Option | In short |
+|---|---|---|
+| A | Rail, back on top (today) | back above, one button below |
+| **B ★** | Rail, footer bar | Back left, Next right |
+| C | Top stepper | no rail, same form at every width |
+
+★ Why B: back and the main action sit together, like in dialogs.
+
+![R${k} · 1. Shell · A, B, C at 1280](${montage("1. Shell", ["A", "B", "C"], 210)})
+
+### 2. Heading: the step heading in the pane
+
+| | Option | In short |
+|---|---|---|
+| **A ★** | Hidden | the rail names the step |
+| B | Small, visible | heading with the step's action |
+
+★ Why A: say it once.
+
+![R${k} · 2. Heading · A, B at 1280](${montage("2. Heading", ["A", "B"], 140)})
+
+### 3. Width: how wide the form runs
+
+| | Option | In short |
+|---|---|---|
+| A | Full width (today) | fields stretch with the pane |
+| **B ★** | Content width | 560px column, left aligned |
+
+★ Why B: long fields are harder to scan than short ones.
+
+![R${k} · 3. Width · A, B at 1280](${montage("3. Width", ["A", "B"], 20)})
+
+<details><summary>Stories, checks, build cost, dropped</summary>
+
+Job: connect a source · Stories: As a user, when I connect a source, I want back and next together.
+Checks: brief asserted · tech check inline
+Per option: 1A: rail · S · 1B: footer bar · S · 1C: stepper · M
+Dropped: three shells (contradicts #562)
+</details>`;
+
+/** proto #17. A request as \`decide.sh request\` writes it for several questions: hidden \`choices\` lines, a \`+\` legend, the one tile \`- ok\`. */
+export const choicesRequestBody = (id: string, question: string, lines: string[], extra = "") => {
+  const legend = lines.map((l) => {
+    const [head, rest] = [l.slice(0, l.indexOf(":")), l.slice(l.indexOf(":") + 1).trim()];
+    return `+ **${head}:** ${rest.split(" · ").map((o) => (o.includes("★") ? `**${o}**` : o)).join(" · ")}`;
+  });
+  const short = lines.map((l) => `${/^\d+/.exec(l)![0]}${/([A-Z]) ★/.exec(l)![1]}`).join(" ");
+  return `<!-- decision-request ${id} -->\n${lines.map((l) => `<!-- choices ${l} -->`).join("\n")}\n### Decision needed (${id})\n${question}\n${extra ? `${extra}\n` : ""}\n${legend.join("\n")}\n\n- ok: take every ★ option\n\nRecommendation: ok (${short})\n\n---\nCopy, change only the letters you disagree with, post as a comment. Or reply \`ok\` to take every recommendation. Short form: \`${id}: ${short}\`. The run picks it up at its next checkpoint.`;
+};
+
 export const lookBody = () => `<!-- decision-note look -->
 ### Look: Settings page shows the new theme switch
 Preview: http://localhost:5317/settings?seed=demo
@@ -355,6 +431,56 @@ export function demoIssues(now = Date.now()): RawIssue[] {
         comments: [comment(roundBody(1, `Dialog keys demo ${n}`), ago(now, 10)), comment(requestBody("D1", "Which layout?\n- a: Grouped list\n- b: Split pane\n- c: Cards grid\nRecommendation: b (confidence medium)"), ago(now, 10))],
       }),
     ),
+    // proto #17: a round in the question format (decision-format.md), its request with `choices` lines, a request with choices and no round, and a one-question request whose options carry Markdown
+    issue(A, 183, "Setup sheet for connections", {
+      now,
+      ageH: 52,
+      labels: ["needs-design", "phase:design", "needs-decision"],
+      body: "## Problem\n\nConnecting Notion and Reminders are two different flows today, and the way back is in a different place in each.\n\nJob: connect a source without losing my place.\n\n## Solution\n\nOpen (needs a design round): one sheet for both, with a rail that names the steps.\n\n- back and next sit together\n- the same form at every width",
+      comments: [
+        comment(questionRoundBody(1, "Setup sheet for connections"), ago(now, 4.5)),
+        comment(
+          choicesRequestBody("D1", "Setup sheet: 3 choices", [
+            "1 Shell: A (back on top, today) · B ★ (footer bar) · C (top stepper)",
+            "2 Heading: A ★ (hidden) · B (small, visible)",
+            "3 Width: A (full width, today) · B ★ (content width)",
+          ], "Preview: http://localhost:5317/setup?seed=demo&variant=1A\nOptions with screenshots: https://github.com/acme/app/issues/183#issuecomment-1"),
+          ago(now, 4.4),
+        ),
+      ],
+    }),
+    issue(A, 184, "Retry policy for webhooks", {
+      now,
+      ageH: 22,
+      labels: ["needs-spec", "phase:build", "needs-decision"],
+      body: "Failed webhook deliveries are dropped today.\n\n## Acceptance criteria\n- a failed delivery is retried\n- a delivery that keeps failing is visible",
+      comments: [
+        comment(
+          choicesRequestBody("D1", "Webhook retries: 4 choices", [
+            "1 Backoff: A (fixed 30 s) · B ★ (exponential, capped)",
+            "2 Give up: A (3 tries) · B ★ (5 tries) · C (never)",
+            "3 Dead letters: A ★ (keep 7 days) · B (drop)",
+            "4 Alert: A (every failure) · B ★ (on give up)",
+          ]),
+          ago(now, 9),
+        ),
+      ],
+    }),
+    issue(A, 185, "Visual re-design of the desk", {
+      now,
+      ageH: 470,
+      labels: ["needs-design", "phase:design", "needs-decision", "on-hold"],
+      body: "The desk should get a look of its own.",
+      comments: [
+        comment(
+          requestBody(
+            "D1",
+            'Which look should Build take, and should it push the outline style to dialogs too?\n- **H1 Sunlit Outline** (S). Yellow desk, ink outlines, no shadows on overlays.\n- **H2 Sticker Desk** (M). Hard shadows, tilted labels, yellow only for Jetzt.\n- **A3 Ink Pills** (S). Pure A, boldest headings, ink pill group heads.\n- **C1 Riso Pop** (M). Dot-grid paper, tilted caps stickers, four flat fills, tomato accent.\n- **C2 Mono Press** (M). Black on white, square corners, ink heading bars, yellow only for Jetzt.\n- Or a mix ("H1 outlines with A3 pill headings"), then round 3.\nRecommendation: **H1 Sunlit Outline**, confidence ~45% (taste). It takes the C trait you liked (clear outlines, strong component separation) onto A\'s yellow desk without giving up calm, and costs little to build.',
+          ),
+          ago(now, 456),
+        ),
+      ],
+    }),
     // Backlog Cards the Hand to agent E2E spec hands over (app has a fake coordinator, agent-workflow does not)
     issue(A, 130, "Hand demo: delivered", { now, ageH: 15, labels: ["ready"], body: "Hand this one to the coordinator." }),
     issue(A, 131, "Hand demo: failing Push", { now, ageH: 16, labels: ["ready"], body: "Its Push fails once." }),

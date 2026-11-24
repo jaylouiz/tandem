@@ -105,6 +105,8 @@ export interface DesignRound {
   createdAt: string;
   url: string;
   commentId: string;
+  /** proto #17: the comment as written, for the question sections (prototype/questions.ts) */
+  body?: string;
 }
 
 export interface LookNote {

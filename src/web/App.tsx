@@ -6,6 +6,7 @@ import { BoardView, LaneToggle, boardNavGroups } from "./components/BoardView.ts
 import { DragGhost } from "./components/DragGhost.tsx";
 import { Capture } from "./components/Capture.tsx";
 import { CardPane } from "./components/CardPane.tsx";
+import { Switcher } from "./prototype/Switcher.tsx";
 import { MapsView } from "./components/MapsView.tsx";
 import { MarkBar } from "./components/MarkBar.tsx";
 import { Palette } from "./components/Palette.tsx";
@@ -282,6 +283,7 @@ export function App() {
       <Shortcuts />
       <DragGhost />
       <ToastRegion />
+      <Switcher />
     </div>
   );
 }

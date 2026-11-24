@@ -10,6 +10,10 @@ import { TRIAGE_ENTRIES, actionBlocked, runTriage } from "../triage.ts";
 import { BINDINGS, keyCaps, keyOf } from "../keys.ts";
 import { AgentDecisionPanel, DecisionPanel, EarlierRounds, LookPanel, PrPanel, RoundPanel } from "./Feedback.tsx";
 import { Tooltip } from "../ui/Tooltip.tsx";
+import { ProtoPane } from "../prototype/Sheet.tsx";
+import { AskPanel } from "../prototype/Questions.tsx";
+import { questionsOf } from "../prototype/questions.ts";
+import { useVariant } from "../prototype/variant.ts";
 import { ActDot, Age, Btn, CardChips, Ext, KindGlyph, Markdown, RepoTag, Stepper, ago, clock } from "./bits.tsx";
 
 
@@ -86,7 +90,7 @@ function Triage({ card }: { card: Card }) {
 }
 
 /** The coordination log of one Card, fetched when `enabled` and again when the Card's last log line changes. */
-function useLog(card: Card, enabled: boolean): string | null | undefined {
+export function useLog(card: Card, enabled: boolean): string | null | undefined {
   const [log, setLog] = useState<string | null | undefined>(undefined);
   const stamp = useStore((s) => s.board?.activity[card.key]?.at ?? null);
   useEffect(() => {
@@ -103,7 +107,7 @@ function useLog(card: Card, enabled: boolean): string | null | undefined {
   return log;
 }
 
-function useActivityOf(card: Card | null): Activity | null {
+export function useActivityOf(card: Card | null): Activity | null {
   const activity = useActivity();
   const cfg = useStore((s) => s.board?.workflow);
   const now = useNow();
@@ -155,7 +159,7 @@ function Status({ card, act, expanded }: { card: Card; act: Activity | null; exp
   );
 }
 
-function Decided({ card, rounds, roundWaits, src, signal }: { card: Card; rounds: DesignRound[]; roundWaits: boolean; src: ReturnType<typeof useSigned>; signal: number | undefined }) {
+export function Decided({ card, rounds, roundWaits, src, signal }: { card: Card; rounds: DesignRound[]; roundWaits: boolean; src: ReturnType<typeof useSigned>; signal: number | undefined }) {
   const answered = card.requests.filter((r) => r.answer !== null || r.resolved);
   const earlier = roundWaits ? rounds.slice(0, -1) : rounds;
   const nothing = !answered.length && !card.agentDecisions.length && !earlier.length;
@@ -202,7 +206,15 @@ function Decided({ card, rounds, roundWaits, src, signal }: { card: Card; rounds
 }
 
 /** `drawer`: the Card behind an ask of Focus (`focus/Focus.tsx`): Decided, Activity and Issue, without the Now tab (the ask is on the cover), so no second Feedback panel is mounted. */
-export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "split" | "aside" | "drawer"; onClose?: () => void }) {
+export function CardPane(props: { cardKey: string; mode: "split" | "aside" | "drawer"; onClose?: () => void }) {
+  // proto #17: question 1 of the round swaps the sheet (the drawer of Focus keeps today's)
+  const v = useVariant();
+  if (v.sheet !== "A" && props.mode !== "drawer") return <ProtoPane cardKey={props.cardKey} mode={props.mode} />;
+  return <TodayPane {...props} />;
+}
+
+function TodayPane({ cardKey, mode, onClose }: { cardKey: string; mode: "split" | "aside" | "drawer"; onClose?: () => void }) {
+  const v = useVariant();
   const card = useCard(cardKey);
   const select = useStore((s) => s.select);
   const storeTab = useStore((s) => s.tab);
@@ -255,6 +267,9 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
   const kind = kindOf(card);
   // the Feedback panels lead with their own question: only an ask without a panel (Awaiting pickup) is spelled out in the head
   const headAsk = kind === "pickup";
+  // proto #17, question 3: a decision with several questions gets the question panel
+  const ask = v.answer !== "A" ? questionsOf(card) : null;
+  const multi = ask && !ask.legacy && ask.questions.length > 1 ? ask : null;
 
   return (
     <aside className={`pane ${mode}`} data-testid="detail" aria-label={`Card ${card.key}`}>
@@ -314,13 +329,14 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
               </button>
             </div>
           )}
-          {card.waiting?.kind === "decision" && <DecisionPanel key={card.waiting.requestId} card={card} />}
+          {multi && <AskPanel key={multi.id} card={card} ask={multi} />}
+          {!multi && card.waiting?.kind === "decision" && <DecisionPanel key={card.waiting.requestId} card={card} />}
           {card.decisionsToAccept.length > 0 && (
             <button className="quiet-line" data-testid="decisions-line" onClick={() => setTab("decided")}>
               {card.decisionsToAccept.length} agent decision{card.decisionsToAccept.length > 1 ? "s" : ""}, not blocking <kbd>{keyCaps(BINDINGS.find((b) => b.id === "tab")!)[1]}</kbd>
             </button>
           )}
-          {roundWaits && round && <RoundPanel key={`${card.key}-${round.round}`} card={card} round={round} src={signed} openSignal={signalFor("round")} />}
+          {!multi && roundWaits && round && <RoundPanel key={`${card.key}-${round.round}`} card={card} round={round} src={signed} openSignal={signalFor("round")} />}
           {card.waiting?.kind === "pr-approval" && card.pullRequest && <PrPanel card={card} />}
           {lookShown && <LookPanel key={`look-${card.key}`} card={card} look={look} src={signed} openSignal={signalFor("look")} />}
 

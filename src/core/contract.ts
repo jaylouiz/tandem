@@ -289,6 +289,7 @@ function parseRound(c: RawComment, round: number): DesignRound {
     createdAt: c.createdAt,
     url: c.url,
     commentId: c.id,
+    body: c.body,
   };
 }
 

@@ -34,6 +34,9 @@ export function askOf(card: Card, kind: Kind | null = kindOf(card)): string {
       return firstLine(req?.question ?? "Decision needed");
     case "design-round": {
       const r = card.rounds.at(-1);
+      // proto #17: a round in the question format counts its questions
+      const qs = (r?.body ?? "").match(/^###\s+\d+\.\s/gm)?.length ?? 0;
+      if (r && qs) return `Round ${r.round}, ${qs} question${qs > 1 ? "s" : ""}: ${firstLine(req?.question ?? "")}`;
       const main = r?.variants.filter((v) => v.axis === null).length ?? 0;
       const axes = r?.axes.length ? ` plus ${r.axes.map((a) => a.name).join(", ")}` : "";
       return `Round ${r?.round ?? 1}, ${main} variants${axes}: ${firstLine(req?.question ?? r?.question ?? "")}`;

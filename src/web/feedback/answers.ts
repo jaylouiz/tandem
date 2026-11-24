@@ -13,10 +13,10 @@ const DONE: Partial<Card> = { waiting: null, awaitingPickup: true };
 
 /** Wraps a send: Focus holds the ask while the write runs and keeps the receipt (`focus/session.ts`). Default: just run it. */
 export type SendVia = (card: Card, feedback: Feedback, run: () => Promise<boolean>) => Promise<boolean>;
-const direct: SendVia = (_card, _feedback, run) => run();
+export const direct: SendVia = (_card, _feedback, run) => run();
 
 /** Send `f` through the one write path (`giveFeedback`: optimistic patch, rollback, the failure on the Card); the draft goes once it went through. */
-function sendFeedback(card: Card, f: Feedback | null, push: boolean, dKey: string, via: SendVia): Promise<boolean> {
+export function sendFeedback(card: Card, f: Feedback | null, push: boolean, dKey: string, via: SendVia): Promise<boolean> {
   if (!f || !canSend(f)) return Promise.resolve(false);
   const patch = f.action === "pr" && f.body.verdict === "hold" ? { ...DONE, onHold: true } : DONE;
   return via(card, f, async () => {

@@ -69,5 +69,8 @@ export function formatRoute(s: { view: View; selected: string | null; tab: Tab; 
   const q: string[] = [];
   if (seg && s.tab !== "now") q.push(`tab=${s.tab}`);
   if (s.repoFilter) q.push(`repo=${encodeURIComponent(s.repoFilter).replace(/%2F/gi, "/")}`);
+  // proto #17: the variant switcher's keys stay in the URL
+  const proto = typeof location === "undefined" ? null : new URLSearchParams(location.search);
+  for (const k of ["variant", "bar"]) if (proto?.get(k)) q.push(`${k}=${proto.get(k)}`);
   return q.length ? `${path}?${q.join("&")}` : path;
 }

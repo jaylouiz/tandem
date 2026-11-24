@@ -14,6 +14,9 @@ import { TABS, focusQueue, useStore } from "../../store.ts";
 import { Dialog } from "../../ui/Dialog.tsx";
 import { CardPane } from "../CardPane.tsx";
 import { Ext } from "../bits.tsx";
+import { QuestionsCover } from "../../prototype/Questions.tsx";
+import { questionsOf } from "../../prototype/questions.ts";
+import { useVariant } from "../../prototype/variant.ts";
 import { DecisionCover } from "./DecisionCover.tsx";
 import { LookCover } from "./LookCover.tsx";
 import { PrCover } from "./PrCover.tsx";
@@ -26,6 +29,10 @@ function Cover({ card }: { card: Card }) {
   const signed = useSigned(card);
   const kind = kindOf(card);
   const round = card.rounds.at(-1);
+  // proto #17, question 3: several questions are answered per question, in one comment
+  const v = useVariant();
+  const ask = v.answer !== "A" ? questionsOf(card) : null;
+  if (ask && !ask.legacy && ask.questions.length > 1) return <QuestionsCover card={card} ask={ask} />;
   if (kind === "decision" && card.requests.some((r) => r.id === card.waiting?.requestId)) return <DecisionCover card={card} />;
   if (kind === "design-round" && round) return <RoundCover card={card} round={round} signed={signed} />;
   if (kind === "pr-approval" && card.pullRequest) return <PrCover card={card} />;
