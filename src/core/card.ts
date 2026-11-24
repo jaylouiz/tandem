@@ -13,6 +13,7 @@ function matches(issue: RawIssue, pr: RawPullRequest | null, when: PhaseConditio
   if (when.state === "closed" && !(issue.state === "closed" && issue.stateReason !== "not_planned")) return false;
   if (when.state === "open" && issue.state !== "open") return false;
   if (when.anyLabel && !when.anyLabel.some((l) => issue.labels.includes(l))) return false;
+  if (when.anyStatus && !(issue.status && when.anyStatus.includes(issue.status))) return false;
   if (when.openPr && pr?.state !== "open") return false;
   return true;
 }
@@ -23,6 +24,10 @@ export const isWayfinderIssue = (i: RawIssue, cfg: WorkflowConfig) => i.labels.s
 export function phaseOf(issue: RawIssue, pr: RawPullRequest | null, cfg: WorkflowConfig): Phase {
   return cfg.phaseRules.find((r) => matches(issue, pr, r.when))?.phase ?? "Inbox";
 }
+
+/** Handed to an agent and not started yet: only while it can still be true (open, Backlog, not on hold). The Phase takes over once work starts. */
+export const handedOf = (c: { state: "open" | "closed"; status: string | null; phase: Phase; onHold: boolean }, cfg: WorkflowConfig) =>
+  c.state === "open" && c.phase === "Backlog" && !c.onHold && c.status === cfg.handedStatus;
 
 export function priorityOf(labels: string[], cfg: WorkflowConfig): number | null {
   const ns = labels.flatMap((l) => (l.startsWith(cfg.priorityLabelPrefix) && /^[1-3]$/.test(l.slice(cfg.priorityLabelPrefix.length)) ? [Number(l.slice(cfg.priorityLabelPrefix.length))] : []));
@@ -69,6 +74,8 @@ export function buildCard(issue: RawIssue, cfg: WorkflowConfig, seenAt: string |
   const decisionsToAccept = issue.state === "open" && has(cfg.agentDecidedLabel) ? digest.agentDecisions.filter((d) => d.challenge === null).map((d) => d.id) : [];
 
   const wentThroughDesign = digest.rounds.length > 0 || /^## UX decision/m.test(issue.body);
+  const status = issue.status ?? null;
+  const onHold = cfg.holdLabels.some(has);
   const needsLook = phase === "Done" && (wentThroughDesign || cfg.lookLabels.some(has));
 
   return {
@@ -80,9 +87,11 @@ export function buildCard(issue: RawIssue, cfg: WorkflowConfig, seenAt: string |
     url: issue.url,
     state: issue.state,
     labels: issue.labels,
+    status,
+    handed: handedOf({ state: issue.state, status, phase, onHold }, cfg),
     phase,
     nextStep: nextStepOf(issue.labels, cfg),
-    onHold: cfg.holdLabels.some(has),
+    onHold,
     priority: priorityOf(issue.labels, cfg),
     fog: has(cfg.fogLabel),
     createdAt: issue.createdAt,

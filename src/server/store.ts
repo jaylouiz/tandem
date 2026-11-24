@@ -21,7 +21,7 @@ export interface LocalState {
 }
 
 /** Bump when a sync starts reading more issue fields: an older cache lacks them and is re-fetched in full once. */
-export const CACHE_VERSION = 2; // 2: parent, assignees, blockedBy (wayfinder maps, removed since: an older or newer cache reads the same)
+export const CACHE_VERSION = 3; // 2: parent, assignees, blockedBy (wayfinder maps, removed since: an older or newer cache reads the same); 3: status (#18)
 
 export interface RepoCache {
   /** absent in a cache written before versions existed */

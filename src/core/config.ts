@@ -1,5 +1,5 @@
 // Phase mapping is configuration, not code (brief "Board model"). Defaults mirror the agent-workflow README
-// table "Clients such as Tandem group issues by phase"; a user file (~/.tandem/config.json, key "workflow")
+// table "Clients such as Tandem group issues by phase" (status first, labels as the fallback); a user file (~/.tandem/config.json, key "workflow")
 // overrides any field.
 import type { NextStep, Phase } from "./types.ts";
 
@@ -7,6 +7,8 @@ export interface PhaseCondition {
   /** issue state; "closed" matches only completed issues (not "not planned") */
   state?: "open" | "closed";
   anyLabel?: string[];
+  /** GitHub's native issue status, by name; an issue without a status never matches */
+  anyStatus?: string[];
   /** an open pull request that closes the issue */
   openPr?: boolean;
 }
@@ -21,6 +23,10 @@ export interface WorkflowConfig {
   phaseRules: PhaseRule[];
   /** lane label -> Next step */
   nextStep: Record<string, NextStep>;
+  /** the native issue status that means "handed to an agent, not started yet"; Tandem sets it on "Hand to agent" */
+  handedStatus: string;
+  /** the status a handed Card goes back to when it is re-steered or its Push did not arrive (a status cannot be cleared) */
+  unhandedStatus: string;
   /** labels that put a Card on hold */
   holdLabels: string[];
   /** the hold label Tandem itself sets and clears (the others belong to the workflow) */
@@ -51,6 +57,10 @@ export const DEFAULT_WORKFLOW: WorkflowConfig = {
   phaseRules: [
     { phase: "Done", when: { state: "closed" } },
     { phase: "Inbox", when: { anyLabel: ["inbox"] } },
+    // the native issue status first (#18): "In progress" is UX Design in the design lane, else Build. Backlog, Todo or no status say
+    // nothing about the Phase, so the label rules below decide (every issue from before statuses keeps its Phase)
+    { phase: "UX Design", when: { anyStatus: ["In progress"], anyLabel: ["needs-design"] } },
+    { phase: "Build", when: { anyStatus: ["In progress", "In review"] } },
     { phase: "UX Design", when: { anyLabel: ["phase:design"] } },
     { phase: "Build", when: { anyLabel: ["phase:build"] } },
     { phase: "Build", when: { openPr: true } },
@@ -58,6 +68,8 @@ export const DEFAULT_WORKFLOW: WorkflowConfig = {
     { phase: "Inbox", when: {} },
   ],
   nextStep: { "needs-design": "design", "needs-spec": "specify", ready: "build" },
+  handedStatus: "Todo",
+  unhandedStatus: "Backlog",
   holdLabels: ["on-hold", "on-hold-after-spec", "do-not-merge"],
   holdLabel: "on-hold",
   lookLabels: ["ux-impact"],

@@ -3,6 +3,7 @@ import { buildCard, onBoard, toLookAt, waitingId, waitingOnMe } from "./card.ts"
 import { DEFAULT_WORKFLOW as cfg } from "./config.ts";
 import { answerComment, challengeComment, digestThread, parseMarker, prVerdictComment, roundReactionComment } from "./contract.ts";
 import { demoIssues, requestBody } from "./fixtures.ts";
+import type { RawIssue } from "./types.ts";
 
 const now = Date.parse("2026-11-04T12:00:00Z");
 const cards = () => demoIssues(now).map((i) => buildCard(i, cfg, null));
@@ -40,6 +41,49 @@ describe("phases", () => {
     expect(card(104).phase).toBe("UX Design");
     expect(card(106).phase).toBe("Build");
     expect(card(108).phase).toBe("Done");
+  });
+});
+
+describe("phases from the native issue status (#18): status first, labels as the fallback", () => {
+  const raw = (n: number) => demoIssues(now).find((i) => i.repo === "acme/app" && i.number === n)!;
+  const phase = (over: Partial<RawIssue>, base = 103) => buildCard({ ...raw(base), ...over }, cfg, null).phase;
+  it("In progress is UX Design in the design lane, else Build; In review is Build, with no phase label at all", () => {
+    expect(phase({ labels: ["needs-design"], status: "In progress" })).toBe("UX Design");
+    expect(phase({ labels: ["needs-spec"], status: "In progress" })).toBe("Build");
+    expect(phase({ labels: ["ready"], status: "In progress" })).toBe("Build");
+    expect(phase({ labels: [], status: "In progress" })).toBe("Build");
+    expect(phase({ labels: ["ready"], status: "In review" })).toBe("Build");
+    expect(phase({ labels: ["needs-design"], status: "In review" })).toBe("Build");
+    expect(card(112)).toMatchObject({ phase: "Build", status: "In progress", labels: ["ready"] }); // the demo Card without a phase label
+  });
+  it("Backlog, Todo, no status or an unknown one say nothing: the labels decide, so every running issue keeps its Phase", () => {
+    for (const status of ["Backlog", "Todo", null, undefined, "Something new"]) {
+      expect(phase({ labels: ["needs-design", "phase:design"], status }), String(status)).toBe("UX Design");
+      expect(phase({ labels: ["ready", "phase:build"], status }), String(status)).toBe("Build");
+      expect(phase({ labels: ["needs-spec"], status }), String(status)).toBe("Backlog");
+      expect(phase({ labels: ["inbox"], status }), String(status)).toBe("Inbox");
+      expect(phase({ labels: [], status }), String(status)).toBe("Inbox");
+    }
+    // an issue read before statuses existed (an older cache, a repo without them) has no `status` key at all
+    const { status: _, ...old } = raw(105);
+    expect(buildCard(old, cfg, null)).toMatchObject({ phase: "Build", status: null, handed: false });
+  });
+  it("the status wins over a phase label that lags; Inbox and Done stay what labels and state say", () => {
+    expect(phase({ labels: ["needs-spec", "phase:design"], status: "In progress" })).toBe("Build"); // Design handed over, the label not dropped yet
+    expect(phase({ labels: ["inbox"], status: "In progress" })).toBe("Inbox");
+    expect(phase({ state: "closed", stateReason: "completed", status: "Done", closedAt: new Date(now).toISOString() })).toBe("Done");
+    expect(phase({ state: "closed", stateReason: "completed", status: "In progress", closedAt: new Date(now).toISOString() })).toBe("Done");
+  });
+  it("is configuration: other status names, or rules without any status, work the same way", () => {
+    const named = { ...cfg, phaseRules: cfg.phaseRules.map((r) => (r.when.anyStatus ? { ...r, when: { ...r.when, anyStatus: ["Doing"] } } : r)) };
+    expect(buildCard({ ...raw(103), status: "Doing" }, named, null).phase).toBe("Build");
+    expect(buildCard({ ...raw(103), status: "In progress" }, named, null).phase).toBe("Backlog");
+    const labelsOnly = { ...cfg, phaseRules: cfg.phaseRules.filter((r) => !r.when.anyStatus) };
+    expect(buildCard({ ...raw(103), status: "In progress" }, labelsOnly, null).phase).toBe("Backlog");
+  });
+  it("a Card carries its status, and the demo data has one handed Card", () => {
+    expect(card(132)).toMatchObject({ status: "Todo", handed: true, phase: "Backlog" });
+    expect(card(130)).toMatchObject({ status: null, handed: false });
   });
 });
 

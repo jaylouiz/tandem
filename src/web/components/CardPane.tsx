@@ -5,7 +5,7 @@ import type { Card, DesignRound } from "../../core/types.ts";
 import type { ShotsTarget } from "../../core/gallery.ts";
 import { TABS, api, useActivity, useCard, useNow, useStore } from "../store.ts";
 import { useSigned } from "../signed.ts";
-import { handedValid, startNotice, startRequests } from "../../core/triage.ts";
+import { startNotice, startRequests } from "../../core/triage.ts";
 import { TRIAGE_ENTRIES, actionBlocked, runTriage } from "../triage.ts";
 import { BINDINGS, keyCaps, keyOf } from "../keys.ts";
 import { AgentDecisionPanel, DecisionPanel, EarlierRounds, LookPanel, PrPanel, RoundPanel } from "./Feedback.tsx";
@@ -14,7 +14,6 @@ import { ActDot, Age, Btn, CardChips, Ext, KindGlyph, Markdown, RepoTag, Stepper
 
 
 function Triage({ card }: { card: Card }) {
-  const handed = useStore((s) => s.handed);
   const hold = useStore((s) => s.board?.workflow.holdLabel ?? "on-hold");
   const entry = (id: string) => TRIAGE_ENTRIES.find((e) => e.id === id)!;
   const heldByWorkflow = card.onHold && !card.labels.includes(hold);
@@ -41,7 +40,7 @@ function Triage({ card }: { card: Card }) {
             <Btn
               key={e.id}
               className={`btn ${e.action.kind === "next" && card.nextStep === e.action.step ? "selected" : ""}`}
-              why={actionBlocked(e.action, [card], handed)}
+              why={actionBlocked(e.action, [card])}
               title={`${e.label} (${e.key})`}
               onClick={() => void runTriage(e, [card])}
             >
@@ -75,7 +74,7 @@ function Triage({ card }: { card: Card }) {
         )}
         <Btn
           className="btn"
-          why={heldByWorkflow ? "On hold through a workflow label; remove that label on GitHub to release it" : actionBlocked({ kind: "hold" }, [card], handed)}
+          why={heldByWorkflow ? "On hold through a workflow label; remove that label on GitHub to release it" : actionBlocked({ kind: "hold" }, [card])}
           onClick={() => void runTriage(entry("hold"), [card])}
         >
           {heldByWorkflow ? "On hold" : card.labels.includes(hold) ? "Release hold" : "Hold Card"} <kbd>h</kbd>
@@ -214,13 +213,11 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
   const shotsRequest = useStore((s) => s.shotsRequest);
   const act = useActivityOf(card);
   const signed = useSigned(card);
-  const handed = useStore((s) => s.handed);
-  const handedRec = handed[cardKey];
   const handedRef = useRef<HTMLSpanElement>(null);
   const handBtnRef = useRef<HTMLButtonElement>(null);
   /** the Card whose Hand button (or handed text) holds the keyboard */
   const refocus = useRef<string | null>(null);
-  const isHanded = !!card && handedValid(card, handedRec);
+  const isHanded = !!card?.handed;
   // the Hand button and the handed text swap places: keep the keyboard where it was (also when a failed Push or a hold swaps them back)
   useEffect(() => {
     const mine = refocus.current === cardKey;
@@ -335,11 +332,9 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
               {card.phase === "Backlog" && !card.waiting && (
                 <div className="actions">
                   <span className="spacer" />
-                  {handedValid(card, handedRec) ? (
+                  {card.handed ? (
                     <span className="handed" data-testid="handed" tabIndex={-1} ref={handedRef}>
-                      <span>
-                        Handed to the coordinator · {handedRec.nextStep} · {clock(new Date(handedRec.at).toISOString())}
-                      </span>
+                      <span>Handed to the coordinator{card.nextStep ? ` · ${card.nextStep}` : ""}</span>
                       <span className="muted">Hold and release to hand again</span>
                     </span>
                   ) : (
@@ -350,7 +345,7 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
                         refocus.current = card.key;
                         void runTriage(TRIAGE_ENTRIES.find((e) => e.id === "hand")!, [card]);
                       }}
-                      why={actionBlocked({ kind: "hand" }, [card], handed)}
+                      why={actionBlocked({ kind: "hand" }, [card])}
                     >
                       Hand to agent ({card.nextStep ?? "set a Next step"}) <kbd>a</kbd>
                     </Btn>
@@ -380,9 +375,9 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
   );
 }
 
-/** Start a coordinator per repo for these Cards, all repos at once (a Card's own button passes one Card). It starts with their numbers, so they count as handed; repos that failed stay on the toast for a retry. */
+/** Start a coordinator per repo for these Cards, all repos at once (a Card's own button passes one Card). It starts with their numbers, so the server sets their handed status; repos that failed stay on the toast for a retry. */
 export async function startCoordinator(cards: Card[]) {
-  const { setNotice, markHanded } = useStore.getState();
+  const { setNotice } = useStore.getState();
   const requests = startRequests(cards);
   const results = await Promise.allSettled(requests.map(({ repo, numbers }) => api.post(`/api/coordinator/start`, { repo, numbers })));
   const failed = requests.flatMap((r, i) => {
@@ -390,7 +385,6 @@ export async function startCoordinator(cards: Card[]) {
     return res.status === "rejected" ? [{ repo: r.repo, error: res.reason instanceof Error ? res.reason.message : String(res.reason) }] : [];
   });
   const failedRepos = failed.map((f) => f.repo);
-  markHanded(cards.filter((c) => !failedRepos.includes(c.repo)));
   const retry = cards.filter((c) => failedRepos.includes(c.repo));
   setNotice({ key: (retry[0] ?? cards[0]!).key, text: startNotice(requests.map((r) => r.repo).filter((r) => !failedRepos.includes(r)), failed), canStart: retry.length > 0, start: retry, failed: failed.length > 0 });
 }

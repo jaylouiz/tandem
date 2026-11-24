@@ -128,6 +128,46 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
     }
   }
 
+  /**
+   * "Hand to agent" on GitHub (#18): the issues get the workflow's handed status before `send` (a Push, a coordinator start) runs, so a failed
+   * write stops before anything is sent (a Push cannot be taken back). When `send` throws or what it returns did not arrive, each status goes
+   * back to what it was (the unhanded status when there was none: a status cannot be cleared). `restoreError`: why that last write failed.
+   */
+  async function handOver<T>(repo: string, numbers: number[], send: () => Promise<T>, arrived: (result: T) => boolean): Promise<{ result: T; restoreError: string | null }> {
+    const cfg = board.workflow;
+    const set: { n: number; before: string | null }[] = [];
+    const restore = async () => {
+      const errors: string[] = [];
+      for (const { n, before } of set) {
+        const back = before ?? cfg.unhandedStatus;
+        try {
+          await source.setStatus(repo, n, back);
+          board.patch(repo, n, (i) => (i.status = back));
+        } catch (e) {
+          errors.push(`${repo}#${n} keeps the status ${cfg.handedStatus}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      return errors.length ? errors.join("; ") : null;
+    };
+    let result: T;
+    try {
+      for (const n of numbers) {
+        const before = board.rawIssue(repo, n)?.status ?? null;
+        if (before === cfg.handedStatus) continue;
+        // false: the repo offers no such status, the hand-over goes on without one
+        if (await source.setStatus(repo, n, cfg.handedStatus)) {
+          set.push({ n, before });
+          board.patch(repo, n, (i) => (i.status = cfg.handedStatus));
+        }
+      }
+      result = await send();
+    } catch (e) {
+      const kept = await restore();
+      throw kept ? new Error(`${e instanceof Error ? e.message : String(e)}; ${kept}`) : e;
+    }
+    return { result, restoreError: arrived(result) ? null : await restore() };
+  }
+
   card.post("/answer", async (c) => {
     const { requestId, answer, push = true } = await c.req.json<{ requestId: string; answer: string; push?: boolean }>();
     return c.json({ push: await feedback(c.var.repo, c.var.n, answerComment(requestId, answer), push, `${requestId} answered`) });
@@ -163,15 +203,19 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
 
   card.post("/start", async (c) => {
     const cur = board.card(c.var.repo, c.var.n);
-    return c.json({ push: await maybePush(c.var.repo, c.var.n, "start", cur?.nextStep ?? "triage", true) });
+    const { result: push, restoreError } = await handOver(c.var.repo, [c.var.n], () => maybePush(c.var.repo, c.var.n, "start", cur?.nextStep ?? "triage", true), (p) => !!p?.delivered);
+    return c.json({ push, restoreError });
   });
 
   card.post("/labels", async (c) => {
-    const { add = [], remove = [] } = await c.req.json<{ add?: unknown; remove?: unknown }>();
+    const { add = [], remove = [], status } = await c.req.json<{ add?: unknown; remove?: unknown; status?: unknown }>();
     if (!isStringArray(add) || !isStringArray(remove)) return bad(c, "add and remove must be label names");
+    if (status !== undefined && (typeof status !== "string" || !status.trim())) return bad(c, "status must be a status name");
     if (add.length) await source.addLabels(c.var.repo, c.var.n, add);
     for (const l of remove) await source.removeLabel(c.var.repo, c.var.n, l);
     board.patch(c.var.repo, c.var.n, (i) => (i.labels = [...new Set([...i.labels.filter((l) => !remove.includes(l)), ...add])]));
+    // a re-steered Card that was handed: its status goes back with the labels (after them, so a failure here leaves the labels shown as written)
+    if (status !== undefined && (await source.setStatus(c.var.repo, c.var.n, status))) board.patch(c.var.repo, c.var.n, (i) => (i.status = status));
     return c.json({ ok: true });
   });
 
@@ -220,7 +264,8 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
     if (!Array.isArray(numbers) || !numbers.length || !numbers.every(isIssueNumber)) return bad(c, "numbers must be issue numbers");
     const path = store.state.repoPaths[repo] ?? (await pusher.knownPaths())[repo];
     if (!path) return c.json({ error: `No local checkout known for ${repo}. Set its path in Settings.` }, 400);
-    await pusher.startCoordinator(repo, path, numbers);
+    // it starts with these numbers, so they count as handed
+    await handOver(repo, numbers, () => pusher.startCoordinator(repo, path, numbers), () => true);
     return c.json({ ok: true });
   });
 

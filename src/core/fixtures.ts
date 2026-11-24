@@ -338,8 +338,11 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 130, "Hand demo: delivered", { now, ageH: 15, labels: ["ready"], body: "Hand this one to the coordinator." }),
     issue(A, 131, "Hand demo: failing Push", { now, ageH: 16, labels: ["ready"], body: "Its Push fails once." }),
     issue(B, 40, "Hand demo: no coordinator", { now, ageH: 17, labels: ["ready"], body: "No coordinator runs for this repo." }),
+    // native issue status (#18): Todo = handed and not started yet; the other demo issues have none (older than statuses) and sit where their labels put them
+    issue(A, 132, "Hand demo: handed earlier", { now, ageH: 18, labels: ["ready"], status: "Todo", body: "Handed to the coordinator before this page was opened: the status on GitHub says so." }),
     // agents at work, in every activity state (their log lines come from the fixture source's `fixtureActivity`)
-    issue(A, 112, "Undo for deleted tasks", { now, ageH: 3, labels: ["ready", "phase:build"], body: "Undo a delete for 10 seconds." }),
+    // in Build by its status alone: no phase label
+    issue(A, 112, "Undo for deleted tasks", { now, ageH: 3, labels: ["ready"], status: "In progress", body: "Undo a delete for 10 seconds." }),
     issue(A, 113, "Offline banner", {
       now,
       ageH: 9,

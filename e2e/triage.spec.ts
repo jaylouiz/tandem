@@ -129,7 +129,7 @@ test("Hand to agent: the Card shows it was handed over, offers no second Push, h
   await toBoard(page);
   await card(page, 130).click();
   await handButton(page).click();
-  await expect(handed(page)).toContainText(/Handed to the coordinator · build · \d\d:\d\d/);
+  await expect(handed(page)).toHaveText(/^Handed to the coordinator · build\s*Hold and release to hand again$/);
   await expect(handed(page)).toContainText("Hold and release to hand again");
   await expect(handButton(page)).toHaveCount(0);
   await expect(toast(page, "Handed to the coordinator")).toBeVisible();
@@ -150,10 +150,36 @@ test("Hand to agent: the Card shows it was handed over, offers no second Push, h
   await expect(page.getByRole("option", { name: /Hand to agent/ })).toHaveCount(0);
 });
 
-test("Hand to agent: a failed Push rolls back with the reason and stays retryable", async ({ page }) => {
+test("Hand to agent is on GitHub (#18): the status Todo keeps the Card handed after a reload and in a second page; a status alone puts a Card in Build", async ({ page, context }) => {
+  await toBoard(page);
+  // handed before this page was opened: nothing in the page knows it, the issue's status does
+  await card(page, 132).click();
+  await expect(handed(page)).toContainText("Handed to the coordinator · build");
+  await expect(handButton(page)).toHaveCount(0);
+  await card(page, 130).click();
+  await handButton(page).click();
+  await expect(handed(page)).toContainText("Handed to the coordinator · build");
+  await page.reload();
+  await expect(handed(page)).toContainText("Handed to the coordinator · build");
+  const other = await context.newPage();
+  await toBoard(other);
+  await card(other, 130).click();
+  await expect(handed(other)).toContainText("Handed to the coordinator · build");
+  // moving it to Inbox and back takes the status with it: it can be handed again
+  await other.keyboard.press("i");
+  await expect(other.getByTestId("column-Inbox").locator(".card", { hasText: "Hand demo: delivered" })).toBeVisible();
+  await other.keyboard.press("b");
+  await expect(handButton(other)).toBeEnabled();
+  await expect(handed(other)).toHaveCount(0);
+  await expect(handed(page)).toHaveCount(0); // and the first page follows
+  // "In progress" without a phase label
+  await expect(page.getByTestId("column-Build").locator(".card", { hasText: "Undo for deleted tasks" })).toBeVisible();
+});
+
+test("Hand to agent: a failed status write or Push rolls back with the reason and stays retryable", async ({ page }) => {
+  await page.route("**/api/cards/**/start", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await toBoard(page);
   await card(page, 131).click();
-  await page.route("**/api/cards/**/start", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await handButton(page).click();
   await expect(toast(page, "Failed: boom")).toBeVisible();
   await expect(handed(page)).toHaveCount(0);

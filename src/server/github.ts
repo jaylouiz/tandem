@@ -10,13 +10,15 @@ import type { Source } from "./source.ts";
 const run = promisify(execFile);
 const API = "https://api.github.com";
 
-const ISSUES_QUERY = `
+// `status` is GitHub's native issue status (#18), a preview field: `issuesQuery(false)` is the same read without it, for a repo or a
+// GitHub that does not know the field (the Phase then comes from labels alone).
+const issuesQuery = (withStatus: boolean) => `
 query($owner: String!, $name: String!, $cursor: String, $since: DateTime, $states: [IssueState!]) {
   repository(owner: $owner, name: $name) {
     issues(first: 40, after: $cursor, states: $states, filterBy: { since: $since }, orderBy: { field: UPDATED_AT, direction: DESC }) {
       pageInfo { hasNextPage endCursor }
       nodes {
-        number title body url state stateReason createdAt updatedAt closedAt
+        number title body url state stateReason createdAt updatedAt closedAt${withStatus ? " status { name }" : ""}
         labels(first: 30) { nodes { name } }
         comments(last: 80) { nodes { id body createdAt url author { login } } }
         closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
@@ -26,6 +28,13 @@ query($owner: String!, $name: String!, $cursor: String, $since: DateTime, $state
     }
   }
 }`;
+
+// Writing a status takes two node ids: the issue's and the status's. Statuses are resolved by name, never by a remembered id.
+export const STATUS_TARGET_QUERY = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { planningStatuses(first: 50) { nodes { id name } } issue(number: $number) { id } } }`;
+export const SET_STATUS_MUTATION = `mutation($issueId: ID!, $statusId: ID!) { setIssueStatus(input: { issueId: $issueId, statusId: $statusId }) { issue { number } } }`;
+
+/** GitHub answered the GraphQL call with errors (an unknown field, a refused write), as opposed to not answering at all. */
+export class GraphQLError extends Error {}
 
 // Read one comment's rendered HTML on demand. Private repos get signed `private-user-images` URLs that expire
 // after about 5 minutes, so they are never part of the synced issues or the cache.
@@ -41,6 +50,7 @@ interface GqlIssue {
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
+  status?: { name: string } | null;
   labels: { nodes: { name: string }[] };
   comments: { nodes: { id: string; body: string; createdAt: string; url: string; author: { login: string } | null }[] };
   closedByPullRequestsReferences: {
@@ -58,6 +68,7 @@ export function toRawIssue(repo: string, i: GqlIssue): RawIssue {
     state: i.state === "OPEN" ? "open" : "closed",
     stateReason: i.stateReason ? (i.stateReason.toLowerCase() as RawIssue["stateReason"]) : null,
     labels: i.labels.nodes.map((l) => l.name),
+    status: i.status?.name ?? null,
     createdAt: i.createdAt,
     updatedAt: i.updatedAt,
     closedAt: i.closedAt,
@@ -81,6 +92,8 @@ export class GitHubSource implements Source {
   readonly kind = "github" as const;
   private token: Promise<string>;
   private etags = new Map<string, string>();
+  /** repos whose issues could not be read with `status`: read without it, and no status is written, until the next full fetch asks again */
+  private noStatus = new Set<string>();
 
   constructor(token?: string) {
     this.token = token ? Promise.resolve(token) : run("gh", ["auth", "token"]).then((r) => r.stdout.trim());
@@ -107,7 +120,7 @@ export class GitHubSource implements Source {
   private async graphql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
     const res = await this.rest("/graphql", { method: "POST", body: JSON.stringify({ query, variables }) });
     const json = (await res.json()) as { data?: T; errors?: { message: string }[] };
-    if (json.errors?.length) throw new Error(`GitHub GraphQL: ${json.errors.map((e) => e.message).join("; ")}`);
+    if (json.errors?.length) throw new GraphQLError(`GitHub GraphQL: ${json.errors.map((e) => e.message).join("; ")}`);
     return json.data as T;
   }
 
@@ -130,14 +143,27 @@ export class GitHubSource implements Source {
           { states: ["CLOSED"], since: new Date(Date.now() - closedLookbackDays * 86_400_000).toISOString() },
         ];
     const out: RawIssue[] = [];
+    type Page = { repository: { issues: { pageInfo: { hasNextPage: boolean; endCursor: string }; nodes: GqlIssue[] } } };
+    if (!since) this.noStatus.delete(repo); // a full fetch asks for the status again
+    const page = async (variables: Record<string, unknown>): Promise<Page> => {
+      if (this.noStatus.has(repo)) return this.graphql<Page>(issuesQuery(false), variables);
+      try {
+        return await this.graphql<Page>(issuesQuery(true), variables);
+      } catch (e) {
+        // only an answer with errors can be about the field; the same read without it decides (a rate limit fails again and stays an error)
+        if (!(e instanceof GraphQLError)) throw e;
+        const plain = await this.graphql<Page>(issuesQuery(false), variables);
+        this.noStatus.add(repo);
+        return plain;
+      }
+    };
     for (const b of batches) {
       let cursor: string | null = null;
       do {
-        type Page = { repository: { issues: { pageInfo: { hasNextPage: boolean; endCursor: string }; nodes: GqlIssue[] } } };
-        const data: Page = await this.graphql<Page>(ISSUES_QUERY, { owner, name, cursor, since: b.since, states: b.states });
-        const page = data.repository.issues;
-        out.push(...page.nodes.map((i) => toRawIssue(repo, i)));
-        cursor = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
+        const data: Page = await page({ owner, name, cursor, since: b.since, states: b.states });
+        const issues = data.repository.issues;
+        out.push(...issues.nodes.map((i) => toRawIssue(repo, i)));
+        cursor = issues.pageInfo.hasNextPage ? issues.pageInfo.endCursor : null;
       } while (cursor);
     }
     return out;
@@ -161,6 +187,19 @@ export class GitHubSource implements Source {
     }
   }
 
+  async setStatus(repo: string, number: number, status: string) {
+    if (this.noStatus.has(repo)) return false;
+    const [owner, name] = repo.split("/");
+    type Target = { repository: { planningStatuses: { nodes: { id: string; name: string }[] } | null; issue: { id: string } | null } };
+    const target = await this.graphql<Target>(STATUS_TARGET_QUERY, { owner, name, number });
+    const statusId = target.repository.planningStatuses?.nodes.find((s) => s.name === status)?.id;
+    if (!statusId) return false; // the repo offers no such status: nothing to write
+    const issueId = target.repository.issue?.id;
+    if (!issueId) throw new Error(`GitHub has no issue ${repo}#${number}`);
+    await this.graphql(SET_STATUS_MUTATION, { issueId, statusId });
+    return true;
+  }
+
   async createIssue(repo: string, title: string, body: string, labels: string[]): Promise<RawIssue> {
     const res = await this.rest(`/repos/${repo}/issues`, { method: "POST", body: JSON.stringify({ title, body, labels }) });
     const i = (await res.json()) as { number: number; html_url: string; created_at: string; updated_at: string };
@@ -173,6 +212,7 @@ export class GitHubSource implements Source {
       state: "open",
       stateReason: null,
       labels,
+      status: null,
       createdAt: i.created_at,
       updatedAt: i.updated_at,
       closedAt: null,
