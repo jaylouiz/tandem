@@ -196,8 +196,11 @@ test("Gallery: the key legend is three groups, Pick first, on one line at 1024 a
     expect(rows, `${width}`).toHaveLength(1);
     expect(await legend.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), `${width}`).toBe(true);
     // every key still works: p picks the shown variant
+    await expect(gallery).toBeFocused(); // its keys are the popup's: they need the focus in it
     await page.keyboard.press("p");
-    await expect(gallery).toContainText("picked");
+    // the pick is a draft and drafts outlive a reload (#13): the second pass finds it picked and takes it back
+    if (width === 1024) await expect(gallery).toContainText("picked");
+    else await expect(gallery).not.toContainText("picked");
     await page.keyboard.press("Escape");
   }
   // a Look has nothing to pick: no Pick group

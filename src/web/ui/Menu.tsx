@@ -3,7 +3,7 @@
 // classes (`menu`, `menu-item` in styles.css). While it is open it is a layer of its own, like a dialog: the window key table stays out.
 // An item shows the single key that runs it with the menu closed (`keys`); `onKey` lets that same key run it while the menu is open.
 import { Menu as Base } from "@base-ui/react/menu";
-import { useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { layer } from "./Dialog.tsx";
 
 const Tick = () => (
@@ -11,6 +11,9 @@ const Tick = () => (
     <path d="M3 8.5 6.5 12 13 4.5" />
   </svg>
 );
+
+/** Closes the menu an item sits in: an item that ran closes it, whatever kind it is (the library keeps a radio item's menu open). */
+const CloseCtx = createContext<() => void>(() => {});
 
 export interface MenuProps {
   /** the popup's accessible name */
@@ -47,7 +50,7 @@ export function Menu({ label, trigger, onKey, testId, children }: MenuProps) {
               setOpen(false);
             }}
           >
-            {children}
+            <CloseCtx.Provider value={() => setOpen(false)}>{children}</CloseCtx.Provider>
           </Base.Popup>
         </Base.Positioner>
       </Base.Portal>
@@ -76,8 +79,10 @@ const body = (children: ReactNode, why: string | null | undefined, keys: string 
 );
 
 export function MenuItem({ keys, why, onSelect, testId, children }: ItemProps) {
+  const close = useContext(CloseCtx);
+  const run = () => (onSelect(), close());
   return (
-    <Base.Item className="menu-item" disabled={!!why} onClick={onSelect} data-testid={testId}>
+    <Base.Item className="menu-item" disabled={!!why} onClick={run} data-testid={testId}>
       <span className="menu-check" aria-hidden />
       {body(children, why, keys)}
     </Base.Item>
@@ -102,8 +107,10 @@ export function MenuGroup({ label, value, children }: { label: string; value?: s
 }
 
 export function MenuRadio({ value, keys, why, onSelect, testId, children }: ItemProps & { value: string }) {
+  const close = useContext(CloseCtx);
+  const run = () => (onSelect(), close());
   return (
-    <Base.RadioItem className="menu-item" value={value} disabled={!!why} closeOnClick onClick={onSelect} data-testid={testId}>
+    <Base.RadioItem className="menu-item" value={value} disabled={!!why} closeOnClick onClick={run} data-testid={testId}>
       <span className="menu-check" aria-hidden>
         <Base.RadioItemIndicator>
           <Tick />

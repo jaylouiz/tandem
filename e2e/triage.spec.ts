@@ -271,9 +271,10 @@ test("board (#33): a click on empty column space closes the Card pane, a Card cl
   await card(page, 150).click({ modifiers: [ctrl] });
   await expect(bar(page)).toContainText("2 selected");
   const ux = page.getByTestId("column-UX Design");
+  await page.locator(".scroll").evaluate((el) => (el.scrollTop = el.scrollHeight)); // the column's end is below the fold; Build is longer, so there is empty space under its last Card
   const box = (await ux.boundingBox())!;
   const last = (await ux.locator(".card").last().boundingBox())!;
-  await page.mouse.click(box.x + box.width / 2, last.y + last.height + 30); // below the last Card
+  await page.mouse.click(box.x + box.width / 2, Math.max(last.y + last.height + 30, 400)); // below the last Card (scrolled to the Board's end it sits above the window)
   await expect(page.getByTestId("pane-marked")).toHaveCount(0);
   await expect(detail).toBeHidden();
   await expect(bar(page)).toContainText("2 selected");

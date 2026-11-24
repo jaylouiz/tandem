@@ -199,7 +199,7 @@ test("a question without a recommendation blocks Send until it has a pick", asyn
   await expect(send).toHaveAttribute("title", "Pick an option for every question");
   await expect(page.getByTestId("send-row")).toContainText("Pick an option for every question");
   await page.keyboard.press("Meta+Enter");
-  await send.click();
+  await send.click({ force: true }); // Playwright waits on an aria-disabled button; a person can still click it
   await page.waitForTimeout(200);
   expect(sent).toHaveLength(0);
   await step(page, 2).click();

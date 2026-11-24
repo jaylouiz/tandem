@@ -111,11 +111,11 @@ test("no tabs: [ and ] do nothing on a Card whose ask has one question; an opene
   // and back: the fold opened before is closed again (it is not remembered per Card)
   await row(page, 105).click();
   await expect(issue).toHaveAttribute("aria-expanded", "false");
-  // [ ] and digits stay out of the way while the palette is open
+  // digits stay out of the way while the palette is open: typed into it, they pick nothing on the ask
   await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.press("]");
-  await expect(page.getByRole("tab", { name: "Decided", includeHidden: true })).toHaveAttribute("aria-selected", "true"); // behind the dialog the page is aria-hidden
+  await page.keyboard.press("1");
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("panel-decision").getByTestId("option-B")).toHaveAttribute("aria-checked", "true");
 });
 
 test("Esc returns focus to the list and keeps the Card open", async ({ page }) => {

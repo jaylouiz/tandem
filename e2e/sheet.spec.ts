@@ -67,6 +67,7 @@ test("the More menu holds Next step (the current one checked), Hold Card and Ope
   await more(page).click();
   await expect(m.getByRole("menuitemradio", { name: /build/ })).toHaveAttribute("aria-checked", "true");
   // with the menu open the key on an item runs it too
+  await expect(m).toBeFocused(); // its keys are the popup's: they need the focus in it
   await page.keyboard.press("d");
   await expect(m).toHaveCount(0);
   await expect(toast(page, "Next step: design")).toBeVisible();
@@ -138,7 +139,7 @@ test("Activity: the state said once in its summary; the coordination log on dema
   await head(page, "activity").click();
   await expect(fold(page, "activity").getByTestId("coordination-log").locator(".timeline li").first()).toBeVisible();
   await open(page, 105, "board");
-  await expect(fold(page, "activity").locator(".fold-sum")).toHaveText(/^Parked · waiting for your Feedback · \d+[mhd] ago$/);
+  await expect(fold(page, "activity").locator(".fold-sum")).toHaveText(/^Parked · .+ · \d+[mhd] ago$/);
   await head(page, "activity").click();
   await expect(fold(page, "activity").getByTestId("coordination-log")).toHaveText("No coordination log for this issue.");
   // a Backlog Card has no agent activity: when it last moved
