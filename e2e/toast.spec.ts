@@ -103,7 +103,7 @@ test("a failure stays until dismissed and is announced as an alert; Esc on the f
   await page.route("**/api/cards/**/labels", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await card(page, "A").click();
   await page.keyboard.press("i");
-  const failed = toast(page, "Failed: boom");
+  const failed = toast(page, "Nothing moved, 1 failed: boom"); // the move notice (src/core/triage.ts), not the single-Card "Failed: boom": the old case-insensitive match hid the difference
   await expect(failed).toBeVisible();
   await expect(failed).toHaveAttribute("data-tone", "failed");
   await expect(page.getByRole("alert").filter({ hasText: "Failed: boom" })).toHaveCount(1); // announced urgently, not as a status
