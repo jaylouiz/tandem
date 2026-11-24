@@ -26,6 +26,8 @@ export const CACHE_VERSION = 2; // 2: parent, assignees, blockedBy (wayfinder ma
 export interface RepoCache {
   /** absent in a cache written before versions existed */
   v?: number;
+  /** when the repo was last fetched in full (the only pass that drops issues GitHub no longer has); absent in an older cache: a full fetch is due */
+  fullAt?: string;
   syncedAt: string;
   issues: RawIssue[];
 }

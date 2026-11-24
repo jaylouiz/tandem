@@ -194,3 +194,50 @@ describe("to look at with a Card still open", () => {
     expect(toLookAt(all, all.find((c) => c.number === 119)!.key).map((c) => c.number)).toEqual([108, 119, 163, 162, 161, 160, 164, 165, 176]);
   });
 });
+
+describe("what waits, by hand on GitHub or through Tandem (#14, #16)", () => {
+  const at = (h: number) => new Date(now + h * 3_600_000).toISOString();
+  let n = 0;
+  const say = (body: string, h: number) => ({ id: `m${++n}`, author: "u", createdAt: at(h), url: "u", body });
+  /** The thread shape of the case in #16 (kan-do #423): D1 asked, answered through the coordinator and resumed, a plain note, D2 asked, and a later note that D2 stays open. */
+  const thread = () => [
+    say(requestBody("D1", "Which of the four directions?\n- A: Sunlit Desk\n- B: Colour Lanes"), 0),
+    say("<!-- decision-answer D1 -->\nAnswer from the user (via the coordinator): another round with new variants of A and C", 1),
+    say("<!-- decision-resolved D1 -->\nResuming with: round 2", 1),
+    say("<!-- decision-note -->\nDesign round 2 started (autonomous worker).", 2),
+    say(requestBody("D2", "Which of the seven A/C variants?\n- A1: Butter Desk\n- H1: Sunlit Outline"), 3),
+    say("<!-- decision-note -->\nD2 stays open: the user chose to skip it for now. Nothing else waits.", 4),
+  ];
+  const issue = (over: Partial<ReturnType<typeof demoIssues>[number]> = {}) => ({ ...demoIssues(now).find((i) => i.number === 105)!, labels: ["needs-design", "needs-decision", "phase:design"], comments: thread(), ...over });
+  const build = (over: Parameters<typeof issue>[0] = {}) => buildCard(issue(over), cfg, null);
+
+  it("an open request waits while the issue is open and labelled, whatever notes follow it", () => {
+    const c = build();
+    expect(c.waiting).toMatchObject({ kind: "decision", requestId: "D2" });
+    expect(c.awaitingPickup).toBe(false);
+    expect(c.requests.map((r) => [r.id, r.resolved])).toEqual([["D1", true], ["D2", false]]);
+  });
+
+  it("an answer typed on GitHub counts: `D<k>:` anywhere after the request, a plain comment when the request is the nearest marked comment", () => {
+    const direct = thread().slice(0, 5); // D2 is the last marked comment
+    for (const [comments, body] of [[thread(), "D2: H1"], [direct, "D2: H1"], [direct, "H1, but with A3's pill headings"]] as const) {
+      const c = build({ comments: [...comments, say(body, 5)] });
+      expect(c.waiting, body).toBeNull();
+      expect(c.awaitingPickup, body).toBe(true);
+      expect(c.requests.find((r) => r.id === "D2")!.answer, body).toBe(body);
+    }
+  });
+
+  it("a plain comment after a later note replies to that note, not to the request (the rule `decide.sh` reads by too): the request still waits", () => {
+    const c = build({ comments: [...thread(), say("H1, but with A3's pill headings", 5)] });
+    expect(c.waiting).toMatchObject({ requestId: "D2" });
+  });
+
+  it("a resolved marker, a removed needs-decision label or a closed issue ends the wait and the pickup", () => {
+    const resolved = build({ comments: [...thread(), say("D2: H1", 5), say("<!-- decision-resolved D2 -->\nResuming with: H1", 6)] });
+    const unlabelled = build({ labels: ["needs-design", "phase:design"] });
+    const closed = build({ state: "closed", stateReason: "completed", closedAt: at(7) });
+    for (const c of [resolved, unlabelled]) expect(c).toMatchObject({ waiting: null, awaitingPickup: false });
+    expect(closed.waiting).toBeNull();
+  });
+});

@@ -197,7 +197,7 @@ describe("launch", () => {
     const src = new FixtureSource();
     const orig = src.fetchIssues.bind(src);
     src.fetchIssues = async (repo, since, lookback) => (fetched.push(since), orig(repo, since, lookback));
-    st.saveCache({ "acme/app": { v: CACHE_VERSION, syncedAt: new Date().toISOString(), issues: await orig("acme/app", null) } });
+    st.saveCache({ "acme/app": { v: CACHE_VERSION, fullAt: new Date().toISOString(), syncedAt: new Date().toISOString(), issues: await orig("acme/app", null) } });
     const b = new Board(src, st, new FakePusher(new Set()), { pollMs: 60_000, persist: true });
     expect(b.view().cards.length).toBeGreaterThan(0); // cached Cards before any sync
     await b.start();
@@ -311,6 +311,201 @@ describe("launch", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe("a failed poll (#2)", () => {
+    const REPO = "acme/app";
+    /** A Board with a current cache whose source can be made to fail: `changed()` (the ETag check) or `fetchIssues`. */
+    async function board() {
+      const st = new Store({ repos: [REPO] }, { memory: true });
+      const src = new FixtureSource();
+      const orig = src.fetchIssues.bind(src);
+      const calls: (string | null)[] = [];
+      const s = { failChanged: false, failFetch: false, changed: false };
+      src.changed = async () => {
+        if (s.failChanged) throw new Error("GitHub could not be reached: fetch failed (ENOTFOUND)");
+        return s.changed;
+      };
+      src.fetchIssues = async (repo, since, lookback) => {
+        calls.push(since);
+        if (s.failFetch) throw new Error("GitHub POST /graphql: 502 Bad Gateway");
+        return orig(repo, since, lookback);
+      };
+      const b = new Board(src, st, new FakePusher(new Set()), { pollMs: 15_000, persist: false });
+      await b.refreshAll(false); // no cache: the first full fetch
+      calls.length = 0;
+      return { b, src, s, calls, sync: () => b.view().sync[REPO]! };
+    }
+
+    it("a single failed poll shows no error; the next poll that works clears the streak, also when nothing changed", async () => {
+      const { b, s, calls, sync } = await board();
+      s.failChanged = true;
+      await b.refreshAll(false);
+      expect(sync()).toMatchObject({ error: null, errorAt: null }); // one blip: not shown
+      s.failChanged = false;
+      await b.refreshAll(false);
+      expect(sync()).toMatchObject({ error: null, errorAt: null });
+      expect(calls).toHaveLength(1); // after a failure the ETag is not trusted: one incremental fetch
+      expect(calls[0]).not.toBeNull();
+      await b.refreshAll(false);
+      expect(calls).toHaveLength(1); // healthy again: back to the quiet ETag poll
+    });
+
+    it("reports from the second failed poll in a row, with the time of the first, and recovers by itself on a quiet repo", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T11:05:00Z") });
+      try {
+        const { b, s, sync } = await board();
+        const okAt = sync().okAt;
+        s.failChanged = s.failFetch = true; // the network is down: the ETag check fails, and so does the fetch the next poll goes for
+        await b.refreshAll(false);
+        vi.advanceTimersByTime(15_000);
+        await b.refreshAll(false);
+        expect(sync()).toMatchObject({ error: "GitHub POST /graphql: 502 Bad Gateway", errorAt: "2026-11-24T11:05:00.000Z", okAt });
+        expect(b.view().cards.length).toBeGreaterThan(0); // the last synced Cards stay
+        // the network is back and nothing changed in the repo meanwhile: the error must not stick (it did until the repo's next change)
+        s.failChanged = s.failFetch = false;
+        vi.advanceTimersByTime(15_000);
+        const seen: BoardView[] = [];
+        b.subscribe((v) => seen.push(v));
+        await b.refreshAll(false);
+        await new Promise((r) => setTimeout(r, 0));
+        expect(sync()).toMatchObject({ error: null, errorAt: null, okAt: "2026-11-24T11:05:30.000Z" });
+        expect(seen.at(-1)?.sync[REPO]!.error).toBeNull(); // and the page is told
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a change whose fetch failed is not skipped: the next poll fetches although GitHub now answers 'not changed'", async () => {
+      const { b, src, s, calls, sync } = await board();
+      s.changed = true; // GitHub: something changed (the new ETag is stored by this answer)...
+      s.failFetch = true; // ...but fetching it fails
+      await b.refreshAll(false);
+      expect(calls).toHaveLength(1);
+      s.changed = false; // the next "changed?" compares against the stored ETag: not changed
+      s.failFetch = false;
+      await src.comment(REPO, 105, "D1: B"); // the change that was never fetched
+      await b.refreshAll(false);
+      expect(calls).toHaveLength(2);
+      expect(b.rawIssue(REPO, 105)!.comments.at(-1)!.body).toBe("D1: B");
+      expect(sync().error).toBeNull();
+    });
+
+    it("a refresh the developer asked for reports its failure at once", async () => {
+      const { b, s, sync } = await board();
+      s.failFetch = true;
+      await b.refresh(REPO, true);
+      expect(sync().error).toBe("GitHub POST /graphql: 502 Bad Gateway");
+      expect(sync().syncing).toBe(false);
+    });
+  });
+
+  describe("a scheduled full fetch (#16: an issue GitHub no longer has leaves the Board)", () => {
+    const REPO = "acme/app";
+    const HOUR = 3_600_000;
+    async function board() {
+      const st = new Store({ repos: [REPO] }, { memory: true });
+      const src = new FixtureSource();
+      const orig = src.fetchIssues.bind(src);
+      const calls: (string | null)[] = [];
+      const s = { gone: new Set<number>(), fail: false };
+      src.changed = async () => false;
+      src.fetchIssues = async (repo, since, lookback) => {
+        calls.push(since);
+        if (s.fail) throw new Error("GitHub POST /graphql: 502 Bad Gateway");
+        return (await orig(repo, since, lookback)).filter((i) => !s.gone.has(i.number));
+      };
+      const b = new Board(src, st, new FakePusher(new Set()), { pollMs: 15_000, persist: false });
+      await b.refreshAll(false);
+      calls.length = 0;
+      const waits = () => b.view().cards.some((c) => c.number === 105 && !!c.waiting);
+      return { b, s, calls, waits, src };
+    }
+
+    it("an incremental sync keeps a vanished issue; the full fetch after fullSyncHours drops it, quietly", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, s, calls, waits, src } = await board();
+        expect(waits()).toBe(true); // #105 waits on a decision
+        s.gone.add(105); // deleted, transferred, or the repo was recreated
+        src.changed = async () => true;
+        vi.advanceTimersByTime(HOUR);
+        await b.refreshAll(false);
+        expect(calls.at(-1)).not.toBeNull(); // incremental
+        expect(waits()).toBe(true); // nothing tells an incremental sync that it is gone
+        src.changed = async () => false;
+        vi.advanceTimersByTime(5 * HOUR);
+        const snaps: BoardView[] = [];
+        b.subscribe((v) => snaps.push(v));
+        await b.refreshAll(false); // 6 h after the last full fetch
+        await new Promise((r) => setTimeout(r, 0));
+        expect(calls.at(-1)).toBeNull(); // a full fetch, although "changed?" said no
+        expect(waits()).toBe(false);
+        expect(b.rawIssue(REPO, 105)).toBeNull();
+        expect(snaps.every((v) => !v.sync[REPO]!.syncing)).toBe(true); // quiet: never "Syncing"
+        const n = calls.length;
+        await b.refreshAll(false);
+        expect(calls).toHaveLength(n); // done for the next 6 h
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("an incremental fetch in between does not push the full fetch out", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, calls, src } = await board();
+        src.changed = async () => true;
+        for (let h = 1; h <= 5; h++) (vi.advanceTimersByTime(HOUR), await b.refreshAll(false));
+        expect(calls.every((c) => c !== null)).toBe(true);
+        vi.advanceTimersByTime(HOUR);
+        await b.refreshAll(false);
+        expect(calls.at(-1)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a failing full fetch keeps the Cards, backs off, and the Board stays in sync incrementally meanwhile", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, s, calls, waits } = await board();
+        vi.advanceTimersByTime(6 * HOUR);
+        s.fail = true;
+        await b.refreshAll(false);
+        expect(calls).toEqual([null]);
+        expect(waits()).toBe(true); // the Cards stay as they were
+        s.fail = false;
+        vi.advanceTimersByTime(15_000);
+        await b.refreshAll(false); // inside the back-off: after a failure, an incremental fetch instead of the ETag
+        expect(calls).toHaveLength(2);
+        expect(calls[1]).not.toBeNull();
+        expect(b.view().sync[REPO]!.error).toBeNull();
+        vi.advanceTimersByTime(60_000);
+        await b.refreshAll(false);
+        expect(calls.at(-1)).toBeNull(); // the full fetch is tried again after the back-off
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a cache written before full fetches were stamped gets one right away", async () => {
+      process.env.TANDEM_HOME = mkdtempSync(join(tmpdir(), "tandem-nofull-"));
+      const st = new Store({ repos: [REPO] });
+      const src = new FixtureSource();
+      const orig = src.fetchIssues.bind(src);
+      const calls: (string | null)[] = [];
+      src.fetchIssues = async (repo, since, lookback) => (calls.push(since), orig(repo, since, lookback));
+      const ghost = { ...(await orig(REPO, null)).find((i) => i.number === 105)!, number: 423, title: "Visual UI Re-Design" }; // only the cache still has it
+      st.saveCache({ [REPO]: { v: CACHE_VERSION, syncedAt: new Date().toISOString(), issues: [...(await orig(REPO, null)), ghost] } }); // no `fullAt`
+      const b = new Board(src, st, new FakePusher(new Set()), { pollMs: 60_000, persist: true });
+      expect(b.view().cards.some((c) => c.number === 423 && !!c.waiting)).toBe(true);
+      await b.start();
+      b.stop();
+      expect(calls).toEqual([null]);
+      expect(b.view().cards.some((c) => c.number === 423)).toBe(false);
+      expect(st.loadCache()[REPO]!.fullAt).toBeTruthy();
     });
   });
 

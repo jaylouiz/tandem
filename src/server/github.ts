@@ -95,6 +95,10 @@ export class GitHubSource implements Source {
         "X-GitHub-Api-Version": "2022-11-28",
         ...(init.headers ?? {}),
       },
+    }).catch((e: unknown) => {
+      // Node says only "fetch failed" (no network, DNS, a dropped connection, e.g. after sleep): name it and keep the cause. Never retried here: writes use this too
+      const code = (e as { cause?: { code?: string } }).cause?.code;
+      throw new Error(`GitHub could not be reached: ${e instanceof Error ? e.message : String(e)}${code ? ` (${code})` : ""}`);
     });
     if (!res.ok && res.status !== 304) throw new Error(`GitHub ${init.method ?? "GET"} ${path}: ${res.status} ${await res.text()}`);
     return res;

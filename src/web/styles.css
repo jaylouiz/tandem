@@ -1492,6 +1492,9 @@ button.done-head:hover { background: var(--bg-hover); color: var(--text); }
   gap: 2px;
   overflow-wrap: anywhere;
 }
+.sync-err + .sync-err {
+  margin-top: var(--s-3);
+}
 
 /* ---- Focus, "Covers" (components/focus/): one ask per screen, composed for its kind, and it takes the window ---- */
 .shell[data-focus] { grid-template-columns: minmax(0, 1fr); }

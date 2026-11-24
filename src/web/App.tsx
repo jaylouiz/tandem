@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { waitingId } from "../core/card.ts";
+import { syncFailure, syncFailureStatus } from "../core/sync.ts";
 import type { Card } from "../core/types.ts";
 import { AgentOverlay, AgentsLine } from "./components/AgentOverlay.tsx";
 import { BoardView, LaneToggle, boardNavGroups } from "./components/BoardView.tsx";
@@ -12,7 +13,7 @@ import { Shortcuts } from "./components/Shortcuts.tsx";
 import { Settings } from "./components/Settings.tsx";
 import { RepoFilterChip, Repos } from "./components/Repos.tsx";
 import { WaitingView, queueOf } from "./components/WaitingView.tsx";
-import { NavIcon, shortRepo } from "./components/bits.tsx";
+import { NavIcon, clock, shortRepo } from "./components/bits.tsx";
 import { InfoPopover } from "./ui/Tooltip.tsx";
 import { handleKey, keyCtxRef, keyOf, type KeyCtx } from "./keys.ts";
 import { useNoticeToasts } from "./notices.ts";
@@ -229,12 +230,17 @@ export function App() {
               label="Sync errors"
               className="chip danger"
               testId="sync-error"
-              detail={errors.map(([r, s]) => (
-                <div key={r} className="sync-err">
-                  <strong>{r}</strong>
-                  <span className="muted">{s.error}</span>
-                </div>
-              ))}
+              detail={errors.map(([r, s]) => {
+                const f = syncFailure(s.error!);
+                return (
+                  <div key={r} className="sync-err">
+                    <strong>{r}</strong>
+                    <span>{f.what}</span>
+                    <span className="muted">{syncFailureStatus(s, clock)}</span>
+                    {f.detail !== f.what && <span className="faint">{f.detail}</span>}
+                  </div>
+                );
+              })}
             >
               Sync error · {errors.length}
             </InfoPopover>

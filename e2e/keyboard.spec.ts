@@ -45,44 +45,18 @@ test("Board j/k/arrows keep the selected Card in view and focused, so Enter acts
   await expect(page.locator('.card[aria-selected="true"]')).toBeInViewport();
 });
 
-test("Card keys and the Selection bar are not live where there are no Cards: Maps, Settings (U4)", async ({ page }) => {
+test("Card keys and the Selection bar are not live where there are no Cards: Settings (U4)", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Wayfinder maps" }).click();
-  await expect(page.getByTestId("map-109")).toBeVisible();
-  await viaPalette(page, "app#117"); // the pane opens in Maps too (maps.spec.ts)
-  const pane = detail(page);
-  await expect(pane).toHaveAttribute("aria-label", "Card acme/app#117");
-  for (const key of ["x", "h", "m", "i", "a", "d", "s", "b", "1", "2", "3", "0", "w", "l", "j", "k", "ArrowDown", "ControlOrMeta+a", "Shift+J"]) await page.keyboard.press(key);
-  await expect(bar(page)).toBeHidden();
-  await expect(page.getByTestId("toast")).toHaveCount(0); // nothing was written or Pushed
-  await expect(pane).toHaveAttribute("aria-label", "Card acme/app#117"); // j/k did not walk anywhere
   // Settings has no Card pane: a Card picked in the palette opens on the Board instead of acting unseen
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await page.keyboard.press("x");
-  await page.keyboard.press("h");
+  for (const key of ["x", "h", "m", "i", "a", "d", "s", "b", "1", "2", "3", "0", "w", "l", "j", "k", "ArrowDown", "ControlOrMeta+a", "Shift+J"]) await page.keyboard.press(key);
   await expect(bar(page)).toBeHidden();
+  await expect(page.getByTestId("toast")).toHaveCount(0); // nothing was written or Pushed
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await viaPalette(page, "Move demo A");
   await expect(page.getByTestId("board")).toBeVisible();
   await expect(detail(page)).toContainText("Move demo A");
-});
-
-test("the Feedback keys (digits, ⌘↵, [ ]) do nothing on Maps either: a Card picked there is shown, never answered by key (U4)", async ({ page }) => {
-  const writes: string[] = [];
-  page.on("request", (r) => r.method() !== "GET" && writes.push(`${r.method()} ${r.url()}`));
-  await page.goto("/");
-  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Wayfinder maps" }).click();
-  await expect(page.getByTestId("map-109")).toBeVisible();
-  await viaPalette(page, "app#127"); // a real blocker: its Feedback panel is on the pane
-  await expect(detail(page)).toHaveAttribute("aria-label", "Card acme/app#127");
-  const tab = page.getByRole("tab", { selected: true });
-  const was = await tab.textContent();
-  await expect(page.getByTestId("panel-decision")).toBeVisible();
-  for (const key of ["1", "2", "3", "ControlOrMeta+Enter", "]", "["]) await page.keyboard.press(key);
-  await expect(page.getByTestId("toast")).toHaveCount(0); // no "Feedback given"
-  await expect(page.getByTestId("panel-decision").locator("button.selected")).toHaveCount(0); // no choice was picked
-  await expect(tab).toHaveText(was!); // [ ] did not change the tab
-  expect(writes).toEqual([]);
 });
 
 test("⌘A marks the open Card's whole Board column, Esc clears (U17)", async ({ page }) => {
@@ -128,9 +102,9 @@ test("⌘A keeps its native meaning in a text field (U17)", async ({ page }) => 
 
 test("arrow keys are only prevented when they moved a selection (U19)", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Wayfinder maps" }).click();
-  await expect(page.getByTestId("map-109")).toBeVisible();
-  expect(await prevented(page, "ArrowDown")).toBe(false); // Maps scrolls by arrow
+  await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  expect(await prevented(page, "ArrowDown")).toBe(false); // Settings scrolls by arrow
   expect(await prevented(page, "ArrowUp")).toBe(false);
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Board" }).click();
   const cards = page.getByTestId("board").locator(".card");

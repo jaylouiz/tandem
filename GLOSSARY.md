@@ -32,17 +32,9 @@ _Avoid_: ticket, task
 The Cards the developer has marked on the Board to move or triage together (cmd/ctrl-click, shift-click, `x`). It spans columns, is never saved, and ends when the Cards move or the developer clears it.
 _Avoid_: bulk, batch, marked set
 
-**Wayfinder map**:
-An issue labelled `wayfinder:map` that charts a large effort as decision tickets. It is read-only in Tandem and never a Card; it lives in the Wayfinder maps view.
+**Wayfinder issue**:
+An issue of the `/wayfinder` skill: a map (`wayfinder:map`) or one of its decision tickets (`wayfinder:<kind>`). Never a Card and never on the Board; Tandem does not show them (the Wayfinder maps view was removed, #15).
 _Avoid_: epic, roadmap
-
-**Ticket**:
-A decision ticket of a Wayfinder map: a sub-issue labelled `wayfinder:<research|prototype|grilling|task>`. Never a Card and never on the Board.
-_Avoid_: task, issue, Card
-
-**Frontier**:
-The open, unblocked and unclaimed Tickets of a Wayfinder map: what can be taken next. A claimed Ticket has an assignee; a blocked one has an open blocker.
-_Avoid_: backlog, queue
 
 **Feedback**:
 Any human answer an agent waits on or reacts to: answering a decision request, reacting to a design round, approving or holding a merge, and (not blocking) accepting or challenging an agent decision.

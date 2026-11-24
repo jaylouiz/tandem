@@ -29,7 +29,7 @@ Secondary:
 8. **Triage**: move Inbox Cards into the Backlog, set a Next step, put Cards on hold, reprioritize.
 9. **Capture an idea fast**, as a new issue straight from the Board.
 10. **Take a Look at finished work**: for Done Cards with UX impact, open the prepared preview URL and the final screenshots, then mark the Card Seen.
-11. **See wayfinder maps** (issues labelled `wayfinder:map`) and their decision tickets, read-only. The grilling itself stays in the terminal.
+11. _Removed (2026-11-24, #15): see wayfinder maps._ Wayfinder issues (`wayfinder:map`, `wayfinder:<kind>`) stay off the Board.
 12. **Get notified** with a desktop notification when something new waits on me.
 13. **Understand a Card at a glance**: what was decided and what waits on me, in a structured form with full detail one step away, never as a raw comment thread.
 
@@ -55,7 +55,7 @@ Tandem has **no agent operations layer of its own**: it does not run, host or su
 
 - The Push goes to the running `/orchestrate-gh-issues` coordinator, which already knows how to resume parked issues.
 - Tandem never types into worker terminals and never changes the developer's own Orca or Claude Code setup.
-- If no coordinator is running, the Card shows "Feedback given, awaiting pickup" with a one-click option to start one.
+- Tandem does not show whether a coordinator is running (#14): it cannot know reliably. A Card with answered Feedback shows "Feedback given, awaiting pickup". A Push that finds no Orca Run to send to says so and offers to start a coordinator.
 - Push is on by default and can be switched off for a single piece of Feedback.
 
 ## Hard requirements
@@ -81,4 +81,4 @@ UI and interaction design, information architecture, tech stack, how GitHub data
 
 ## Out of scope
 
-Team or multi-user features. Phone or remote access (a possible later effort). Running or hosting agents. Line-by-line code review. Replacing GitHub's issue editor beyond what the jobs need. Interactive grilling for wayfinder maps.
+Team or multi-user features. Phone or remote access (a possible later effort). Running or hosting agents. Line-by-line code review. Replacing GitHub's issue editor beyond what the jobs need. Wayfinder maps and their grilling (they stay in the terminal).

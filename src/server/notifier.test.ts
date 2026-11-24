@@ -26,7 +26,7 @@ function harness() {
 }
 
 function view(cards: Card[], s: { at: string | null; syncing: boolean }): BoardView {
-  return { generatedAt: "", repos: [repo], cards, sync: { [repo]: { ...s, error: null } }, viewer: null, source: "github", coordinators: {} };
+  return { generatedAt: "", repos: [repo], cards, sync: { [repo]: { ...s, error: null } }, viewer: null, source: "github" };
 }
 const synced = { at: "2026-11-04T12:00:00Z", syncing: false };
 

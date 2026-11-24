@@ -169,8 +169,11 @@ export interface BoardSnapshot {
   generatedAt: string;
   repos: string[];
   cards: Card[];
-  /** repo -> last successful refresh, an error, and whether a refresh is running now */
-  sync: Record<string, { at: string | null; error: string | null; syncing: boolean }>;
+  /**
+   * repo -> `at`: the last sync that brought issues in; `okAt`: the last pass that reached GitHub (also one that found nothing new);
+   * `error`: what failed, from the second failed pass in a row, with `errorAt` the first of them; `syncing`: a refresh the developer waits for runs now
+   */
+  sync: Record<string, { at: string | null; okAt: string | null; error: string | null; errorAt: string | null; syncing: boolean }>;
 }
 
 /**

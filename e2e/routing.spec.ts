@@ -35,8 +35,6 @@ test("the URL follows view, Card, tab and filter; closing the Card removes its s
   await expect.poll(() => url(page)).toBe(`/board/${K}/107?tab=issue&repo=${K}`);
   await page.keyboard.press("Escape");
   await expect.poll(() => url(page)).toBe(`/board?repo=${K}`);
-  await sidebar(page, "Wayfinder maps").click();
-  await expect.poll(() => url(page)).toBe(`/maps?repo=${K}`);
   await sidebar(page, "Settings").click();
   await expect.poll(() => url(page)).toBe(`/settings?repo=${K}`);
 });
@@ -190,7 +188,7 @@ test("each view remembers its scroll position while the page lives", async ({ pa
   await list.evaluate((el) => (el.scrollTop = 120));
   await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(80);
   const waiting = await list.evaluate((el) => el.scrollTop);
-  await sidebar(page, "Wayfinder maps").click();
+  await sidebar(page, "Settings").click();
   await expect.poll(() => page.locator(".scroll").evaluate((el) => el.scrollTop)).toBe(0);
   await sidebar(page, "Board").click();
   await expect.poll(() => page.locator(".scroll").evaluate((el) => el.scrollTop)).toBe(board);
