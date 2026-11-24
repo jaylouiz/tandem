@@ -63,13 +63,20 @@ export class FixtureSource implements Source {
     this.touch(i);
   }
 
+  async setStatus(repo: string, number: number, status: string) {
+    const i = this.find(repo, number);
+    i.status = status;
+    this.touch(i);
+    return true;
+  }
+
   async createIssue(repo: string, title: string, body: string, labels: string[]) {
     const number = Math.max(0, ...this.issues.filter((i) => i.repo === repo).map((i) => i.number)) + 1;
     const now = new Date().toISOString();
     const issue: RawIssue = {
       repo, number, title, body, labels,
       url: `https://github.com/${repo}/issues/${number}`,
-      state: "open", stateReason: null, createdAt: now, updatedAt: now, closedAt: null, comments: [], pullRequests: [],
+      state: "open", stateReason: null, status: "Backlog", createdAt: now, updatedAt: now, closedAt: null, comments: [], pullRequests: [],
     };
     this.issues.push(issue);
     this.dirty.add(repo);

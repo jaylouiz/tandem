@@ -3,7 +3,8 @@ import { buildCard } from "./card.ts";
 import { DEFAULT_WORKFLOW as cfg } from "./config.ts";
 import { demoIssues } from "./fixtures.ts";
 import { boardOrder } from "./card.ts";
-import { handNotice, handedValid, invertChange, moveNotice, planMove, pruneHanded, startNotice, planTriage, relabel, skipReason, startRequests, triageLabels } from "./triage.ts";
+import type { RawIssue } from "./types.ts";
+import { handNotice, invertChange, moveNotice, planMove, startNotice, planTriage, relabel, skipReason, startRequests, triageLabels } from "./triage.ts";
 
 const now = Date.parse("2026-11-04T12:00:00Z");
 const card = (n: number) => buildCard(demoIssues(now).find((i) => i.number === n && i.repo === "acme/app")!, cfg, null);
@@ -165,32 +166,47 @@ describe("hand to agent: notice and coordinator start", () => {
 });
 
 describe("handed to the coordinator", () => {
-  const rec = { at: 1, nextStep: "specify" as const };
-  it("counts only while the Card is open in Backlog, not on hold, with the same Next step", () => {
-    const c = card(103);
-    expect(handedValid(c, rec)).toBe(true);
-    expect(handedValid(c, undefined)).toBe(false);
-    expect(handedValid({ ...c, onHold: true }, rec)).toBe(false);
-    expect(handedValid({ ...c, nextStep: "build" }, rec)).toBe(false);
-    expect(handedValid({ ...c, phase: "Build" }, rec)).toBe(false);
-    expect(handedValid({ ...c, state: "closed" }, rec)).toBe(false);
+  const issue = (over: Partial<RawIssue> = {}) => ({ ...demoIssues(now).find((i) => i.number === 103 && i.repo === "acme/app")!, ...over });
+  const handed = (over: Partial<RawIssue> = {}) => buildCard(issue({ status: "Todo", ...over }), cfg, null);
+  it("is the status Todo, and counts only while the Card is open in Backlog and not on hold", () => {
+    expect(handed().handed).toBe(true);
+    expect(card(103).handed).toBe(false);
+    expect(buildCard(issue({ status: null }), cfg, null).handed).toBe(false);
+    expect(handed({ labels: ["needs-spec", "on-hold"] }).handed).toBe(false);
+    expect(handed({ labels: ["needs-spec", "phase:build"] }).handed).toBe(false); // work started on an agent-workflow that only writes labels
+    expect(handed({ labels: ["inbox"] }).handed).toBe(false);
+    expect(handed({ state: "closed", stateReason: "completed" }).handed).toBe(false);
+    expect(buildCard(issue({ status: "Queued" }), { ...cfg, handedStatus: "Queued" }, null).handed).toBe(true); // the name is configuration
   });
   it("makes Hand to agent not applicable again, other actions unaffected", () => {
-    const c = card(103);
-    expect(skipReason({ kind: "hand" }, c, rec)).toBe("already handed");
-    expect(skipReason({ kind: "hand" }, { ...c, onHold: true }, rec)).toBeNull();
-    expect(skipReason({ kind: "hold" }, c, rec)).toBeNull();
-    const plan = planTriage({ kind: "hand" }, [c, { ...c, number: 104, key: "acme/app#104" }], cfg, { [c.key]: rec });
+    const c = handed();
+    expect(skipReason({ kind: "hand" }, c)).toBe("already handed");
+    expect(skipReason({ kind: "hand" }, card(103))).toBeNull();
+    expect(skipReason({ kind: "hold" }, c)).toBeNull();
+    const plan = planTriage({ kind: "hand" }, [c, { ...card(103), number: 104, key: "acme/app#104" }], cfg);
     expect(plan.skipped.map((s) => [s.card.number, s.reason])).toEqual([[103, "already handed"]]);
     expect(plan.steps.map((s) => s.card.number)).toEqual([104]);
   });
-  it("prunes records of Cards that moved on or left the Board, and keeps the object when nothing changes", () => {
-    const c = card(103);
-    const handed = { [c.key]: rec, "o/r#9": rec };
-    expect(pruneHanded(handed, [c])).toEqual({ [c.key]: rec });
-    const same = { [c.key]: rec };
-    expect(pruneHanded(same, [c])).toBe(same);
-    expect(pruneHanded(same, [{ ...c, onHold: true }])).toEqual({});
+  it("re-steering a handed Card takes the status back with the labels; other Cards and other actions carry no status", () => {
+    const c = handed();
+    expect(planTriage({ kind: "hold" }, [c], cfg).steps[0]!.change).toEqual({ add: ["on-hold"], remove: [], status: "Backlog" });
+    expect(planTriage({ kind: "next", step: "build" }, [c], cfg).steps[0]!.change).toEqual({ add: ["ready"], remove: ["needs-spec"], status: "Backlog" });
+    expect(planTriage({ kind: "priority", level: 1 }, [c], cfg).steps[0]!.change).toEqual({ add: ["priority:1"], remove: ["priority:2"] });
+    expect(planTriage({ kind: "hold" }, [card(103)], cfg).steps[0]!.change).toEqual({ add: ["on-hold"], remove: [] });
+    expect(planMove([c], "Inbox", cfg).steps[0]!.change).toEqual({ add: ["inbox"], remove: ["needs-spec"], status: "Backlog" });
+    expect(planMove([c], "Backlog", cfg, "design").steps[0]!.change).toEqual({ add: ["needs-design"], remove: ["needs-spec"], status: "Backlog" });
+    expect(planMove([card(103)], "Inbox", cfg).steps[0]!.change).toEqual({ add: ["inbox"], remove: ["needs-spec"] });
+    expect(planTriage({ kind: "hold" }, [c], { ...cfg, unhandedStatus: "Parked" }).steps[0]!.change.status).toBe("Parked");
+  });
+  it("relabel shows the re-steered Card at once: no longer handed, and handed again only by a new hand-over", () => {
+    const c = handed();
+    const held = { ...c, ...relabel(c, planTriage({ kind: "hold" }, [c], cfg).steps[0]!.change, cfg) };
+    expect(held).toMatchObject({ handed: false, status: "Backlog", onHold: true });
+    const released = { ...held, ...relabel(held, planTriage({ kind: "hold" }, [held], cfg).steps[0]!.change, cfg) };
+    expect(released).toMatchObject({ handed: false, status: "Backlog", onHold: false });
+    expect(skipReason({ kind: "hand" }, released)).toBeNull();
+    // an Undo of a move puts the labels back, not the handed status
+    expect(invertChange({ add: ["inbox"], remove: ["needs-spec"], status: "Backlog" })).toEqual({ add: ["needs-spec"], remove: ["inbox"] });
   });
   it("names handed, undelivered and failed Cards in one notice", () => {
     const a = card(103);

@@ -20,6 +20,10 @@ _Avoid_: swimlane, group (Done days are groups)
 The rough stage of development a Card is in, which is its Board column: Inbox, Backlog, UX Design, Build, Done.
 _Avoid_: column, status, lane
 
+**Handed**:
+A Backlog Card the developer gave to an agent ("Hand to agent") that no agent has started yet. On GitHub it is the issue status Todo (ADR 0006); once work starts, the Phase says so.
+_Avoid_: assigned, queued, started
+
 **Next step**:
 The stage an agent or the developer takes next on a Card (design, specify, build), independent of its Phase. Spec, implementation and technical review are all activities inside the Build Phase.
 _Avoid_: lane (in Tandem's UI), state

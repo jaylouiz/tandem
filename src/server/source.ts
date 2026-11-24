@@ -11,6 +11,11 @@ export interface Source {
   comment(repo: string, number: number, body: string): Promise<{ id: string; url: string; createdAt: string }>;
   addLabels(repo: string, number: number, labels: string[]): Promise<void>;
   removeLabel(repo: string, number: number, label: string): Promise<void>;
+  /**
+   * Set the issue's native status by name (#18). False when the repo offers no status of that name (or none at all): nothing was written and
+   * the caller goes on without one. Throws when the write itself fails.
+   */
+  setStatus(repo: string, number: number, status: string): Promise<boolean>;
   createIssue(repo: string, title: string, body: string, labels: string[]): Promise<RawIssue>;
   /** Images of one comment as GitHub renders them (signed, short-lived URLs on private repos); null when the source has none. */
   signedImages(commentId: string): Promise<HtmlImage[] | null>;
