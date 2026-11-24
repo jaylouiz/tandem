@@ -7,7 +7,7 @@ import { extendSelection, keyFocus, selectGroup } from "./select.ts";
 import { markSelectionSeen, openFromList } from "./seen.ts";
 import { anyDialogOpen, keyFromDialog } from "./ui/Dialog.tsx";
 import { keyFromToast, undoLatest } from "./ui/Toast.tsx";
-import { TABS, showsCards, useStore, type View } from "./store.ts";
+import { showsCards, useStore, writing, type View } from "./store.ts";
 import { runFocusKey, type FocusKeyId } from "./focus/keys.ts";
 import { useFocus } from "./focus/session.ts";
 import { MOVE_ENTRIES, TRIAGE_ENTRIES, runMove, runTriage } from "./triage.ts";
@@ -46,7 +46,7 @@ export interface Binding {
   run: (e: KeyboardEvent, ctx: KeyCtx) => boolean | void;
 }
 
-/** The Feedback panel of the open Card, when its number keys and ⌘↵ are live (the panel registers only while its tab is open; the bindings are scoped to Card views, so never on Settings). */
+/** The Feedback panel of the open Card, when its number keys and ⌘↵ are live (the ask panel of the sheet, or the cover of Focus; the bindings are scoped to Card views, so never on Settings). */
 const livePanel = () => (panelKeys.current && panelKeys.current.cardKey === useStore.getState().selected ? panelKeys.current : null);
 
 const inFocus = () => useStore.getState().focus;
@@ -55,7 +55,7 @@ const asking = () => useFocus.getState().stage === "ask";
 
 /**
  * A key that is Focus's own while Focus is on. What it does depends on what is on screen (`focus/keys.ts`); when that is nothing, the key
- * is still spent, so it never reaches the Card behind the ask (`x` would mark it, `[` `]` would turn its tabs). Outside Focus it hands the key on.
+ * is still spent, so it never reaches the Card behind the ask (`x` would mark it). Outside Focus it hands the key on.
  */
 const focusKey = (id: FocusKeyId, keys: string[], label: string): Binding => ({
   id,
@@ -135,6 +135,9 @@ export const BINDINGS: Binding[] = [
       const panel = livePanel();
       if (!panel) return false;
       if (e.repeat) return; // a held key writes once
+      // one write per Card at a time: a second ⌘↵ while another piece of Feedback on this Card is still being written (a challenge sent
+      // from its field a moment ago) must not send the ask's picked answer on top of it
+      if (writing(panel.cardKey)) return;
       panel.send();
     },
   },
@@ -146,7 +149,7 @@ export const BINDINGS: Binding[] = [
     label: "Pick a Feedback choice",
     scope: "cards",
     run: (e) => {
-      const panel = livePanel(); // digits belong to the open Feedback panel; priority keys stay for Cards without one
+      const panel = livePanel(); // digits belong to the open Feedback panel; without one they do nothing
       if (!panel) return false;
       // A held digit acts once. In Focus a digit sends, and the next ask takes the screen as soon as the write is through: without
       // this, the key's auto-repeat would answer that one too (and the one after), each a comment that cannot be taken back.
@@ -185,7 +188,7 @@ export const BINDINGS: Binding[] = [
   focusKey("focus-details", ["e"], "Card details: Decided, Activity, Issue"),
   focusKey("focus-side", ["t"], "Design round: all variants side by side"),
   focusKey("focus-viewport", ["v"], "Switch the screenshot between desktop and mobile"),
-  focusKey("focus-step", ["[", "]"], "Previous / next variant of a design round, or state of a Look"),
+  focusKey("focus-step", ["[", "]"], "Previous / next question of an ask, variant of a design round, or state of a Look"),
   focusKey("focus-reject", ["x"], "Design round: reject the shown variant"),
   // in Focus the up and down arrows scroll the ask (a screenshot at real size is taller than the window); j / k and ← → step
   { id: "next", group: "Cards", keys: ["j", "ArrowDown"], label: "Next Card", scope: "cards", run: (e, ctx) => (inFocus() && (!asking() || e.key === "ArrowDown") ? false : move(ctx, 1)) },
@@ -231,15 +234,18 @@ export const BINDINGS: Binding[] = [
   },
   // in Focus only the Look on screen is marked, by the developer's own key; on any other ask the key does nothing
   { id: "seen", group: "Cards", keys: ["l"], label: "Mark Seen", scope: "cards", run: (e) => void (inFocus() ? !e.repeat && runFocusKey("seen", e) : markSelectionSeen()) },
+  // an ask with several questions (#13): `[` `]` move between its steps without picking; on any other Card they do nothing
   {
-    id: "tab",
-    group: "Cards",
+    id: "question",
+    group: "Feedback",
+    when: "an ask with several questions",
     keys: ["[", "]"],
-    label: "Previous / next Card tab",
+    label: "Previous / next question",
     scope: "cards",
     run: (e) => {
-      const s = useStore.getState();
-      if (s.selected) s.setTab(TABS[(TABS.findIndex((t) => t.id === s.tab) + (e.key === "]" ? 1 : -1) + TABS.length) % TABS.length]!.id);
+      const panel = livePanel();
+      if (!panel?.step) return false;
+      panel.step(e.key === "]" ? 1 : -1);
     },
   },
   {
@@ -259,7 +265,6 @@ export const BINDINGS: Binding[] = [
   ...TRIAGE_ENTRIES.map((t): Binding => ({
     id: t.id,
     group: "Triage",
-    when: /^[1-3]$/.test(t.key) ? "without a Feedback panel" : undefined,
     keys: [t.key],
     label: t.label,
     scope: "cards",

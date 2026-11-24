@@ -2,17 +2,44 @@
 // both, so the comment an option shows (Focus) is the comment the server writes for it (`app.ts` calls the same builders with the
 // same body; `app.test.ts` posts every body below and compares). Pure; the wire shapes and the comment text are unchanged.
 import { answerComment, prVerdictComment, roundReactionComment, type PrVerdict } from "./contract.ts";
+import { changedFrom, effectivePicks, optionKey, recommendedOf, unanswered, type Ask, type Notes, type Picks } from "./questions.ts";
+import type { Question } from "./types.ts";
 
-/** An option as the agent wrote it (`B: field-level merge`): its key, the part an answer names. */
-export const optionKey = (option: string) => option.split(":")[0]!.trim();
-
-/** The rest of an option after its key, or "" when the option is its key alone. */
-export const optionText = (option: string) => (option.includes(":") ? option.slice(option.indexOf(":") + 1).trim() : "");
+export { optionKey, optionText } from "./questions.ts";
 
 /** A decision's answer text: the chosen option's key, then the note. Either may be missing; "" means there is nothing to send. */
 export function decisionAnswer(choice: string | null, note: string): string {
   return [choice ? optionKey(choice) : "", note.trim()].filter(Boolean).join(". ");
 }
+
+const spelled = (q: Question, letter: string) => {
+  const name = q.options.find((o) => o.letter === letter)?.name;
+  return `${q.n} ${q.label}: ${letter}${name ? ` (${name})` : ""}`;
+};
+
+/**
+ * The answer to an ask with questions, without its prefix, in the forms agent-workflow's `decision_format.py read` takes:
+ *   `ok`                                    every recommendation
+ *   `ok. 1A 3B`                             the recommendations, except these
+ *   `1B 2A`                                 when a question has no recommendation
+ *   `1 Shell: C (top stepper) but calmer`   one line per question, as soon as a question carries a note
+ * One question: the option's key, then the note (`B`, `B. wait for the review`), as `decisionAnswer`.
+ * "" while a question has no pick (and, with one question, no note either): nothing to send.
+ */
+export function questionsAnswer(ask: Ask, picks: Picks, notes: Notes): string {
+  const eff = effectivePicks(ask, picks);
+  const note = (q: Question) => notes[q.n]?.trim() ?? "";
+  if (ask.questions.length === 1) return [eff[ask.questions[0]!.n] ?? "", note(ask.questions[0]!)].filter(Boolean).join(". ");
+  if (unanswered(ask, picks).length) return "";
+  if (ask.questions.some(note)) return ask.questions.map((q) => `${spelled(q, eff[q.n]!)}${note(q) ? ` ${note(q)}` : ""}`).join("\n");
+  const short = (qs: Question[]) => qs.map((q) => `${q.n}${eff[q.n]}`).join(" ");
+  if (ask.questions.some((q) => !recommendedOf(q))) return short(ask.questions);
+  const diff = changedFrom(ask, picks);
+  return diff.length ? `ok. ${short(diff)}` : "ok";
+}
+
+/** The Feedback for an ask with questions: an answer to its request (a design round with an open request is answered as that request, #1). */
+export const questionsFeedback = (ask: Ask, picks: Picks, notes: Notes): Feedback => ({ action: "answer", body: { requestId: ask.id, answer: questionsAnswer(ask, picks, notes) } });
 
 /** One piece of Feedback as it goes to the server: the route under the Card (`/answer`, `/pr`, `/round`) and its body, without Push. */
 export type Feedback =

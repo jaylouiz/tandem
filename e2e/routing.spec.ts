@@ -1,4 +1,4 @@
-import { expect, test, type Page, toast } from "./fixtures.ts";
+import { expect, openFold, test, type Page, toast } from "./fixtures.ts";
 
 // The URL reflects view, open Card, tab and Repo filter (#48). Read-only: it opens Cards of the demo
 // data (blockers it picks from the snapshot; Board Card 107; the unseen Look 108) and changes nothing on any of them.
@@ -15,35 +15,33 @@ const blockers = async (page: Page): Promise<number[]> => {
 };
 const card = (page: Page, n: number) => page.locator(`.card[data-card="${K}#${n}"]`);
 
-test("the URL follows view, Card, tab and filter; closing the Card removes its segment", async ({ page }) => {
+test("the URL follows view, Card and filter; a fold is no part of it; closing the Card removes its segment", async ({ page }) => {
   const [b] = await blockers(page);
   await page.goto("/");
   await loaded(page);
   await expect.poll(() => url(page)).toBe("/waiting"); // `/` ends on a valid URL
   await row(page, b!).click();
   await expect.poll(() => url(page)).toBe(`/waiting/${K}/${b}`);
-  await page.getByRole("tab", { name: "Activity" }).click();
-  await expect.poll(() => url(page)).toBe(`/waiting/${K}/${b}?tab=activity`);
-  await page.getByRole("tab", { name: "Now" }).click();
-  await expect.poll(() => url(page)).toBe(`/waiting/${K}/${b}`);
+  await openFold(page, "activity");
+  await page.waitForTimeout(150);
+  expect(url(page)).toBe(`/waiting/${K}/${b}`); // which folds are open is not in the address
   await sidebar(page, "Board").click();
   await expect.poll(() => url(page)).toBe("/board");
   await card(page, 107).click();
-  await page.getByRole("tab", { name: "Issue" }).click();
-  await expect.poll(() => url(page)).toBe(`/board/${K}/107?tab=issue`);
+  await expect.poll(() => url(page)).toBe(`/board/${K}/107`);
   await page.getByRole("group", { name: "Repos" }).getByRole("button", { name: /^app/ }).click();
-  await expect.poll(() => url(page)).toBe(`/board/${K}/107?tab=issue&repo=${K}`);
+  await expect.poll(() => url(page)).toBe(`/board/${K}/107?repo=${K}`);
   await page.keyboard.press("Escape");
   await expect.poll(() => url(page)).toBe(`/board?repo=${K}`);
   await sidebar(page, "Settings").click();
   await expect.poll(() => url(page)).toBe(`/settings?repo=${K}`);
 });
 
-test("a reload and a pasted link restore view, Card, tab and filter; the pane is open once the Board shows", async ({ page, context }) => {
-  const link = `/board/${K}/107?tab=decided&repo=${K}`;
-  await page.goto(link);
+test("a reload and a pasted link restore view, Card and filter; the pane is open once the Board shows; an older link with ?tab= opens the Card too", async ({ page, context }) => {
+  const link = `/board/${K}/107?repo=${K}`;
+  await page.goto(`/board/${K}/107?tab=decided&repo=${K}`); // a link from before the sheet had no tabs (#17)
   await expect(detail(page)).toHaveAttribute("aria-label", `Card ${K}#107`);
-  await expect(page.getByRole("tab", { name: "Decided" })).toHaveAttribute("aria-selected", "true");
+  await expect.poll(() => url(page)).toBe(link); // the parameter is dropped from the address
   await expect(page.getByRole("button", { name: /Repo filter/ })).toBeVisible();
   expect(url(page)).toBe(link);
   await page.reload();
@@ -52,22 +50,22 @@ test("a reload and a pasted link restore view, Card, tab and filter; the pane is
   const fresh = await context.newPage();
   await fresh.goto(link);
   await expect(detail(fresh)).toHaveAttribute("aria-label", `Card ${K}#107`);
-  await expect(fresh.getByRole("tab", { name: "Decided" })).toHaveAttribute("aria-selected", "true");
+  await expect(fresh.getByTestId("fold-decided")).toBeVisible();
   const [b] = await blockers(page);
   await fresh.goto(`/waiting/${K}/${b}`);
   await expect(detail(fresh)).toHaveAttribute("aria-label", `Card ${K}#${b}`);
   await expect(row(fresh, b!)).toHaveAttribute("aria-selected", "true");
 });
 
-test("Back and Forward walk view, Card, Card and tab; j/k and tab switches add no stop", async ({ page }) => {
+test("Back and Forward walk view and Card; j/k and opening a fold add no stop", async ({ page }) => {
   await page.goto("/");
   await loaded(page);
   // the first rows of the list are blockers (a Look row opened by j would be marked Seen)
   const rows = page.getByTestId("waiting-list").locator('.qrow:not([data-kind="look"])');
   await rows.nth(0).click();
   await page.keyboard.press("j"); // next Card: replaces the entry
-  await page.getByRole("tab", { name: "Decided" }).click(); // replaces too
-  await expect.poll(() => url(page)).toMatch(/^\/waiting\/acme\/[^/]+\/\d+\?tab=decided$/);
+  await openFold(page, "issue"); // no entry, no change of the address
+  await expect.poll(() => url(page)).toMatch(/^\/waiting\/acme\/[^/]+\/\d+$/);
   const second = url(page);
   await rows.nth(2).click(); // a pointer open pushes
   await expect.poll(() => url(page)).not.toBe(second);
@@ -78,9 +76,8 @@ test("Back and Forward walk view, Card, Card and tab; j/k and tab switches add n
   await page.goBack();
   await expect.poll(() => url(page)).toBe(third);
   await expect(detail(page)).toHaveAttribute("aria-label", new RegExp(`^Card ${third.split("/").slice(2).join("/").replace(/\/(\d+)$/, "#$1")}$`));
-  await page.goBack(); // not the first Card, not the j step: the entry before this one is the Card j and the tab left behind
+  await page.goBack(); // not the first Card, not the j step: the entry before this one is the Card j left behind
   await expect.poll(() => url(page)).toBe(second);
-  await expect(page.getByRole("tab", { name: "Decided" })).toHaveAttribute("aria-selected", "true");
   await page.goForward();
   await expect.poll(() => url(page)).toBe(third);
   await page.goForward();
@@ -130,7 +127,7 @@ test("restoring a link never marks a Look Seen or writes to GitHub", async ({ pa
   expect(snap.cards.find((c: { key: string }) => c.key === `${K}#108`).seenAt).toBeNull();
 });
 
-test("an Agent overlay row opens its Card on Activity in the view the developer is in", async ({ page }) => {
+test("an Agent overlay row opens its Card with the Activity fold open, in the view the developer is in", async ({ page }) => {
   await page.goto("/board");
   await loaded(page);
   await page.getByTestId("agents-line").click();
@@ -138,13 +135,14 @@ test("an Agent overlay row opens its Card on Activity in the view the developer 
   await expect(first).toBeVisible();
   await first.click();
   await expect(page.getByTestId("board")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
-  expect(url(page)).toMatch(/^\/board\/acme\/[^/]+\/\d+\?tab=activity$/);
+  await expect(page.getByTestId("fold-activity").locator(".fold-head")).toHaveAttribute("aria-expanded", "true");
+  expect(url(page)).toMatch(/^\/board\/acme\/[^/]+\/\d+$/);
   // from Settings there is no Card pane: it goes to Waiting on me
   await sidebar(page, "Settings").click();
   await page.getByTestId("agents-line").click();
   await page.getByRole("dialog", { name: "Agent activity" }).locator(".arow").first().click();
-  await expect.poll(() => url(page)).toMatch(/^\/waiting\/acme\/[^/]+\/\d+\?tab=activity$/);
+  await expect.poll(() => url(page)).toMatch(/^\/waiting\/acme\/[^/]+\/\d+$/);
+  await expect(page.getByTestId("fold-activity").locator(".fold-head")).toHaveAttribute("aria-expanded", "true");
 });
 
 test("a notification opens its Card by URL in Waiting on me", async ({ page }) => {

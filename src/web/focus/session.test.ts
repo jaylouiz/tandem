@@ -35,8 +35,8 @@ describe("a send from Focus", () => {
     expect(await first).toBe(true);
     expect(session.useFocus.getState().sending).toEqual({});
     expect(session.useFocus.getState().receipt).toEqual([
-      { key: "o/r#2", title: "Card 2", repo: "o/r", number: 2, kind: "decision", comment: "D1: Hold", effect: "The PR stays open and is labelled do-not-merge" },
-      { key: "o/r#1", title: "Card 1", repo: "o/r", number: 1, kind: "decision", comment: "D1: B", effect: "The agent goes on with your answer" },
+      { key: "o/r#2", title: "Card 2", repo: "o/r", number: 2, kind: "decision", comment: "Decision D1: Hold", effect: "The PR stays open and is labelled do-not-merge" },
+      { key: "o/r#1", title: "Card 1", repo: "o/r", number: 1, kind: "decision", comment: "Decision D1: B", effect: "The agent goes on with your answer" },
     ]);
   });
 
@@ -46,13 +46,13 @@ describe("a send from Focus", () => {
     expect(session.useFocus.getState()).toMatchObject({ sending: {}, receipt: [], failed: { "o/r#1": true } }); // the cover's own failure: its Send bar says it
     expect(await session.focusSend(card(1), f, async () => true)).toBe(true);
     expect(session.useFocus.getState().failed).toEqual({});
-    expect(session.useFocus.getState().receipt.map((r) => r.comment)).toEqual(["D1: A"]);
+    expect(session.useFocus.getState().receipt.map((r) => r.comment)).toEqual(["Decision D1: A"]);
   });
 
   it("gives every comment written its own line: a Card answered twice in one visit shows both", async () => {
     await session.focusSend(card(1), decisionFeedback("D1", "A: x", ""), async () => true);
     await session.focusSend(card(1), decisionFeedback("D2", "B: y", ""), async () => true);
-    expect(session.useFocus.getState().receipt.map((r) => r.comment)).toEqual(["D1: A", "D2: B"]);
+    expect(session.useFocus.getState().receipt.map((r) => r.comment)).toEqual(["Decision D1: A", "Decision D2: B"]);
   });
 
   it("lets go of the ask when the write throws", async () => {

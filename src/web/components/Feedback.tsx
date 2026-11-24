@@ -1,19 +1,22 @@
 // One panel per kind of Feedback (brief jobs 2-5, 10). Each writes what the workflow writes and Pushes
 // unless the developer unticks Push for this piece of Feedback. Every panel is pick-then-send, by mouse and by keys:
-// a click or a digit only picks, the Send button or ⌘↵ writes. What was typed and picked is a draft in the store
+// a click or a digit only picks, the Send button or ⌘↵ writes. An ask with options to pick from (one question or several) is
+// `AskPanel` in `Questions.tsx`; here are the answer in words, the round in the older shape, the PR, the agent decisions and the Look. What was typed and picked is a draft in the store
 // (per Card + request, `useDraft`): it survives Card switches and snapshots, goes when the send succeeded. What an answer is and how
 // it is sent lives in `feedback/answers.ts`, shared with the covers of Focus (where a click on an option sends).
 import { Fragment, useEffect, useRef, useState } from "react";
 import { keyLabel, splitKey } from "../../core/axes.ts";
-import { buildNav, type ShotGroup, type ShotNav } from "../../core/gallery.ts";
+import { feedbackComment } from "../../core/answer.ts";
+import { buildNav, shotGroups, type ShotGroup, type ShotNav } from "../../core/gallery.ts";
 import type { Card, DesignRound, LookNote, Screenshot } from "../../core/types.ts";
 import { AGENT_DRAFT_ID, draftKey } from "../../core/drafts.ts";
 import { VERDICTS, useDecisionAnswer, usePrVerdict, useRoundReaction } from "../feedback/answers.ts";
 import { useRegisterPanel, type PanelSpec } from "../feedback/panel.ts";
-import { giveFeedback, useDraft, useStore, type Tab } from "../store.ts";
+import { giveFeedback, useDraft, useStore } from "../store.ts";
 import { Gallery, ShotImg, type Reaction } from "./Gallery.tsx";
 import { keyOf } from "../keys.ts";
-import { Btn, Ext, Markdown, ago } from "./bits.tsx";
+import { Writes } from "./Questions.tsx";
+import { Btn, Ext, Inline, Markdown, ago, agoText } from "./bits.tsx";
 
 /** The key cap of ⌘↵ inside every panel's Send button: the one way to send is always in view. */
 const SendKey = () => <kbd aria-hidden>{keyOf("send-feedback")}</kbd>;
@@ -26,10 +29,9 @@ function PushToggle({ push, setPush }: { push: boolean; setPush: (p: boolean) =>
   );
 }
 
-/** Register this panel's number keys (`1`-`9`), ⌘↵ and its other actions for the window handler and the palette while it is mounted and its tab is open. */
-function usePanelKeys(cardKey: string, spec: PanelSpec, tabId: Tab = "now") {
-  const open = useStore((s) => s.tab === tabId);
-  useRegisterPanel(cardKey, spec, open);
+/** Register this panel's number keys (`1`-`9`), ⌘↵ and its other actions for the window handler and the palette while it is mounted (and `on`). */
+function usePanelKeys(cardKey: string, spec: PanelSpec, on = true) {
+  useRegisterPanel(cardKey, spec, on);
 }
 
 const submitKeys = (e: React.KeyboardEvent, go: () => void) => {
@@ -43,7 +45,9 @@ const submitKeys = (e: React.KeyboardEvent, go: () => void) => {
 function PanelHead({ question, id, since, children }: { question: string; id?: string; since: string | null; children?: React.ReactNode }) {
   return (
     <div className="panel-head">
-      <div className="section-title">{question}</div>
+      <div className="section-title">
+        <Inline text={question} />
+      </div>
       <div className="panel-meta">
         {id && <span className="did">{id}</span>}
         {since && (
@@ -56,24 +60,14 @@ function PanelHead({ question, id, since, children }: { question: string; id?: s
   );
 }
 
+/** A request with nothing to pick from (an open question): answered in words. A request with options is `AskPanel` (`Questions.tsx`). */
 export function DecisionPanel({ card }: { card: Card }) {
-  const { req, choice, text, push, edit, canSend, send } = useDecisionAnswer(card);
-  const clip = (o: string) => (o.length > 60 ? `${o.slice(0, 59)}…` : o);
-  usePanelKeys(card.key, {
-    pick: (n) => {
-      const opt = req?.options[n - 1];
-      if (opt) edit({ choice: choice === opt ? null : opt });
-    },
-    send: () => void send(),
-    choices: (req?.options ?? []).map((o, i) => ({ n: i + 1, label: `Choose ${clip(o)}`, on: choice === o })),
-    canSend,
-    push,
-    setPush: (p) => edit({ push: p }),
-  });
+  const { req, text, push, edit, canSend, send, feedback } = useDecisionAnswer(card);
+  usePanelKeys(card.key, { pick: () => {}, send: () => void send(), choices: [], canSend, push, setPush: (p) => edit({ push: p }) });
   if (!req) return null;
-  const recommended = (opt: string) => !!req.recommendation && opt.split(":")[0]!.trim().toLowerCase() === req.recommendation.split(/[\s(]/)[0]!.toLowerCase();
+  const why = canSend ? null : "Write an answer";
   return (
-    <div className="section waiting" data-testid="panel-decision">
+    <div className="section waiting askp" data-testid="panel-decision">
       <PanelHead question={req.question} id={req.id} since={card.waiting?.since ?? null}>
         {req.preview && (
           <a href={req.preview} target="_blank" rel="noreferrer">
@@ -82,37 +76,27 @@ export function DecisionPanel({ card }: { card: Card }) {
           </a>
         )}
       </PanelHead>
-      {req.options.length > 0 && (
-        <div className="options" role="group" aria-label="Options">
-          {req.options.map((o, i) => (
-            <button key={o} className={`option ${choice === o ? "selected" : ""} ${recommended(o) ? "recommended" : ""}`} aria-pressed={choice === o} onClick={() => edit({ choice: choice === o ? null : o })}>
-              <kbd>{i + 1}</kbd>
-              <span className="option-text">{o}</span>
-              {recommended(o) && <span className="option-rec">Recommended</span>}
-            </button>
-          ))}
-        </div>
+      {req.recommendation && (
+        <p className="qwhy" data-testid="why">
+          <b>The agent says:</b> <Inline text={req.recommendation} />
+        </p>
       )}
-      {req.recommendation && <div className="muted">The agent recommends {req.recommendation}</div>}
-      <textarea
-        className="input"
-        placeholder="Answer or add a note (⌘↵ to send)"
-        value={text}
-        onChange={(e) => edit({ text: e.target.value })}
-        onKeyDown={(e) => submitKeys(e, () => void send())}
-      />
-      <div className="actions">
+      <textarea className="input" aria-label="Your answer" placeholder="Your answer" value={text} onChange={(e) => edit({ text: e.target.value })} onKeyDown={(e) => submitKeys(e, () => void send())} />
+      <div className="qsend" data-testid="send-row">
+        <div className="qsend-what">
+          <Writes card={card} comment={canSend && feedback ? feedbackComment(feedback) : null} why={why} />
+        </div>
         <PushToggle push={push} setPush={(p) => edit({ push: p })} />
-        <span className="spacer" />
-        <Btn className="btn primary" why={canSend ? null : req.options.length ? "Pick an option or write an answer" : "Write an answer"} onClick={() => void send()}>
-          Answer <SendKey />
+        <Btn className="btn primary" data-testid="send" why={why} onClick={() => void send()}>
+          Send answer <SendKey />
         </Btn>
       </div>
     </div>
   );
 }
 
-export function AgentDecisionPanel({ card }: { card: Card }) {
+/** `keys`: its digits and ⌘↵ are live (no ask panel has them); else the buttons show no key and the challenge is sent from its text field. */
+export function AgentDecisionPanel({ card, keys }: { card: Card; keys: boolean }) {
   const pending = card.agentDecisions.filter((d) => card.decisionsToAccept.includes(d.id));
   // mode: "accept" (key 1), or the id of the decision being challenged (keys 2…), or nothing chosen yet
   const dKey = draftKey(card.key, AGENT_DRAFT_ID);
@@ -156,7 +140,7 @@ export function AgentDecisionPanel({ card }: { card: Card }) {
       push,
       setPush: (p) => edit({ push: p }),
     },
-    "decided",
+    keys,
   );
   return (
     <div className="section" data-testid="panel-agent-decision">
@@ -171,7 +155,7 @@ export function AgentDecisionPanel({ card }: { card: Card }) {
             aria-pressed={challenging === d.id}
             onClick={() => edit({ mode: challenging === d.id ? null : d.id })}
           >
-            Challenge {d.id} <kbd>{i + 2}</kbd>
+            Challenge {d.id} {keys && <kbd>{i + 2}</kbd>}
           </button>
         </div>
       ))}
@@ -189,7 +173,7 @@ export function AgentDecisionPanel({ card }: { card: Card }) {
         <PushToggle push={push} setPush={(p) => edit({ push: p })} />
         <span className="spacer" />
         <button className={`btn ${mode === "accept" ? "selected" : ""}`} aria-pressed={mode === "accept"} onClick={() => edit({ mode: mode === "accept" ? null : "accept" })}>
-          Accept all <kbd>1</kbd>
+          Accept all {keys && <kbd>1</kbd>}
         </button>
         <Btn
           className="btn primary"
@@ -426,7 +410,7 @@ export function EarlierRounds({
             <div className="thumb-group-title">
               <strong>R{r.round}</strong> {r.title.replace(/^Design round \d+:?\s*/, "")}
             </div>
-            <Thumbs set={roundSet(r)} variants={r.variants} src={src} onOpen={(index) => setOpen({ round: r.round, index })} />
+            <Thumbs set={roundSet(r)} variants={shotGroups(r)} src={src} onOpen={(index) => setOpen({ round: r.round, index })} />
           </div>
         ))}
       </details>
@@ -434,7 +418,7 @@ export function EarlierRounds({
         <Gallery
           context={`R${current.round}`}
           shots={current.screenshots}
-          variants={current.variants}
+          variants={shotGroups(current)}
           by="variant"
           index={open.index}
           onIndex={(index) => setOpen({ round: current.round, index })}
@@ -517,7 +501,7 @@ export function LookPanel({ card, look, src, openSignal }: { card: Card; look: L
       <div className="panel-head">
         <div className="section-title">{look ? look.headline : "Look"}</div>
         <div className="panel-meta">
-          <span className="faint">{card.closedAt ? `Done ${ago(card.closedAt)} ago` : "Done"}</span>
+          <span className="faint">{card.closedAt ? `Done ${agoText(card.closedAt)}` : "Done"}</span>
           <span className="spacer" />
           {look?.preview && (
             <a href={look.preview} target="_blank" rel="noreferrer">

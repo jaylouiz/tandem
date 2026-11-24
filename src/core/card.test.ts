@@ -139,7 +139,7 @@ describe("waiting on me", () => {
   });
 
   it("orders closest to Done first, then oldest", () => {
-    expect(waitingOnMe(cards()).map((c) => c.number)).toEqual([106, 173, 177, 180, 170, 127, 171, 172, 117, 105, 118, 175, 178, 179, 110, 104, 182]);
+    expect(waitingOnMe(cards()).map((c) => c.number)).toEqual([106, 173, 177, 180, 170, 127, 171, 172, 184, 117, 105, 185, 118, 175, 178, 179, 110, 104, 182, 183]);
   });
 
   it("an answered request is awaiting pickup, not waiting", () => {
@@ -163,7 +163,7 @@ describe("a reply belongs to the decision it names (#26)", () => {
     const c = withReply(127, answerComment("D3", "B"));
     expect(c.waiting).toBeNull();
     expect(c.awaitingPickup).toBe(true);
-    expect(c.requests.find((r) => r.id === "D3")!.answer).toBe("D3: B");
+    expect(c.requests.find((r) => r.id === "D3")!.answer).toBe("Decision D3: B");
     expect(c.agentDecisions.find((d) => d.id === "D2")!.challenge).toBeNull();
     expect(c.decisionsToAccept).toEqual(["D2", "D4"]);
   });
@@ -172,7 +172,7 @@ describe("a reply belongs to the decision it names (#26)", () => {
     const c = withReply(127, challengeComment("D2", "log at info"));
     expect(c.waiting).toMatchObject({ kind: "decision", requestId: "D3" });
     expect(c.awaitingPickup).toBe(false);
-    expect(c.agentDecisions.find((d) => d.id === "D2")!.challenge).toBe("D2: log at info");
+    expect(c.agentDecisions.find((d) => d.id === "D2")!.challenge).toBe("Decision D2: log at info");
     expect(c.decisionsToAccept).toEqual(["D4"]);
   });
 
@@ -210,7 +210,7 @@ describe("done and look", () => {
 describe("what Tandem writes", () => {
   it("writes unmarked comments", () => {
     expect(roundReactionComment({ round: 1, picks: ["b"], rejects: ["c"], comment: "header from a" })).toBe("R1:\n- pick: b\n- reject: c\n\nheader from a");
-    expect(prVerdictComment("D1", "approve", "")).toBe("D1: Approve: merge");
+    expect(prVerdictComment("D1", "approve", "")).toBe("Decision D1: Approve: merge");
     expect(parseMarker(answerComment("D1", "B"))).toBeNull();
   });
 });

@@ -3,6 +3,7 @@ import { KIND_LABEL, type Kind } from "../../core/ask.ts";
 import { STATE_LABEL, type AgentState } from "../../core/activity.ts";
 import { NO_REPOS, useStore, type View } from "../store.ts";
 import { PHASES, type Card, type Phase, type WaitingKind } from "../../core/types.ts";
+import { ago } from "../ago.ts";
 
 export const PHASE_COLOR: Record<Phase, string> = {
   Inbox: "var(--phase-inbox)",
@@ -48,14 +49,7 @@ export const clock = (iso: string) => {
   return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
 };
 
-export function ago(iso: string | null): string {
-  if (!iso) return "";
-  const s = (Date.now() - Date.parse(iso)) / 1000;
-  if (s < 60) return "now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
-}
+export { ago, agoText } from "../ago.ts";
 
 export const shortRepo = (repo: string) => repo.split("/")[1] ?? repo;
 
@@ -75,11 +69,14 @@ export function CardChips({ card }: { card: Card }) {
   );
 }
 
-const plain = ({ text }: { text: string; breaks: boolean }) => (
-  <div className="markdown" style={{ whiteSpace: "pre-wrap" }}>
-    {text}
-  </div>
-);
+const plain = ({ text, inline }: { text: string; breaks: boolean; inline?: boolean }) =>
+  inline ? (
+    <span className="markdown-inline">{text}</span>
+  ) : (
+    <div className="markdown" style={{ whiteSpace: "pre-wrap" }}>
+      {text}
+    </div>
+  );
 /** A chunk that cannot be fetched (the page outlived a rebuild: its hashed file is gone, or the server is down) leaves the text as it is instead of throwing through React. */
 const loadMarkdown = () => import("./MarkdownBody.tsx").catch(() => ({ default: plain }));
 const MarkdownBody = lazy(loadMarkdown);
@@ -94,6 +91,22 @@ export function Markdown({ text, breaks = false }: { text: string; breaks?: bool
     </Suspense>
   );
 }
+
+/** One line of an agent's text (a question, an option, a reason) with its inline Markdown rendered: `**bold**`, `code`, a link. Never a block. */
+export function Inline({ text }: { text: string }) {
+  return (
+    <Suspense fallback={plain({ text, breaks: false, inline: true })}>
+      <MarkdownBody text={text} breaks={false} inline />
+    </Suspense>
+  );
+}
+
+/** The recommendation's mark: the ★ of the decision format, drawn. */
+export const Star = () => (
+  <svg className="star" width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+    <path d="M6 .8l1.5 3.3 3.6.4-2.7 2.4.8 3.5L6 8.6 2.8 10.4l.8-3.5L.9 4.5l3.6-.4z" />
+  </svg>
+);
 
 const ICON: Record<Kind, ReactNode> = {
   decision: (
@@ -209,16 +222,22 @@ export function Age({ iso }: { iso: string | null }) {
   return <span className="faint age">{ago(iso)}</span>;
 }
 
-export function Stepper({ phase }: { phase: Phase }) {
+/**
+ * Where the Card is in the flow, said once (#17): five segments, the past ones faint, the current one wider and in its Phase colour, then
+ * the Phase's name. Not a control and not a path: no chevrons, nothing to click. The tooltip spells the flow out.
+ */
+export function PhaseTrack({ phase }: { phase: Phase }) {
   const at = PHASES.indexOf(phase);
   return (
-    <ol className="stepper" aria-label={`Phase: ${phase}`}>
-      {PHASES.map((p, i) => (
-        <li key={p} data-state={i < at ? "past" : i === at ? "now" : "next"} aria-current={i === at ? "step" : undefined}>
-          {p}
-        </li>
-      ))}
-    </ol>
+    <span className="phase-mark" data-testid="phase" title={`Phase ${at + 1} of ${PHASES.length}: ${PHASES.join(", ")}`}>
+      <span className="phase-track" aria-hidden>
+        {PHASES.map((p, i) => (
+          <i key={p} data-state={i < at ? "past" : i === at ? "now" : "next"} style={i === at ? { background: PHASE_COLOR[phase] } : undefined} />
+        ))}
+      </span>
+      <span className="sr-only">Phase: </span>
+      {phase}
+    </span>
   );
 }
 

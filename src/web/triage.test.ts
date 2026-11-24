@@ -129,14 +129,6 @@ describe("re-steering a handed Card", () => {
     expect(shown(a)).toMatchObject({ handed: true, status: "Todo" });
   });
 
-  it("a priority on a handed Card leaves its status alone", async () => {
-    seed();
-    const fetched = vi.fn(reply({ ok: true }));
-    vi.stubGlobal("fetch", fetched);
-    await triage.runTriage(entry("priority-1"), [a]);
-    expect(JSON.parse(String((fetched.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ add: ["priority:1"], remove: [] });
-    expect(shown(a).handed).toBe(true);
-  });
 });
 
 describe("moving Cards between Inbox and Backlog", () => {

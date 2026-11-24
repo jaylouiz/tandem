@@ -49,7 +49,7 @@ The set of Cards blocked on the developer's Feedback (decision request, design r
 _Avoid_: notifications, queue
 
 **Focus**:
-Waiting on me, one Card at a time: the list steps aside and each ask is shown alone, the blockers first, then the unseen Looks. In Focus an option sends when it is clicked or its digit is pressed, and shows beforehand the comment it will write (a design round with further axes takes one pick per axis and sends on the pick that completes them); an answer with a note is sent from the note. Giving Feedback or marking Seen moves on to the next Card; passing a Look does not mark it Seen. Started from the list (key `f`), left with `esc`.
+Waiting on me, one Card at a time: the list steps aside and each ask is shown alone, the blockers first, then the unseen Looks. In Focus an option sends when it is clicked or its digit is pressed, and shows beforehand the comment it will write (a design round with further axes takes one pick per axis and sends on the pick that completes them); an answer with a note is sent from the note. A decision with several questions takes one pick per question and is sent with `⌘↵`. Giving Feedback or marking Seen moves on to the next Card; passing a Look does not mark it Seen. Started from the list (key `f`), left with `esc`.
 _Avoid_: review mode, slideshow, wizard
 
 **Agent decision**:
@@ -73,7 +73,7 @@ An orchestration run in Orca: where a Push is sent (`run:<id>`). Tandem looks on
 _Avoid_: coordinator state, session
 
 **On hold**:
-A Card the developer parked with the hold label (Hold Card on the Card pane, key `h`; Release hold takes it back). An agent does not pick it up. Not the same as **Hold merge**, the verdict on a PR approval that keeps the PR open. The toast says "Held" or "Released".
+A Card the developer parked with the hold label (Hold Card in the Card's More menu, key `h`; Release hold takes it back). An agent does not pick it up. Not the same as **Hold merge**, the verdict on a PR approval that keeps the PR open. The toast says "Held" or "Released".
 _Avoid_: pause, freeze, a bare "Hold" on a control (it names both)
 
 **Agent activity**:

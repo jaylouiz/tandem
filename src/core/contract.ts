@@ -11,6 +11,7 @@ import type {
   Screenshot,
 } from "./types.ts";
 import { axisKey, byAxis } from "./axes.ts";
+import { roundQuestions } from "./questions.ts";
 
 const MARKER = /<!--\s*decision-([a-z]+)(?:\s+([^>]*?))?\s*-->/;
 
@@ -121,11 +122,13 @@ export interface ThreadDigest {
 /**
  * Which marked comment each unmarked comment replies to: index of the marked comment -> its replies in thread order.
  * One rule, read the same way by agent-workflow's `decide.sh` (scan/status/digest, jaylouiz/agent-workflow#16):
- * 1. an unmarked comment whose first text is `D<k>:` and with a `request`/`record` D<k> earlier in the thread
- *    belongs to that decision (Tandem writes that prefix on every answer, challenge and verdict, so a challenge to D2
- *    written while D3 is open stays D2's);
+ * 1. an unmarked comment whose first text is `Decision D<k>:` (what Tandem writes on every answer, challenge and verdict, #1) or
+ *    `D<k>:` (what it wrote before, and what a person types), with a `request`/`record` D<k> earlier in the thread, belongs to
+ *    that decision (so a challenge to D2 written while D3 is open stays D2's);
  * 2. any other unmarked comment belongs to the nearest earlier marked comment (a `note` has no reply of its own).
  */
+const NAMED = /^\s*(?:Decision\s+)?(D\d+):/;
+
 function repliesByMarker(comments: RawComment[]): Map<number, string[]> {
   const replies = new Map<number, string[]>();
   const decisions = new Map<string, number>(); // id -> latest request/record so far
@@ -137,7 +140,7 @@ function repliesByMarker(comments: RawComment[]): Map<number, string[]> {
       if ((marker.kind === "request" || marker.kind === "record") && marker.id) decisions.set(marker.id, i);
       return;
     }
-    const named = /^\s*(D\d+):/.exec(c.body)?.[1];
+    const named = NAMED.exec(c.body)?.[1];
     const owner = named !== undefined && decisions.has(named) ? decisions.get(named)! : nearest;
     if (owner >= 0) replies.set(owner, [...(replies.get(owner) ?? []), c.body.trim()]);
   });
@@ -146,7 +149,7 @@ function repliesByMarker(comments: RawComment[]): Map<number, string[]> {
 
 /**
  * Walk an issue thread once and pull out every structured element the Board shows. A reply belongs to the decision
- * it names (`D<k>:`), else to the nearest earlier marked comment: see `repliesByMarker`, the same rule as `decide.sh`.
+ * it names (`Decision D<k>:` or `D<k>:`), else to the nearest earlier marked comment: see `repliesByMarker`, the same rule as `decide.sh`.
  */
 export function digestThread(comments: RawComment[]): ThreadDigest {
   const requests: DecisionRequest[] = [];
@@ -270,6 +273,17 @@ function parseRound(c: RawComment, round: number): DesignRound {
     if (axis && !axisNames.includes(axis)) axisNames.push(axis);
     if (!found.some((v) => v.key === key)) found.push({ key, name: h[2]!.trim(), summary, axis });
   });
+  const screenshots0 = parseScreenshots(c.body);
+  const questions = roundQuestions(c.body, screenshots0);
+  if (questions.length) {
+    // the question format: the `### <n>. <label>:` headings are questions, not variants; the things to pick are the declared short forms (`1A`)
+    for (let i = found.length - 1; i >= 0; i--) if (/^\d+\.\s/.test(found[i]!.key)) found.splice(i, 1);
+    for (const q of questions)
+      for (const o of q.options) {
+        const key = `${q.n}${o.letter}`;
+        if (declared.main.includes(key) && !found.some((v) => v.key === key)) found.push({ key, name: o.name, summary: o.short, axis: null });
+      }
+  }
   for (const k of declared.main) if (!found.some((v) => v.key === k)) found.push({ key: k, name: k, summary: "", axis: null });
   for (const a of declared.axes)
     for (const o of a.options) if (!found.some((v) => v.key === axisKey(a.name, o))) found.push({ key: axisKey(a.name, o), name: o, summary: "", axis: a.name });
@@ -277,7 +291,8 @@ function parseRound(c: RawComment, round: number): DesignRound {
   const variants = [...found.filter((v) => v.axis === null), ...axisNames.flatMap((a) => found.filter((v) => v.axis === a))];
   const keys = variants.map((v) => v.key);
   const question = lines.find((l) => l.startsWith("**Question:**"))?.replace("**Question:**", "").trim() ?? null;
-  const screenshots = parseScreenshots(c.body, { variants: keys }).map((s) => (s.variant && !keys.includes(s.variant) ? { ...s, ...shotKey(s.variant, axisNames, keys) } : s));
+  // a question round's shots keep their alt's own grouping (`1. Shell`) and their order, which `questions[].shots` indexes
+  const screenshots = questions.length ? screenshots0 : parseScreenshots(c.body, { variants: keys }).map((s) => (s.variant && !keys.includes(s.variant) ? { ...s, ...shotKey(s.variant, axisNames, keys) } : s));
   return {
     round,
     title,
@@ -285,6 +300,7 @@ function parseRound(c: RawComment, round: number): DesignRound {
     variants,
     axes: axisNames.map((name) => ({ name, about: about.get(name) ?? "" })),
     question,
+    questions,
     screenshots,
     createdAt: c.createdAt,
     url: c.url,
@@ -328,12 +344,15 @@ function parseLook(c: RawComment): LookNote {
 
 // ---- What Tandem writes (as the user: unmarked, like a comment typed on GitHub) ----
 
+/** What every reply to a decision starts with: the decision it belongs to, spelled out (#1). Read back by `repliesByMarker` and by `decide.sh`. */
+export const decisionPrefix = (id: string) => `Decision ${id}: `;
+
 export function answerComment(requestId: string, answer: string): string {
-  return `${requestId}: ${answer.trim()}`;
+  return `${decisionPrefix(requestId)}${answer.trim()}`;
 }
 
 export function challengeComment(decisionId: string, text: string): string {
-  return `${decisionId}: ${text.trim()}`;
+  return `${decisionPrefix(decisionId)}${text.trim()}`;
 }
 
 export interface RoundReaction {
@@ -356,6 +375,6 @@ export type PrVerdict = "approve" | "hold" | "send-back";
 
 export function prVerdictComment(requestId: string | null, verdict: PrVerdict, text: string): string {
   const head = { approve: "Approve: merge", hold: "Hold", "send-back": "Send back" }[verdict];
-  const prefix = requestId ? `${requestId}: ` : "";
+  const prefix = requestId ? decisionPrefix(requestId) : "";
   return `${prefix}${head}${text.trim() ? `. ${text.trim()}` : ""}`;
 }

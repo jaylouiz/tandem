@@ -34,6 +34,8 @@ export function askOf(card: Card, kind: Kind | null = kindOf(card)): string {
       return firstLine(req?.question ?? "Decision needed");
     case "design-round": {
       const r = card.rounds.at(-1);
+      const qs = r?.questions.length ?? 0;
+      if (r && qs) return `Round ${r.round}, ${qs} question${qs > 1 ? "s" : ""}: ${firstLine(req?.question ?? "")}`;
       const main = r?.variants.filter((v) => v.axis === null).length ?? 0;
       const axes = r?.axes.length ? ` plus ${r.axes.map((a) => a.name).join(", ")}` : "";
       return `Round ${r?.round ?? 1}, ${main} variants${axes}: ${firstLine(req?.question ?? r?.question ?? "")}`;
@@ -70,4 +72,56 @@ export function tally(done: Kind[]): string {
   const seen = done.filter((k) => k === "look").length;
   const answered = done.length - seen;
   return [answered ? `${answered} answered` : "", seen ? `${seen} marked Seen` : ""].filter(Boolean).join(" and ");
+}
+
+// ---- The Card sheet (#17): one page, the ask first, then folds that open in place ----
+
+export type FoldId = "issue" | "decided" | "activity";
+
+/** The sheet shows a panel that asks something of the developer: a Feedback panel, or the Look of a Done Card. */
+export const hasAskPanel = (card: Pick<Card, "waiting" | "phase" | "needsLook">) => !!card.waiting || (card.phase === "Done" && card.needsLook);
+
+/**
+ * Which folds are open when the Card opens (afterwards they are the developer's): the issue text when nothing is asked, Decided when it
+ * holds an agent decision nobody has looked at, Activity never.
+ */
+export const foldStart = (card: Pick<Card, "waiting" | "phase" | "needsLook" | "decisionsToAccept">): Record<FoldId, boolean> => ({
+  issue: !hasAskPanel(card),
+  decided: card.decisionsToAccept.length > 0,
+  activity: false,
+});
+
+/** The requests the developer answered (or that were resolved), and the rounds they can only read: what the Decided fold lists. */
+export function decidedParts(card: Pick<Card, "requests" | "agentDecisions" | "decisionsToAccept" | "rounds" | "waiting">) {
+  const answers = card.requests.filter((r) => r.answer !== null || r.resolved).length;
+  const roundWaits = card.waiting?.kind === "design-round" && card.rounds.length > 0;
+  return { answers, decisions: card.agentDecisions.length, fresh: card.decisionsToAccept.length, rounds: card.rounds.length - (roundWaits ? 1 : 0) };
+}
+
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** The Decided fold in one line: `2 answers · 1 agent decision, 1 new · 1 earlier round` (only the parts that exist); "" when nothing is decided. */
+export function decidedSummary(card: Parameters<typeof decidedParts>[0]): string {
+  const p = decidedParts(card);
+  return [
+    p.answers ? count(p.answers, "answer") : "",
+    p.decisions ? `${count(p.decisions, "agent decision")}${p.fresh ? `, ${p.fresh} new` : ""}` : "",
+    p.rounds ? count(p.rounds, card.waiting?.kind === "design-round" ? "earlier round" : "design round") : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** The Issue fold in one line: the first 90 characters of the issue text without its Markdown. */
+export function issueSummary(body: string): string {
+  const text = body
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)|<img\b[^>]*>/gi, " ")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/^\s{0,3}(?:#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
+    .replace(/[*_`~]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text ? (text.length > 90 ? `${text.slice(0, 89).trimEnd()}…` : text) : "No description";
 }

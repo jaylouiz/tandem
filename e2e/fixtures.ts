@@ -19,6 +19,12 @@ export const test = base.extend<{ freshFixture: void }>({
   ],
 });
 
+/** Open a fold of the Card sheet (Issue, Decided, Activity) when it is closed: a click on its head, like a developer would. */
+export async function openFold(page: Page, id: "issue" | "decided" | "activity") {
+  const head = page.getByTestId("detail").getByTestId(`fold-${id}`).locator(".fold-head");
+  if ((await head.getAttribute("aria-expanded")) !== "true") await head.click();
+}
+
 /**
  * The toast whose text contains `text`, case-sensitive. A plain `filter({ hasText: "Marked Seen" })` is a case-insensitive substring match, so it also
  * matches a failure toast "Not marked Seen: boom" that is still up (failures stay): two elements, a strict-mode violation that came and went with timing (#11).

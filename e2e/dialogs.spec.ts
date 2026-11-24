@@ -180,3 +180,32 @@ test("⌘↵ in the Gallery sends its own Card's reaction once and nothing for t
   await page.waitForTimeout(500); // a leaked key would have written by now
   expect(writes).toEqual(["/api/cards/acme/app/178/round"]);
 });
+
+// #5: the Gallery's keys were one run-on line of ten shortcuts that wrapped at 1024. They are three named groups, the keys that answer first.
+test("Gallery: the key legend is three groups, Pick first, on one line at 1024 and 1440; without a reaction Move comes first", async ({ page }) => {
+  for (const width of [1024, 1440]) {
+    await page.setViewportSize({ width, height: 800 });
+    const gallery = await openGallery(page); // #110: a round that waits, in the older shape (variants)
+    const legend = gallery.getByTestId("gallery-hint");
+    await expect(legend.locator(".legend-group > b")).toHaveText(["Pick", "Move", "View"]);
+    await expect(gallery.getByTestId("legend-pick")).toHaveText(/^Pick\s*p\s*pick\s*x\s*reject\s*⌘↵\s*send$/);
+    await expect(gallery.getByTestId("legend-move")).toHaveText(/^Move\s*←\s*→\s*screenshot\s*\[\s*\]\s*variant\s*1–9\s*jump to a variant$/);
+    await expect(gallery.getByTestId("legend-view")).toHaveText(/^View\s*v\s*desktop \/ mobile\s*esc\s*close$/);
+    // one line: every entry sits on the same row, and nothing is cut off at the window's edge
+    const rows = await legend.locator(".legend-group > span").evaluateAll((els) => [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().top)))]);
+    expect(rows, `${width}`).toHaveLength(1);
+    expect(await legend.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), `${width}`).toBe(true);
+    // every key still works: p picks the shown variant
+    await expect(gallery).toBeFocused(); // its keys are the popup's: they need the focus in it
+    await page.keyboard.press("p");
+    // the pick is a draft and drafts outlive a reload (#13): the second pass finds it picked and takes it back
+    if (width === 1024) await expect(gallery).toContainText("picked");
+    else await expect(gallery).not.toContainText("picked");
+    await page.keyboard.press("Escape");
+  }
+  // a Look has nothing to pick: no Pick group
+  await page.goto("/waiting/acme/app/108");
+  await page.getByTestId("panel-look").locator(".thumb").first().click();
+  const look = page.getByTestId("gallery");
+  await expect(look.getByTestId("gallery-hint").locator(".legend-group > b")).toHaveText(["Move", "View"]);
+});

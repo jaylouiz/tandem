@@ -9,14 +9,14 @@ beforeAll(async () => {
 });
 
 describe("the key table", () => {
-  it("binds no key twice in the same place, except where a binding hands the key on (Feedback digits fall through to the priorities, a text field's Esc to the usual one, Esc to the Repo filter once nothing is left to close)", () => {
+  it("binds no key twice in the same place, except where a binding hands the key on (a text field's Esc to the usual one, Esc to the Repo filter once nothing is left to close)", () => {
     const seen = new Map<string, string>();
     for (const b of keys.BINDINGS)
       for (const k of b.keys) {
         const slot = `${b.chord ?? ""}|${b.mod ? "mod+" : ""}${k}`;
         const was = seen.get(slot);
-        // a Focus key hands the key on outside Focus (`x`, `[` and `]` are the Card's there), like the Feedback digits hand on to the priorities
-        if (was) expect([was, b.id].some((id) => id === "pick-choice" || id === "leave-field" || id === "clear-repo-filter" || id.startsWith("focus-")), `${was} and ${b.id} on ${slot}`).toBe(true);
+        // a Focus key hands the key on outside Focus (`x` is the Card's there, `[` and `]` the ask's)
+        if (was) expect([was, b.id].some((id) => id === "leave-field" || id === "clear-repo-filter" || id.startsWith("focus-")), `${was} and ${b.id} on ${slot}`).toBe(true);
         seen.set(slot, b.id);
       }
   });
@@ -27,7 +27,7 @@ describe("the key table", () => {
     for (const b of focus) expect([b.when, b.scope, b.group], b.id).toEqual(["Focus", "cards", "Focus"]);
     const at = (id: string) => keys.BINDINGS.findIndex((b) => b.id === id);
     expect(at("focus-reject")).toBeLessThan(at("mark"));
-    expect(at("focus-step")).toBeLessThan(at("tab"));
+    expect(at("focus-step")).toBeLessThan(at("question"));
     // the keys the design round asked for are taken (Move to Inbox, Capture an idea): details and side by side moved (D1)
     expect(keys.keyOf("focus-details")).toBe("e");
     expect(keys.keyOf("focus-side")).toBe("t");
@@ -35,7 +35,7 @@ describe("the key table", () => {
     expect(keys.keyOf("capture")).toBe("c");
   });
 
-  it("in Focus the Selection, tab and triage keys do not act on the Card behind the ask; outside Focus they do", async () => {
+  it("in Focus the Selection, question and triage keys do not act on the Card behind the ask; outside Focus they do", async () => {
     vi.stubGlobal("HTMLElement", class {});
     const { useStore } = await import("./store.ts");
     const { useFocus } = await import("./focus/session.ts");
@@ -50,8 +50,15 @@ describe("the key table", () => {
     press("x");
     expect(st().marked).toEqual(["o/r#1"]);
     st().clearMarks();
-    press("]");
-    expect(st().tab).toBe("decided");
+    // `[` `]` belong to an ask with several questions: with one registered they step it, without one they are nobody's
+    const { panelKeys } = await import("./panelKeys.ts");
+    const steps: number[] = [];
+    panelKeys.current = { cardKey: "o/r#1", pick: () => {}, send: () => {}, choices: () => [], extras: () => [], canSend: () => false, step: (d) => void steps.push(d) };
+    expect([press("]"), press("[")]).toEqual([true, true]);
+    expect(steps).toEqual([1, -1]);
+    panelKeys.current = { ...panelKeys.current, step: undefined };
+    expect(press("]")).toBe(false);
+    panelKeys.current = null;
 
     st().setFocus(true);
     expect(st()).toMatchObject({ focus: true, selected: null }); // Focus starts on its start screen, nothing open
@@ -60,10 +67,9 @@ describe("the key table", () => {
     useFocus.getState().setStage("ask");
     for (const k of ["x", "[", "]"]) expect(press(k), k).toBe(true); // spent in Focus, whatever is on screen
     expect(st().marked).toEqual([]);
-    expect(st().tab).toBe("now");
     expect(press("a", true)).toBe(true); // ⌘A marks nothing
     expect(st().marked).toEqual([]);
-    for (const k of ["d", "s", "b", "h", "a", "w", "m", "i", "0", "1", "2", "3"]) expect(press(k), k).toBe(false); // triage: nothing runs, the key is nobody's
+    for (const k of ["d", "s", "b", "h", "a", "w", "m", "i"]) expect(press(k), k).toBe(false); // triage: nothing runs, the key is nobody's
     expect(st().notice).toBeNull();
     // Esc: back to the overview is the frame's (not mounted here), so the key leaves Focus
     press("Escape");

@@ -18,8 +18,10 @@ test("keyboard: set a Next step moves an Inbox Card to the Backlog, h holds it",
   await page.keyboard.press("h");
   await expect(card(page, 101)).toContainText("On hold");
   await expect(page.locator(".toast", { hasText: "Held · app#101" })).toBeVisible(); // the toast names the outcome (#46)
-  await expect(page.getByTestId("triage").getByRole("button", { name: /Release hold/ })).toBeVisible();
-  await page.keyboard.press("h");
+  await page.getByTestId("detail").getByTestId("more").click();
+  await expect(page.getByTestId("more-menu").getByRole("menuitem", { name: /Release hold/ })).toBeVisible();
+  await page.keyboard.press("h"); // the key on the item runs it, also with the menu open
+  await expect(page.getByTestId("more-menu")).toHaveCount(0);
   await expect(card(page, 101)).not.toContainText("On hold");
   await expect(page.locator(".toast", { hasText: "Released · app#101" })).toBeVisible();
 });
@@ -74,27 +76,19 @@ test("the palette lists triage actions with their keys, only with a target", asy
   await expect(page.getByRole("option", { name: /Hand to agent/ })).toContainText("a");
 });
 
-test("priority keys set P1-P3, sort the Backlog column and 0 clears", async ({ page }) => {
+test("a priority set on GitHub still orders the Backlog column; Tandem sets none (#17)", async ({ page }) => {
   await toBoard(page);
   const backlog = page.getByTestId("column-Backlog");
+  await expect(backlog.locator(".card").first()).toContainText("Keyboard shortcut for quick add"); // carries priority:2
+  await expect(backlog.locator(".card").first().locator(".chip", { hasText: /^P2$/ })).toBeVisible();
+  // the keys that set a priority are gone: on a Card without a Feedback panel a digit does nothing
   await page.locator('[data-card="acme/agent-workflow#21"]').click();
-  await page.keyboard.press("1");
-  await expect(page.locator('[data-card="acme/agent-workflow#21"]')).toContainText("P1");
-  await expect(backlog.locator(".card").first()).toContainText("Retro: shrink the build skill");
-  await page.keyboard.press("3");
-  await expect(page.locator('[data-card="acme/agent-workflow#21"]')).not.toContainText("P1");
-  await expect(page.locator('[data-card="acme/agent-workflow#21"]')).toContainText("P3");
-  await expect(backlog.locator(".card").first()).toContainText("Keyboard shortcut for quick add"); // P2 before P3
-  // k follows the screen order (priority), not last moved: the Card above #21 on screen is the one before it in the column
-  const cards = await backlog.locator(".card").evaluateAll((els) => els.map((e) => e.getAttribute("data-card")));
-  const at = cards.indexOf("acme/agent-workflow#21");
-  expect(at).toBeGreaterThan(0);
-  await page.keyboard.press("k");
-  await expect(page.locator(`[data-card="${cards[at - 1]}"]`)).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("j");
-  await expect(page.locator('[data-card="acme/agent-workflow#21"]')).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("0");
+  for (const k of ["1", "2", "3", "0"]) await page.keyboard.press(k);
+  await expect(page.locator(".toast")).toHaveCount(0);
   await expect(page.locator('[data-card="acme/agent-workflow#21"]')).not.toContainText(/P[123]/);
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.keyboard.type("Priority");
+  await expect(page.getByRole("option", { name: /Priority/ })).toHaveCount(0);
 });
 
 test("fog: w marks an Inbox Card, which stays in Inbox with no Next step; a Next step clears it", async ({ page }) => {
@@ -129,7 +123,8 @@ test("Hand to agent: the Card shows it was handed over, offers no second Push, h
   await toBoard(page);
   await card(page, 130).click();
   await handButton(page).click();
-  await expect(handed(page)).toHaveText(/^Handed to the coordinator · build\s*Hold and release to hand again$/);
+  await expect(handed(page)).toHaveText(/^Handed to the coordinator\s*Hold and release to hand again$/); // the Next step stands before it in the same line, once
+  await expect(page.getByTestId("detail").getByTestId("hand-row")).toContainText("Next step: build");
   await expect(handed(page)).toContainText("Hold and release to hand again");
   await expect(handButton(page)).toHaveCount(0);
   await expect(toast(page, "Handed to the coordinator")).toBeVisible();
@@ -154,17 +149,17 @@ test("Hand to agent is on GitHub (#18): the status Todo keeps the Card handed af
   await toBoard(page);
   // handed before this page was opened: nothing in the page knows it, the issue's status does
   await card(page, 132).click();
-  await expect(handed(page)).toContainText("Handed to the coordinator · build");
+  await expect(handed(page)).toContainText("Handed to the coordinator");
   await expect(handButton(page)).toHaveCount(0);
   await card(page, 130).click();
   await handButton(page).click();
-  await expect(handed(page)).toContainText("Handed to the coordinator · build");
+  await expect(handed(page)).toContainText("Handed to the coordinator");
   await page.reload();
-  await expect(handed(page)).toContainText("Handed to the coordinator · build");
+  await expect(handed(page)).toContainText("Handed to the coordinator");
   const other = await context.newPage();
   await toBoard(other);
   await card(other, 130).click();
-  await expect(handed(other)).toContainText("Handed to the coordinator · build");
+  await expect(handed(other)).toContainText("Handed to the coordinator");
   // moving it to Inbox and back takes the status with it: it can be handed again
   await other.keyboard.press("i");
   await expect(other.getByTestId("column-Inbox").locator(".card", { hasText: "Hand demo: delivered" })).toBeVisible();
@@ -187,7 +182,7 @@ test("Hand to agent: a failed status write or Push rolls back with the reason an
   await expect(handButton(page)).toBeFocused(); // the keyboard goes back to where it was
   await page.unroute("**/api/cards/**/start");
   await handButton(page).click();
-  await expect(handed(page)).toContainText("Handed to the coordinator · build");
+  await expect(handed(page)).toContainText("Handed to the coordinator");
 });
 
 test("Hand to agent: without a Run to send to nothing is handed; Start coordinator retries per repo and hands the Card once it starts", async ({ page }) => {
@@ -208,7 +203,7 @@ test("Hand to agent: without a Run to send to nothing is handed; Start coordinat
   await page.request.put("/api/repos/path", { data: { repo: "acme/agent-workflow", path: "/tmp/agent-workflow" }, headers: WRITE });
   await retry.click();
   await expect(toast(page, "Coordinator starting for acme/agent-workflow")).toBeVisible();
-  await expect(handed(page)).toContainText("Handed to the coordinator · build");
+  await expect(handed(page)).toContainText("Handed to the coordinator");
 });
 
 // ---- #19: multi-select and moving Cards (own Cards: Move demo A-H, #150-157) ----
@@ -303,9 +298,10 @@ test("board (#33): a click on empty column space closes the Card pane, a Card cl
   await card(page, 150).click({ modifiers: [ctrl] });
   await expect(bar(page)).toContainText("2 selected");
   const ux = page.getByTestId("column-UX Design");
+  await page.locator(".scroll").evaluate((el) => (el.scrollTop = el.scrollHeight)); // the column's end is below the fold; Build is longer, so there is empty space under its last Card
   const box = (await ux.boundingBox())!;
   const last = (await ux.locator(".card").last().boundingBox())!;
-  await page.mouse.click(box.x + box.width / 2, last.y + last.height + 30); // below the last Card
+  await page.mouse.click(box.x + box.width / 2, Math.max(last.y + last.height + 30, 400)); // below the last Card (scrolled to the Board's end it sits above the window)
   await expect(page.getByTestId("pane-marked")).toHaveCount(0);
   await expect(detail).toBeHidden();
   await expect(bar(page)).toContainText("2 selected");

@@ -1,4 +1,4 @@
-import { expect, test, type Page, toast } from "./fixtures.ts";
+import { expect, openFold, test, type Page, toast } from "./fixtures.ts";
 
 // Process mode: the blockers on the left, the open Card on the right.
 const row = (page: Page, n: number) => page.locator(`[data-card="acme/app#${n}"]`);
@@ -42,30 +42,31 @@ test("a digit picks a decision option, ⌘↵ sends, the next blocker opens; a f
   await page.goto("/");
   await row(page, 117).click();
   const panel = page.getByTestId("panel-decision");
+  await expect(panel.getByTestId("option-B")).toHaveAttribute("aria-checked", "true"); // the recommendation, picked from the start
+  await page.keyboard.press("1");
+  await expect(panel.getByTestId("option-A")).toHaveAttribute("aria-checked", "true");
+  await expect(panel.getByTestId("option-B")).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByTestId("toast")).toHaveCount(0); // a digit picks, it never sends
   await page.keyboard.press("2");
-  await expect(panel.getByRole("button", { name: /B: 200 MB/ })).toHaveClass(/selected/);
-  await expect(page.getByTestId("detail").locator(".chip", { hasText: /^P2$/ })).toHaveCount(0); // the digit went to the panel, not to the priority key
-  await page.keyboard.press("2"); // toggles off
-  await expect(panel.getByRole("button", { name: /B: 200 MB/ })).not.toHaveClass(/selected/);
-  await page.keyboard.press("ControlOrMeta+Enter"); // nothing chosen: nothing sent
-  await expect(page.getByTestId("toast")).toHaveCount(0);
-  await page.keyboard.press("2");
+  await expect(panel.getByTestId("option-B")).toHaveAttribute("aria-checked", "true");
   await panel.getByTestId("push-toggle").uncheck();
-  await panel.locator("textarea").fill("with a note"); // last, so the focus is in the field for ⌘↵
+  await panel.getByTestId("note-add").click();
+  await panel.getByTestId("note").fill("with a note"); // last, so the focus is in the field for ⌘↵
   await page.route("**/api/cards/acme/app/117/answer", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await page.keyboard.press("ControlOrMeta+Enter");
   await expect(toast(page, "Failed: boom")).toBeVisible();
   await open(page, 117);
   await expect(page.getByTestId("not-sent")).toContainText("boom");
-  await expect(panel.locator("textarea")).toHaveValue("with a note");
+  await expect(panel.getByTestId("note")).toHaveValue("with a note");
   await expect(panel.getByTestId("push-toggle")).not.toBeChecked(); // the Push choice is part of the draft
   await expect(row(page, 117)).toBeVisible();
   await expect(list(page).locator(".group-head", { hasText: "Waiting on me" })).toContainText("Waiting on me");
   await page.unroute("**/api/cards/acme/app/117/answer");
   // the panel was rebuilt for the returning Card, and it kept the drafted choice
-  await expect(panel.getByRole("button", { name: /B: 200 MB/ })).toHaveClass(/selected/);
+  await expect(panel.getByTestId("option-B")).toHaveAttribute("aria-checked", "true");
+  await expect(panel.getByTestId("writes")).toHaveText("Decision D1: B. with a note");
   await panel.getByTestId("push-toggle").check();
-  await panel.locator("textarea").focus();
+  await panel.getByTestId("note").focus();
   await page.keyboard.press("ControlOrMeta+Enter"); // send the kept draft again
   await expect(toast(page, "pushed to the coordinator")).toBeVisible();
   await expect(page.getByTestId("detail")).not.toHaveAttribute("aria-label", "Card acme/app#117"); // the next blocker opened
@@ -91,28 +92,30 @@ test("PR approval and design round take digits and ⌘↵ too", async ({ page })
   await expect(row(page, 118).locator(".kind-chip")).toHaveText("Awaiting pickup");
 });
 
-test("tabs: [ and ] switch Now, Decided, Activity and Issue; the tab resets for another Card", async ({ page }) => {
+test("no tabs: [ and ] do nothing on a Card whose ask has one question; an opened fold belongs to that opening of the Card", async ({ page }) => {
   await page.goto("/");
   await row(page, 105).click();
-  await expect(page.getByRole("tab", { name: "Now" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("detail").getByRole("tab")).toHaveCount(0);
+  const issue = page.getByTestId("fold-issue").locator(".fold-head");
+  await expect(issue).toHaveAttribute("aria-expanded", "false");
   await page.keyboard.press("]");
-  await expect(page.getByRole("tab", { name: "Decided" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("decided")).toBeVisible();
-  await page.keyboard.press("]");
-  await expect(page.getByTestId("tab-activity")).toBeVisible();
-  await page.keyboard.press("]");
-  await expect(page.getByTestId("tab-issue")).toContainText("Two devices editing");
   await page.keyboard.press("[");
-  await expect(page.getByTestId("tab-activity")).toBeVisible();
+  await expect(issue).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByTestId("panel-decision").getByTestId("option-B")).toHaveAttribute("aria-checked", "true"); // nothing moved
+  await issue.click();
+  await expect(page.getByTestId("fold-issue")).toContainText("Two devices editing");
+  // another Card starts from its own state; nothing decided there, so it has no Decided fold
   await openViaPalette(page, "Compact density");
-  await expect(page.getByRole("tab", { name: "Now" })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("tab", { name: "Decided" }).click();
-  await expect(page.getByTestId("decided")).toContainText("Nothing decided yet.");
-  // [ ] and digits stay out of the way while the palette is open
+  await expect(page.getByTestId("fold-issue").locator(".fold-head")).toHaveAttribute("aria-expanded", "false"); // its Look stands first
+  await expect(page.getByTestId("fold-decided")).toHaveCount(0);
+  // and back: the fold opened before is closed again (it is not remembered per Card)
+  await row(page, 105).click();
+  await expect(issue).toHaveAttribute("aria-expanded", "false");
+  // digits stay out of the way while the palette is open: typed into it, they pick nothing on the ask
   await page.keyboard.press("ControlOrMeta+k");
-  await page.keyboard.press("]");
-  await expect(page.getByRole("tab", { name: "Decided", includeHidden: true })).toHaveAttribute("aria-selected", "true"); // behind the dialog the page is aria-hidden
+  await page.keyboard.press("1");
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("panel-decision").getByTestId("option-B")).toHaveAttribute("aria-checked", "true");
 });
 
 test("Esc returns focus to the list and keeps the Card open", async ({ page }) => {
@@ -149,7 +152,7 @@ test("Agent activity: Tab cycles inside the overlay and never reaches the Board 
   await expect(agents).toBeHidden();
 });
 
-test("Agent activity: status line, g a overlay by state, a row opens the Card on its Activity tab", async ({ page }) => {
+test("Agent activity: status line, g a overlay by state, a row opens the Card with its Activity fold open", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("agents-line")).toContainText(/\d+ working, [1-9]\d* stuck/);
   await expect(page.getByTestId("stuck-count")).toHaveClass(/bad/);
@@ -168,8 +171,8 @@ test("Agent activity: status line, g a overlay by state, a row opens the Card on
   await agents.locator('[data-card="acme/app#112"]').click();
   await expect(agents).toBeHidden();
   await open(page, 112);
-  await expect(page.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("tab-activity")).toContainText("Working");
+  await expect(page.getByTestId("fold-activity").locator(".fold-head")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByTestId("fold-activity").getByTestId("status")).toContainText("Working");
   await expect(page.getByTestId("coordination-log")).toContainText("E2E running on the built app");
   await expect(page.getByTestId("coordination-log").locator("li").first()).toContainText("E2E running"); // newest first
   // a Card outside the queue stays open: no list row is highlighted, the list does not take the selection back
@@ -181,8 +184,7 @@ test("Agent activity: status line, g a overlay by state, a row opens the Card on
 test("a Card without a log says so", async ({ page }) => {
   await page.goto("/");
   await row(page, 105).click();
-  await page.keyboard.press("]");
-  await page.keyboard.press("]");
+  await openFold(page, "activity");
   await expect(page.getByTestId("coordination-log")).toContainText("No coordination log for this issue.");
 });
 
@@ -226,7 +228,9 @@ test("every key is listed in the command palette", async ({ page }) => {
   await expect(page.getByRole("option", { name: /Mark the open Card/ })).toContainText("x");
   await expect(page.getByRole("option", { name: /Keyboard shortcuts/ })).toContainText("?");
   await expect(page.getByRole("option", { name: /Send the chosen Feedback/ })).toHaveCount(0);
-  await page.getByPlaceholder("Type a command or search Cards…").fill("tab activity");
+  // a Done Card has no Activity fold, so no command for it; the issue text is one command away
+  await expect(page.getByRole("option", { name: /Show coordination log/ })).toHaveCount(0);
+  await page.getByPlaceholder("Type a command or search Cards…").fill("show issue");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("tab-activity")).toBeVisible();
+  await expect(page.getByTestId("fold-issue").locator(".fold-head")).toHaveAttribute("aria-expanded", "true");
 });

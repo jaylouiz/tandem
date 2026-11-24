@@ -10,7 +10,7 @@ const card = (n: number) => cards.find((c) => c.repo === "acme/app" && c.number 
 
 describe("liveDraftIds: the Feedback panels a Card shows", () => {
   it("a decision blocker: its request id", () => expect(liveDraftIds(card(117))).toEqual(["D1"]));
-  it("a design round: the latest round", () => expect(liveDraftIds(card(118))).toEqual([roundDraftId(1)]));
+  it("a design round: the latest round", () => expect(liveDraftIds(card(118))).toEqual([roundDraftId(1), "D1"])); // the request id: a round in the question format is answered as its request
   it("a PR approval: its request", () => expect(liveDraftIds(card(106))).toEqual([prDraftId("D1")]));
   it("agent decisions to accept sit next to a blocker's panel", () => expect(liveDraftIds(card(127))).toEqual(["D3", AGENT_DRAFT_ID]));
   it("a Card nobody waits on has none", () => expect(liveDraftIds(card(101))).toEqual([]));

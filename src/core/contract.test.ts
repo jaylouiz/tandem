@@ -74,13 +74,40 @@ describe("footers that name the D<k>: prefix (agent-workflow decide.sh)", () => 
 });
 
 describe("what Tandem writes, read back", () => {
-  it("a challenge is exactly `D<k>: text` and never a marker", () => {
-    expect(challengeComment("D2", " text ")).toBe("D2: text");
+  it("a challenge is exactly `Decision D<k>: text` and never a marker", () => {
+    expect(challengeComment("D2", " text ")).toBe("Decision D2: text");
     expect(parseMarker(challengeComment("D2", " text "))).toBeNull();
   });
 
   it("answers and verdicts carry the prefix the reply rule reads", () => {
-    expect(answerComment("D3", "B")).toBe("D3: B");
-    expect(thread(rec("D2"), req("D3"), prVerdictComment("D3", "approve", ""))).toMatchObject({ requests: [{ answer: "D3: Approve: merge" }] });
+    expect(answerComment("D3", "B")).toBe("Decision D3: B");
+    expect(parseMarker(answerComment("D3", "B"))).toBeNull();
+    expect(prVerdictComment("D3", "hold", "")).toBe("Decision D3: Hold");
+    expect(prVerdictComment(null, "hold", "")).toBe("Hold");
+    expect(parseMarker(prVerdictComment("D3", "send-back", "x"))).toBeNull();
+    expect(thread(rec("D2"), req("D3"), prVerdictComment("D3", "approve", ""))).toMatchObject({ requests: [{ answer: "Decision D3: Approve: merge" }] });
+  });
+});
+
+// #1: Tandem writes `Decision D<k>:`; what it wrote before (`D<k>:`) and a round's `R<k>:` reaction read as they did.
+describe("the reply prefix, old and new (#1)", () => {
+  it("`Decision D<k>:` names its decision like `D<k>:` does", () => {
+    const fresh = thread(rec("D2"), req("D3"), "Decision D2: change it", "Decision D3: ok. 1A");
+    const old = thread(rec("D2"), req("D3"), "D2: change it", "D3: ok. 1A");
+    expect(challenges(fresh)).toEqual({ D2: "Decision D2: change it" });
+    expect(answers(fresh)).toEqual({ D3: "Decision D3: ok. 1A" });
+    expect(challenges(old)).toEqual({ D2: "D2: change it" });
+    expect(answers(old)).toEqual({ D3: "D3: ok. 1A" });
+  });
+
+  it("an `R<k>:` reaction still answers the request it follows", () => {
+    expect(answers(thread(req("D1"), "R1:\n- pick: b"))).toEqual({ D1: "R1:\n- pick: b" });
+  });
+
+  it("only `Decision D<k>:` with that decision earlier in the thread is assigned; other text starting with the word falls to the nearest marker", () => {
+    expect(challenges(thread(rec("D1"), rec("D2"), "Decision: let us wait"))).toEqual({ D1: null, D2: "Decision: let us wait" });
+    expect(challenges(thread(rec("D1"), rec("D2"), "Decision D9: x"))).toEqual({ D1: null, D2: "Decision D9: x" });
+    expect(challenges(thread(rec("D1"), rec("D2"), "Decision D1 is fine"))).toEqual({ D1: null, D2: "Decision D1 is fine" });
+    expect(challenges(thread(rec("D1"), rec("D10"), "Decision D1: x"))).toEqual({ D1: "Decision D1: x", D10: null });
   });
 });

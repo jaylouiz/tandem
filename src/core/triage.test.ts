@@ -84,25 +84,9 @@ describe("relabel (optimistic)", () => {
   });
 });
 
-describe("priority", () => {
-  it("sets priority:<n> and removes any other priority label", () => {
-    expect(triageLabels({ kind: "priority", level: 1 }, card(101), cfg)).toEqual({ add: ["priority:1"], remove: [] });
-    expect(triageLabels({ kind: "priority", level: 3 }, card(103), cfg)).toEqual({ add: ["priority:3"], remove: ["priority:2"] });
-    const two = { ...card(103), labels: ["needs-spec", "priority:1", "priority:2"] };
-    expect(triageLabels({ kind: "priority", level: 2 }, two, cfg)).toEqual({ add: [], remove: ["priority:1"] });
-  });
-  it("0 clears and writes nothing when there is none", () => {
-    expect(triageLabels({ kind: "priority", level: 0 }, card(103), cfg)).toEqual({ add: [], remove: ["priority:2"] });
-    expect(triageLabels({ kind: "priority", level: 0 }, card(101), cfg)).toEqual({ add: [], remove: [] });
-    expect(planTriage({ kind: "priority", level: 0 }, [card(101)], cfg).unchanged).toHaveLength(1);
-  });
-  it("applies to any open Card, not Done", () => {
-    expect(skipReason({ kind: "priority", level: 1 }, card(106))).toBeNull();
-    expect(skipReason({ kind: "priority", level: 1 }, card(108))).toBe("Done");
-  });
-  it("the config decides the label prefix; relabel derives the chip", () => {
-    const custom = { ...cfg, priorityLabelPrefix: "p/" };
-    expect(triageLabels({ kind: "priority", level: 2 }, card(101), custom)).toEqual({ add: ["p/2"], remove: [] });
+// Tandem no longer sets a priority (#17); a `priority:<n>` label set on GitHub is still read and orders the Board.
+describe("priority (read only)", () => {
+  it("relabel derives the chip from the labels", () => {
     expect(relabel(card(101), { add: ["priority:2"], remove: [] }, cfg).priority).toBe(2);
     expect(relabel(card(103), { add: [], remove: ["priority:2"] }, cfg).priority).toBeNull();
   });
@@ -191,7 +175,6 @@ describe("handed to the coordinator", () => {
     const c = handed();
     expect(planTriage({ kind: "hold" }, [c], cfg).steps[0]!.change).toEqual({ add: ["on-hold"], remove: [], status: "Backlog" });
     expect(planTriage({ kind: "next", step: "build" }, [c], cfg).steps[0]!.change).toEqual({ add: ["ready"], remove: ["needs-spec"], status: "Backlog" });
-    expect(planTriage({ kind: "priority", level: 1 }, [c], cfg).steps[0]!.change).toEqual({ add: ["priority:1"], remove: ["priority:2"] });
     expect(planTriage({ kind: "hold" }, [card(103)], cfg).steps[0]!.change).toEqual({ add: ["on-hold"], remove: [] });
     expect(planMove([c], "Inbox", cfg).steps[0]!.change).toEqual({ add: ["inbox"], remove: ["needs-spec"], status: "Backlog" });
     expect(planMove([c], "Backlog", cfg, "design").steps[0]!.change).toEqual({ add: ["needs-design"], remove: ["needs-spec"], status: "Backlog" });

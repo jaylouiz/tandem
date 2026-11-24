@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { buildNav, jumpGroup, nextGroup, stepIndex, toggleViewport, viewportPref, type Viewport } from "../../core/gallery.ts";
 import type { DesignRound, Screenshot } from "../../core/types.ts";
 import { Dialog } from "../ui/Dialog.tsx";
-import { GALLERY_KEYS, galleryCap, galleryKey } from "../galleryKeys.ts";
-import { keyCaps } from "../keys.ts";
+import { galleryCap, galleryKey, galleryLegend, type LegendGroup } from "../galleryKeys.ts";
 import { Tooltip } from "../ui/Tooltip.tsx";
 import { Btn, Ext } from "./bits.tsx";
 
@@ -40,6 +39,27 @@ export function ShotImg({ shot, commentUrl, onRetry, loading }: { shot: Screensh
   );
 }
 
+/** The key legend of the screenshot view: named groups, the keys that answer first. One line at 1024. */
+export function KeyLegend({ groups }: { groups: LegendGroup[] }) {
+  return (
+    <div className="gallery-legend" data-testid="gallery-hint">
+      {groups.map((g) => (
+        <span key={g.name} className="legend-group" data-testid={`legend-${g.name.toLowerCase()}`}>
+          <b>{g.name}</b>
+          {g.items.map((it) => (
+            <span key={it.text}>
+              {it.caps.map((c) => (
+                <kbd key={c}>{c}</kbd>
+              ))}{" "}
+              {it.text}
+            </span>
+          ))}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export interface Reaction {
   picks: string[];
   rejects: string[];
@@ -64,7 +84,7 @@ export interface GalleryProps {
 }
 
 /**
- * Full-screen screenshot viewer. ←/→ (h/l) step, 1-9 or [ ] jump between variants, v switches desktop/mobile,
+ * Full-screen screenshot viewer of a round in the older shape (variants) and of a Look. ←/→ (h/l) step, 1-9 or [ ] jump between variants, v switches desktop/mobile,
  * esc closes (the Dialog's); on the current round p/x pick/reject the shown variant and ⌘↵ sends the reaction.
  */
 export function Gallery({ context, shots, variants, by, index, onIndex, onClose, commentUrl, onRetry, reaction }: GalleryProps) {
@@ -176,17 +196,7 @@ export function Gallery({ context, shots, variants, by, index, onIndex, onClose,
           <ShotImg key={shot.alt + index} shot={shot} commentUrl={commentUrl} onRetry={onRetry} />
         </span>
       </div>
-      <div className="gallery-hint" data-testid="gallery-hint">
-        {GALLERY_KEYS.filter((g) => !g.reaction || reaction).map((g, i) => (
-          <span key={g.id}>
-            {i > 0 && " · "}
-            {keyCaps(g).map((c) => (
-              <kbd key={c}>{c}</kbd>
-            ))}{" "}
-            {g.label.toLowerCase()}
-          </span>
-        ))}
-      </div>
+      <KeyLegend groups={galleryLegend(!!reaction)} />
     </Dialog>
   );
 }

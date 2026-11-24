@@ -9,13 +9,20 @@ let openCount = 0;
 let handoff: { el: HTMLElement | null; at: number } | null = null;
 const HANDOFF_MS = 300;
 
-/** True while any Dialog is open. The window key table (`keys.ts`) reads it: dialogs own their keys. */
+/** True while any Dialog (or Menu) is open. The window key table (`keys.ts`) reads it: dialogs own their keys. */
 export const anyDialogOpen = () => openCount > 0;
 
 /** Keydowns that passed through a dialog. A dialog can close while its key is still on its way up (the Gallery's ⌘↵ closes it in React's flush, before the
  *  bubbling window listener runs): `anyDialogOpen()` is false by then, so the window key table asks this instead and still treats the key as dialog-owned. */
 const fromDialog = new WeakSet<Event>();
 export const keyFromDialog = (e: Event) => fromDialog.has(e);
+
+/** Another layer that owns its keys while it is open (the Menu, `ui/Menu.tsx`): counted and marked like a dialog. */
+export const layer = {
+  enter: () => void openCount++,
+  leave: () => void openCount--,
+  mark: (e: Event) => void fromDialog.add(e),
+};
 
 export interface DialogProps {
   open: boolean;

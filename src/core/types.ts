@@ -89,6 +89,30 @@ export interface AgentDecision {
   challenge: string | null;
 }
 
+/** One option of a question (agent-workflow docs/decision-format.md): lettered `A`, `B`, …; one of them may carry ★. */
+export interface QuestionOption {
+  /** what an answer names: the letter, or an older request's key (`B`, `H1 Sunlit Outline`) */
+  letter: string;
+  /** the option's name (a round's table) or its keywords (a request's `choices` line); an older request's may hold inline Markdown */
+  name: string;
+  /** "In short" of the round's table */
+  short: string;
+  today: boolean;
+  recommended: boolean;
+}
+
+/** One question of a decision: `### <n>. <label>: <about>` in a round, `<!-- choices <n> <label>: … -->` in a request. */
+export interface Question {
+  n: number;
+  label: string;
+  about: string;
+  options: QuestionOption[];
+  /** `★ Why B: …` without its head, or an older request's recommendation text */
+  why: string;
+  /** indices into the round's `screenshots` (alt `R<k> · <n>. <label> · …`) */
+  shots: number[];
+}
+
 export interface DesignRound {
   round: number;
   title: string;
@@ -98,6 +122,8 @@ export interface DesignRound {
   /** further questions shown in the same prototype, combined freely with the main variants (`Axis <name>: <keys> (<about>)`) */
   axes: { name: string; about: string }[];
   question: string | null;
+  /** the question sections of a round in the question format; empty for the older shape (variants and axes) */
+  questions: Question[];
   screenshots: Screenshot[];
   createdAt: string;
   url: string;

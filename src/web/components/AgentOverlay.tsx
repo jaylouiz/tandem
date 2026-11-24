@@ -60,7 +60,7 @@ export function AgentOverlay({ cards }: { cards: Card[] }) {
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
   const open_ = (c: Card) => {
     // the Card opens in the view the developer is in; Settings has no Card pane, so it goes to Waiting on me (#48)
-    openCard(c.key, { tab: "activity", view: useStore.getState().view === "settings" ? "waiting" : undefined });
+    openCard(c.key, { fold: "activity", view: useStore.getState().view === "settings" ? "waiting" : undefined });
     setOpen(false);
   };
   const move = (d: number) => {

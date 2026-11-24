@@ -7,7 +7,7 @@ import { kindOf, type Kind } from "../../core/ask.ts";
 import type { Card } from "../../core/types.ts";
 import { VERDICTS, type SendVia } from "../feedback/answers.ts";
 import { markSeen } from "../seen.ts";
-import { currentCards, useStore, type Tab } from "../store.ts";
+import { currentCards, useStore, type Fold } from "../store.ts";
 
 export const LEFT_KEY = "tandem.focus.left";
 
@@ -41,7 +41,7 @@ interface Session {
   at: number;
   receipt: ReceiptEntry[];
   setStage: (stage: Stage) => void;
-  setDetails: (open: boolean, tab?: Tab) => void;
+  setDetails: (open: boolean, fold?: Fold) => void;
   setNoting: (key: string, on: boolean) => void;
 }
 
@@ -63,10 +63,10 @@ const fresh = () => ({ stage: "start" as Stage, since: readLeft(), details: fals
 export const useFocus = create<Session>((set) => ({
   ...fresh(),
   setStage: (stage) => set({ stage }),
-  setDetails: (details, tab) => {
-    // the drawer has no Now tab (the ask is on the cover): it opens on the tab asked for, else on the issue text
+  setDetails: (details, fold) => {
+    // the drawer is the Card sheet without its ask (that is on the cover); a fold asked for opens in it
     const s = useStore.getState();
-    if (details && s.selected) s.select(s.selected, tab ?? (s.tab === "now" ? "issue" : s.tab));
+    if (details && fold && s.selected) s.requestFold(s.selected, fold);
     set({ details });
   },
   setNoting: (key, on) =>

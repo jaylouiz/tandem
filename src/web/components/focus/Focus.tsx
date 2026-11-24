@@ -10,11 +10,13 @@ import { useFocusKeys } from "../../focus/keys.ts";
 import { useFocus } from "../../focus/session.ts";
 import { keyOf } from "../../keys.ts";
 import { useSigned } from "../../signed.ts";
-import { TABS, focusQueue, useStore } from "../../store.ts";
+import { focusQueue, useStore } from "../../store.ts";
 import { Dialog } from "../../ui/Dialog.tsx";
 import { CardPane } from "../CardPane.tsx";
 import { Ext } from "../bits.tsx";
+import { askQuestions } from "../../../core/questions.ts";
 import { DecisionCover } from "./DecisionCover.tsx";
+import { QuestionsCover } from "./QuestionsCover.tsx";
 import { LookCover } from "./LookCover.tsx";
 import { PrCover } from "./PrCover.tsx";
 import { RoundCover } from "./RoundCover.tsx";
@@ -26,6 +28,9 @@ function Cover({ card }: { card: Card }) {
   const signed = useSigned(card);
   const kind = kindOf(card);
   const round = card.rounds.at(-1);
+  // several questions, or a round in the question format: one pick per question and one comment for all (#13)
+  const ask = askQuestions(card);
+  if (ask && (ask.questions.length > 1 || ask.round !== null)) return <QuestionsCover key={ask.id} card={card} ask={ask} signed={signed} />;
   if (kind === "decision" && card.requests.some((r) => r.id === card.waiting?.requestId)) return <DecisionCover card={card} />;
   if (kind === "design-round" && round) return <RoundCover card={card} round={round} signed={signed} />;
   if (kind === "pr-approval" && card.pullRequest) return <PrCover card={card} />;
@@ -48,7 +53,7 @@ function Cover({ card }: { card: Card }) {
   );
 }
 
-/** The Card behind the ask: Decided, Activity and Issue (not Now: the ask is on the cover). A dialog, so Esc closes it first and no key reaches the ask under it. */
+/** The Card behind the ask: the sheet with Issue, Decided and Activity, without the ask (that is on the cover). A dialog, so Esc closes it first and no key reaches the ask under it. */
 function Drawer({ card }: { card: Card }) {
   const open = useFocus((s) => s.details);
   const setDetails = useFocus((s) => s.setDetails);
@@ -58,13 +63,8 @@ function Drawer({ card }: { card: Card }) {
     if (!(el instanceof Node) || !e.currentTarget.contains(el)) return;
     if (el instanceof HTMLElement && el.closest("input, textarea, select, [contenteditable]")) return;
     const mod = e.metaKey || e.ctrlKey;
-    if (!mod && !e.altKey && (e.key === "[" || e.key === "]")) {
-      const tabs = TABS.filter((t) => t.id !== "now");
-      const s = useStore.getState();
-      const at = Math.max(0, tabs.findIndex((t) => t.id === s.tab));
-      s.setTab(tabs[(at + (e.key === "]" ? 1 : -1) + tabs.length) % tabs.length]!.id);
-    } else if (!mod && !e.altKey && /^[1-9]$/.test(e.key) && panelKeys.current?.cardKey === card.key) {
-      panelKeys.current.pick(Number(e.key)); // the agent decisions on Decided: the one panel that is live while the drawer is open
+    if (!mod && !e.altKey && /^[1-9]$/.test(e.key) && panelKeys.current?.cardKey === card.key) {
+      panelKeys.current.pick(Number(e.key)); // the agent decisions in Decided: the one panel that is live while the drawer is open
     } else if (mod && e.key === "Enter" && panelKeys.current?.cardKey === card.key) {
       panelKeys.current.send();
     } else return;

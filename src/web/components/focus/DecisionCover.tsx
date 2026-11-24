@@ -26,7 +26,7 @@ export function DecisionCover({ card }: { card: Card }) {
   const pick = (n: number) => {
     const opt = options[n - 1];
     if (!opt || sending) return;
-    if (noting) return a.edit({ choice: a.choice === opt ? null : opt });
+    if (noting) return a.edit({ choice: a.own === opt ? null : opt });
     a.edit({ choice: opt }); // kept if the send fails: the option stays picked and ⌘↵ sends it again
     void a.sendWith(opt, "");
   };

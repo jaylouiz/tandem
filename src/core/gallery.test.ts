@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildNav, jumpGroup, nextGroup, shotsTarget, stepIndex, toggleViewport, viewportPref } from "./gallery.ts";
+import { buildNav, jumpGroup, nextGroup, shotGroups, shotsTarget, stepIndex, toggleViewport, viewportPref } from "./gallery.ts";
 import type { Card, Screenshot } from "./types.ts";
 
 const shot = (variant: string | null, viewport: Screenshot["viewport"], state: string | null = null): Screenshot => ({ src: `${variant}-${viewport}-${state}`, alt: `${variant} ${viewport}`, variant, viewport, state });
@@ -30,6 +30,26 @@ describe("buildNav", () => {
 
   it("copes with no screenshots", () => {
     expect(buildNav([], variants)).toEqual({ flat: [], groups: [], groupOf: [] });
+  });
+});
+
+describe("a round in the question format groups its screenshots by question", () => {
+  it("one group per question, titled as the alt names it", () => {
+    const round = {
+      variants: [{ key: "1A", name: "Rail", summary: "", axis: null }],
+      questions: [
+        { n: 1, label: "Shell", about: "where back and next sit", options: [], why: "", shots: [0, 1] },
+        { n: 2, label: "Heading", about: "the step heading", options: [], why: "", shots: [2] },
+      ],
+    };
+    const groups = shotGroups(round);
+    expect(groups.map((g) => g.key)).toEqual(["1. Shell", "2. Heading"]);
+    const nav = buildNav([shot("1. Shell", null), shot("2. Heading", null), shot("1. Shell", null)], groups);
+    expect(nav.groups.map((g) => [g.title, g.indices.length])).toEqual([["1. Shell · where back and next sit", 2], ["2. Heading · the step heading", 1]]);
+  });
+  it("a round in the older shape keeps its variants", () => {
+    const older = { variants: [{ key: "a", name: "Grouped list", summary: "", axis: null }], questions: [] };
+    expect(shotGroups(older)).toBe(older.variants);
   });
 });
 
