@@ -77,6 +77,8 @@ export interface ShotsRequest {
 interface State {
   board: BoardView | null;
   connected: boolean;
+  /** the event stream failed and no snapshot has come since: before the first one, the page says the server cannot be reached */
+  unreachable: boolean;
   view: View;
   repoFilter: string | null;
   selected: string | null;
@@ -196,6 +198,7 @@ try {
 export const useStore = create<State>((set) => ({
   board: null,
   connected: false,
+  unreachable: false,
   view: start.view,
   repoFilter: start.repoFilter,
   selected: start.selected,
@@ -335,10 +338,14 @@ function open() {
       const drafts = pruneDrafts(s.drafts, board.cards);
       const repoFilter = validFilter(s.repoFilter, board.repos);
       if (repoFilter !== s.repoFilter) storeFilter(repoFilter);
-      return { board, repoFilter, connected: true, drafts: Object.keys(drafts).length ? drafts : NO_DRAFTS, pending: Object.fromEntries(Object.entries(s.pending).filter(([k]) => inflight.has(k))) };
+      return { board, repoFilter, connected: true, unreachable: false, drafts: Object.keys(drafts).length ? drafts : NO_DRAFTS, pending: Object.fromEntries(Object.entries(s.pending).filter(([k]) => inflight.has(k))) };
     });
   });
-  es.onerror = () => useStore.setState({ connected: false });
+  es.onerror = () => {
+    useStore.setState({ connected: false, unreachable: true });
+    // the browser retries a dropped stream by itself, but not one answered with an error (the dev proxy's 502 while the server is down): open it again after a pause
+    if (es.readyState === EventSource.CLOSED) setTimeout(() => source === es && reconnect(), 3000);
+  };
   return es;
 }
 
@@ -430,9 +437,15 @@ export interface PushResult {
   reason: string | null;
 }
 
+/** What a write says when Tandem's own server did not answer (it is not running, or the connection dropped). */
+export const SERVER_GONE = "Tandem's server did not answer";
+
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   // x-tandem: the server refuses writes without it (CSRF guard, src/server/guard.ts)
-  const res = await fetch(path, { method, headers: { "content-type": "application/json", "x-tandem": "1" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await fetch(path, { method, headers: { "content-type": "application/json", "x-tandem": "1" }, body: body === undefined ? undefined : JSON.stringify(body) }).catch((e: unknown) => {
+    // fetch rejects (a TypeError: "Failed to fetch", "Load failed") only when no answer came at all: say that in plain words
+    throw e instanceof TypeError ? new Error(SERVER_GONE) : e;
+  });
   const json = (await res.json()) as T & { error?: string };
   if (!res.ok) throw new Error(json.error ?? res.statusText);
   return json;
@@ -566,6 +579,10 @@ export async function giveFeedback(card: Card, action: string, body: Record<stri
     const now = useStore.getState();
     if (opts.cover && now.focus && now.selected === card.key) return false;
     if (!now.focus) now.select(card.key);
+    // the Card's sheet on screen says it (Not sent, the reason, the list row too): no toast beside it. Only where no sheet shows the Card
+    // (Focus moved on, a Selection of several Cards) is the toast the place that can.
+    const after = useStore.getState();
+    if (!after.focus && after.selected === card.key && after.view !== "settings" && after.marked.length < 2) return false;
     setNotice({ key: card.key, text: `Failed: ${res.error}`, canStart: false, failed: true });
     return false;
   }

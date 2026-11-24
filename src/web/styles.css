@@ -76,7 +76,7 @@
   --elev-3: 0 18px 40px -10px color-mix(in oklch, var(--ink) 28%, transparent), 0 4px 10px -4px color-mix(in oklch, var(--ink) 14%, transparent), 0 0 0 1px var(--border-strong);
   --scrim: light-dark(oklch(0.25 0.03 270 / 0.3), oklch(0 0 0 / 0.55));
   /* the gallery is a dark stage in both themes */
-  --stage: oklch(0.13 0.005 270 / 0.98);
+  --stage: oklch(0.13 0.005 270);
   --on-stage: oklch(0.97 0.003 270);
 
   /* type: Inter, a tight scale (1.125 steps), tabular numerals where digits line up */
@@ -562,7 +562,7 @@ a:has(> .ext) {
 }
 .board-heads .column-head[data-drop="no"] { opacity: 0.55; }
 /* a Card selected by a key stays clear of the sticky head row (head row is about 40px) */
-.scroll:has(.board) { scroll-padding-top: calc(var(--s-3) + 30px + 28px); } /* + the sticky column head and a Done day head */
+.scroll:has(.board) { scroll-padding-top: calc(var(--s-3) + 30px + 28px); scroll-padding-inline: var(--s-3); } /* + the sticky column head and a Done day head; the open Card's ring clears the pane's edge */
 .scroll:has(.board[data-lanes]) { scroll-padding-top: calc(var(--s-3) + 40px + 28px); }
 .lane {
   display: flex;
@@ -758,6 +758,7 @@ a:has(> .ext) {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
+.option.agent-dec { flex-direction: column; gap: var(--s-1); }
 .options {
   display: flex;
   flex-direction: column;
@@ -1409,6 +1410,9 @@ button.done-head:hover { background: var(--bg-hover); color: var(--text); }
 .done-day { display: flex; flex-direction: column; gap: 6px; }
 .chev { width: 10px; height: 10px; display: inline-flex; color: var(--text-faint); }
 .chev[data-open="true"] { transform: rotate(90deg); }
+/* a native disclosure draws the same chevron as every other one, not the browser's triangle */
+details.disclose > summary { list-style: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+details.disclose > summary::-webkit-details-marker { display: none; }
 
 /* Waiting on me rows: a To look at row carries a Mark Seen icon button at its right edge (beside the row, not inside its button) */
 .qrow-wrap { position: relative; }
@@ -1669,7 +1673,8 @@ button.focus-next:hover { background: var(--bg-hover); }
 .sheet-head { padding: var(--s-3) var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .sheet-head h2 { font-size: var(--fs-xl); line-height: 1.3; margin: 0; font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; overflow-wrap: anywhere; }
 .sheet-top { display: flex; align-items: center; gap: var(--s-3); min-height: 28px; font-size: var(--fs-sm); min-width: 0; }
-.sheet-top .spacer { flex: 1; min-width: 0; }
+.sheet-tags { display: flex; align-items: center; gap: var(--s-3); flex: 1; min-width: 0; min-height: 28px; }
+.sheet-actions { display: flex; align-items: center; gap: var(--s-3); flex-shrink: 0; align-self: flex-start; min-height: 28px; }
 .sheet-top .chip { flex-shrink: 0; }
 .sheet-top a.chip { text-decoration: none; }
 .sheet-top a.chip:hover { box-shadow: inset 0 0 0 1px var(--border-strong); }
@@ -1799,7 +1804,7 @@ button.focus-next:hover { background: var(--bg-hover); }
   .qsteps [role="tab"] { padding-inline: 7px; }
   /* the label stays in the step's name for assistive tech */
   .qsteps [role="tab"]:not([data-testid="step-review"]) .qstep-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .sheet-top { flex-wrap: wrap; row-gap: var(--s-1); }
+  .sheet-tags { flex-wrap: wrap; row-gap: var(--s-1); }
   .qsend-what { flex-basis: 100%; }
   .qsend .toggle { margin-left: auto; }
   .qabout { display: none; }

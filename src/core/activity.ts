@@ -21,7 +21,7 @@ export const STATE_DEFAULT_TEXT: Record<AgentState, string> = {
   working: "no coordination log yet",
   parked: "waiting for your Feedback",
   queued: "your Feedback is on the issue, the run has not resumed",
-  hold: "held, no agent assigned",
+  hold: "no agent assigned",
 };
 
 export interface LogLine {

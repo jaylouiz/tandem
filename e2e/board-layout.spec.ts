@@ -67,6 +67,24 @@ test("wide window: the Card pane stays the 560 px aside (#50)", async ({ page })
   expect(Math.round(w.col)).toBeGreaterThanOrEqual(232);
 });
 
+test("a deep link to a Build Card shows it inside the Board, not under the pane (the pane takes its width after the first layout)", async ({ page }) => {
+  /** How far the open Card sticks out of the Board's scroll area, left or right (0 = inside). */
+  const outside = () =>
+    page.evaluate(() => {
+      const sc = document.querySelector(".scroll")!.getBoundingClientRect();
+      const c = document.querySelector('.board [data-card="acme/app#113"]')!.getBoundingClientRect();
+      return Math.round(Math.max(0, sc.left - c.left, c.right - sc.right));
+    });
+  for (const [width, height] of [[1024, 768], [1440, 900]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/board/acme/app/113");
+    await expect(page.getByTestId("detail")).toBeVisible();
+    await expect(page.locator('.board [data-card="acme/app#113"]')).toBeVisible();
+    await expect.poll(outside).toBe(0);
+    if (width === 1024) await expect.poll(async () => Math.abs(await offsetOf(page, "Build"))).toBeLessThanOrEqual(2);
+  }
+});
+
 test("Group by repo (#36): a toggle in the header, one lane per repo, collapsible, remembered", async ({ page }) => {
   await toBoard(page);
   const toggle = page.getByTestId("lane-toggle");

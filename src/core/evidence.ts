@@ -1,5 +1,6 @@
 // What a PR approval rests on, read from what the agent wrote: the PR body's `## Verification` and `## Review` sections (the build
-// and review skills write them) and the reason the merge stopped (the request's question). Pure; shown as fact columns in Focus.
+// and review skills write them). Pure; shown as fact columns in Focus. Why the merge stopped is the question itself, the cover's
+// headline: it is not said a second time as a column.
 
 export interface EvidenceLine {
   text: string;
@@ -48,14 +49,4 @@ function section(body: string, name: string): EvidenceLine[] | null {
 
 export function prEvidence(body: string): PrEvidence {
   return { verification: section(body, "Verification"), review: section(body, "Review") };
-}
-
-/**
- * Why the agent stopped before merging: the request's question without its closing question sentence
- * ("Merge held: the PR touches the sync store (risk area). Merge?" gives the first sentence). Null when the question is one
- * sentence, or does not end in a question: it is the heading already and would only be said twice.
- */
-export function whyStopped(question: string): string | null {
-  const m = /^([\s\S]*[.!?:])\s+[^.!?]*\?\s*$/.exec(question.trim());
-  return m ? m[1]!.trim() : null;
 }

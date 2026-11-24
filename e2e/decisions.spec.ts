@@ -48,6 +48,9 @@ test("Decided lists each agent decision with its state", async ({ page }) => {
   await expect(decided.getByTestId("panel-agent-decision")).toContainText("D2");
   await expect(decided.getByTestId("panel-agent-decision")).toContainText("New");
   await expect(decided.getByTestId("panel-agent-decision").locator("br").first()).toBeAttached(); // one record field per line
+  // the record's heading is not repeated under the panel's own title: the id is its chip
+  await expect(decided.getByTestId("panel-agent-decision")).not.toContainText("Agent decision (");
+  await expect(decided.getByTestId("panel-agent-decision").locator(".agent-dec .did")).toHaveText(["D2", "D4"]);
 });
 
 test("accept from Decided by keyboard: 1, ⌘↵; the line goes and the decision reads Accepted", async ({ page }) => {

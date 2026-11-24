@@ -1,9 +1,9 @@
-// A PR approval in Focus: a verdict over its evidence. The question, then what the agent reported (why the merge stopped, verification,
-// review) as three fact columns and the link to the diff, then the three verdicts as tiles. Approve and Hold merge send on a click or
+// A PR approval in Focus: a verdict over its evidence. The question (it says why the merge stopped), then what the agent reported
+// (verification, review) as fact columns and the link to the diff, then the three verdicts as tiles. Approve and Hold merge send on a click or
 // their digit; Send back needs a note, so its tile opens the note instead.
 import { feedbackComment } from "../../../core/answer.ts";
 import type { PrVerdict } from "../../../core/contract.ts";
-import { prEvidence, whyStopped, type EvidenceLine } from "../../../core/evidence.ts";
+import { prEvidence, type EvidenceLine } from "../../../core/evidence.ts";
 import type { Card } from "../../../core/types.ts";
 import { VERDICTS, usePrVerdict } from "../../feedback/answers.ts";
 import { useRegisterPanel } from "../../feedback/panel.ts";
@@ -78,7 +78,6 @@ export function PrCover({ card }: { card: Card }) {
 
   const req = card.requests.find((r) => r.id === card.waiting?.requestId);
   const question = req?.question ?? `PR #${pr.number} awaits approval`;
-  const why = whyStopped(question);
   const evidence = prEvidence(pr.body);
   return (
     <>
@@ -87,7 +86,6 @@ export function PrCover({ card }: { card: Card }) {
           <Meta card={card} kind="pr-approval" />
           <h1 className="cover-q">{question}</h1>
           <div className="facts" data-testid="facts">
-            {why && <Facts title="Why it stopped" lines={[{ text: why, open: false }]} tone="waiting" />}
             <Facts title="Verification" lines={evidence.verification} tone="ok" />
             <Facts title="Review" lines={evidence.review} tone="ok" />
             <a className="cover-link" href={`${pr.url}/files`} target="_blank" rel="noreferrer">

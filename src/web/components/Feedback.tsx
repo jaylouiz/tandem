@@ -16,7 +16,7 @@ import { giveFeedback, useDraft, useStore } from "../store.ts";
 import { Gallery, ShotImg, type Reaction } from "./Gallery.tsx";
 import { keyOf } from "../keys.ts";
 import { Writes } from "./Questions.tsx";
-import { Btn, Ext, Inline, Markdown, ago, agoText } from "./bits.tsx";
+import { Btn, Chevron, Ext, Inline, Markdown, ago, agoText } from "./bits.tsx";
 
 /** The key cap of ⌘↵ inside every panel's Send button: the one way to send is always in view. */
 const SendKey = () => <kbd aria-hidden>{keyOf("send-feedback")}</kbd>;
@@ -95,6 +95,17 @@ export function DecisionPanel({ card }: { card: Card }) {
   );
 }
 
+/**
+ * What an agent decision's record says, without what the panel says already: its marker, its heading ("Agent decision (D1): not
+ * blocking": the fold, the panel title and the id say it) and the footer on how to change it.
+ */
+const recordText = (body: string) =>
+  body
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/\n---\n[\s\S]*$/, "")
+    .replace(/^\s*(?:#{1,6}\s*)?Agent decision \([^)]*\)[^\n]*\n?/i, "")
+    .trim();
+
 /** `keys`: its digits and ⌘↵ are live (no ask panel has them); else the buttons show no key and the challenge is sent from its text field. */
 export function AgentDecisionPanel({ card, keys }: { card: Card; keys: boolean }) {
   const pending = card.agentDecisions.filter((d) => card.decisionsToAccept.includes(d.id));
@@ -148,8 +159,9 @@ export function AgentDecisionPanel({ card, keys }: { card: Card; keys: boolean }
         New · {pending.length} <span className="muted">not blocking</span>
       </div>
       {pending.map((d, i) => (
-        <div key={d.id} className="option" style={{ flexDirection: "column" }}>
-          <Markdown text={d.body.replace(/<!--[\s\S]*?-->/g, "").replace(/\n---\n[\s\S]*$/, "")} breaks />
+        <div key={d.id} className="option agent-dec">
+          <span className="did">{d.id}</span>
+          <Markdown text={recordText(d.body)} breaks />
           <button
             className={`btn ghost ${challenging === d.id ? "selected" : ""}`}
             aria-pressed={challenging === d.id}
@@ -401,8 +413,9 @@ export function EarlierRounds({
   if (!rounds.length) return null;
   return (
     <>
-      <details data-testid="earlier-rounds" open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
+      <details className="disclose" data-testid="earlier-rounds" open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
         <summary className="muted">
+          <Chevron open={expanded} />
           {label} · {rounds.length}
         </summary>
         {rounds.map((r) => (
@@ -435,6 +448,7 @@ export function PrPanel({ card }: { card: Card }) {
   const pr = card.pullRequest!;
   // a click or a digit only picks; Send (or ⌘↵) writes. Send back needs the note.
   const { chosen, text, push, edit, canSend, send } = usePrVerdict(card);
+  const [bodyOpen, setBodyOpen] = useState(true);
   const pick = (v: "approve" | "hold" | "send-back") => edit({ chosen: chosen === v ? null : v });
   usePanelKeys(card.key, {
     pick: (n) => {
@@ -460,8 +474,11 @@ export function PrPanel({ card }: { card: Card }) {
           <Ext />
         </a>
       </PanelHead>
-      <details open>
-        <summary className="muted">Summary, verification and review</summary>
+      <details className="disclose" open={bodyOpen} onToggle={(e) => setBodyOpen(e.currentTarget.open)}>
+        <summary className="muted">
+          <Chevron open={bodyOpen} />
+          Summary, verification and review
+        </summary>
         <Markdown text={pr.body} />
       </details>
       <div className="options" role="group" aria-label="Verdict">

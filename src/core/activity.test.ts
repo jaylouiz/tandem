@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agentCounts, agentGroups, classifyActivity, entryOf, parseLog } from "./activity.ts";
+import { STATE_DEFAULT_TEXT, STATE_LABEL, agentCounts, agentGroups, classifyActivity, entryOf, parseLog } from "./activity.ts";
 import { buildCard } from "./card.ts";
 import { DEFAULT_WORKFLOW as cfg } from "./config.ts";
 import { demoIssues } from "./fixtures.ts";
@@ -78,5 +78,12 @@ describe("agentGroups", () => {
     const base = idle(card(107), { updatedAt: hoursAgo(1) });
     const stale = { ...base, key: "x#1", updatedAt: hoursAgo(9) };
     expect(agentCounts(agentGroups([base, stale], {}, now, cfg))).toEqual({ working: 1, stuck: 1 });
+  });
+});
+
+describe("the line shown without a log line", () => {
+  it("does not repeat its state (On hold · no agent assigned, not On hold · held, …)", () => {
+    expect(STATE_DEFAULT_TEXT.hold).toBe("no agent assigned");
+    for (const [state, label] of Object.entries(STATE_LABEL)) expect(STATE_DEFAULT_TEXT[state as keyof typeof STATE_LABEL].toLowerCase()).not.toContain(label.toLowerCase().replace("on ", ""));
   });
 });

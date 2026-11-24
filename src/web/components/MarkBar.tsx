@@ -59,7 +59,7 @@ export function MarkBar() {
         if (!show(why)) return null;
         return (
           <Btn key={id} className="btn ghost" why={why} title={entry(id).label} onClick={() => void runTriage(entry(id))}>
-            {id === "hold" ? "Hold" : "Hand to agent"} <kbd>{entry(id).key}</kbd>
+            {id === "hold" ? "Hold Card" : "Hand to agent"} <kbd>{entry(id).key}</kbd>
           </Btn>
         );
       })}

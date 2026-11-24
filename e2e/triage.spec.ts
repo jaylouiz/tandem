@@ -38,6 +38,8 @@ test("bulk: x marks Cards and one key triages them all", async ({ page }) => {
   await page.keyboard.press("x"); // x marks the open Card; a plain click on another Card would clear the marks
   await page.getByTestId("column-Inbox").locator(".card", { hasText: "Bulk B" }).click({ modifiers: [process.platform === "darwin" ? "Meta" : "Control"] });
   await expect(page.getByTestId("markbar")).toContainText("2 selected");
+  // never a bare "Hold" on a control (GLOSSARY: On hold)
+  await expect(page.getByTestId("markbar").getByRole("button", { name: /^Hold Card/ })).toBeVisible();
   await page.keyboard.press("b");
   await expect(toast(page, "2 of 2 updated")).toBeVisible();
   for (const title of ["Bulk A", "Bulk B"]) {

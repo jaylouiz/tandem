@@ -1,5 +1,18 @@
 import { expect, test } from "./fixtures.ts";
 
+test("the server out of reach on the first load: the page says so, and no count or agents line poses as a fact until the first snapshot", async ({ page }) => {
+  await page.route("**/api/events**", (r) => r.abort());
+  await page.goto("/board");
+  await expect(page.getByTestId("loading")).toHaveText("Cannot reach Tandem's server. Retrying…");
+  await expect(page.getByTestId("agents-line")).toHaveCount(0);
+  await expect(page.getByTestId("count-waiting")).toHaveCount(0);
+  // the server answers again: the stream reconnects by itself and the Board comes
+  await page.unroute("**/api/events**");
+  await expect(page.getByTestId("board")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("agents-line")).toContainText(/\d+ working/);
+  await expect(page.getByTestId("count-waiting")).toHaveText(/\d+/);
+});
+
 test("serves a web manifest with icons so Tandem installs as an app window", async ({ page, request }) => {
   await page.goto("/");
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");

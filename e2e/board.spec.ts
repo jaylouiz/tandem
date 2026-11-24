@@ -30,7 +30,9 @@ test("answer a decision request in place and Push", async ({ page }) => {
   await expect(panel.getByTestId("writes")).toHaveText("Decision D1: C. with a note");
   await page.route("**/api/cards/acme/app/117/answer", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await panel.getByTestId("send").click();
-  await expect(toast(page, "Failed: boom")).toBeVisible();
+  // said on the sheet that shows #117 again, not again in a toast
+  await expect(page.getByTestId("detail").getByTestId("not-sent")).toContainText("boom");
+  await expect(page.getByTestId("toast")).toHaveCount(0);
   await page.locator('[data-card="acme/app#105"]').click();
   await expect(panel).toContainText("How should conflicting edits be resolved?");
   await expect(panel.getByTestId("note")).toHaveCount(0); // no note here
