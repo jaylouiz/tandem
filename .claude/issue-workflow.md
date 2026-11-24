@@ -13,7 +13,7 @@
 ## Sources
 
 - product: `docs/brief.md` (user jobs 1-13, Board model, Push, hard requirements), `GLOSSARY.md` (use its terms in code, UI copy and issues)
-- architecture: `docs/adr/` (0001 local web app, 0002 GitHub sync, 0003 Push via Orca, 0004 config and local state)
+- architecture: `docs/adr/` (0001 local web app, 0002 GitHub sync, 0003 Push via Orca, 0004 config and local state, 0006 native issue status)
 - design system: `DESIGN.md` (direction, tokens, named rules; written by `/impeccable document`), implemented as tokens in `src/web/styles.css` (`:root` with `light-dark()`; dark follows `prefers-color-scheme` unless `[data-theme]`). Update DESIGN.md when a token or named rule changes
 - the contract Tandem reads and writes: agent-workflow README ("Comment markers", phase table) and `skills/orchestrate-gh-issues/decide.sh`; Tandem's side is `src/core/contract.ts`
 
@@ -87,7 +87,7 @@ none
 
 ## Decisions
 
-- one-way (ask the user): a Design round; reversing a recorded UX decision; changing what Tandem writes to GitHub (comment shapes, labels) beyond the agent-workflow contract; anything that writes to repos other than through the developer's explicit action
+- one-way (ask the user): a Design round; reversing a recorded UX decision; changing what Tandem writes to GitHub (comment shapes, labels, issue statuses) beyond the agent-workflow contract; anything that writes to repos other than through the developer's explicit action
 - explicitly two-way: internal structure, client state shape, API routes, test layout
 - digest cap: 2h
 

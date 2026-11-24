@@ -6,7 +6,7 @@ import { STATE_DEFAULT_TEXT, STATE_LABEL, classifyActivity, parseLog, type Activ
 import { askOf, decidedParts, decidedSummary, decisionState, foldStart, issueSummary, type FoldId } from "../../core/ask.ts";
 import type { ShotsTarget } from "../../core/gallery.ts";
 import { askQuestions } from "../../core/questions.ts";
-import { handedValid, startNotice, startRequests } from "../../core/triage.ts";
+import { startNotice, startRequests } from "../../core/triage.ts";
 import type { Card, DesignRound } from "../../core/types.ts";
 import { useSigned } from "../signed.ts";
 import { api, useActivity, useCard, useNow, useStore } from "../store.ts";
@@ -132,11 +132,9 @@ function Decided({ card, rounds, roundWaits, src, signal, keys }: { card: Card; 
   );
 }
 
-/** The one action of a Backlog Card nobody waits on: hand it to the coordinator with its Next step. Once handed, it says so in place. */
+/** The one action of a Backlog Card nobody waits on: hand it to the coordinator with its Next step. Once handed (the issue's status says so, #18), it says so in place. */
 function HandRow({ card }: { card: Card }) {
-  const handed = useStore((s) => s.handed);
-  const rec = handed[card.key];
-  const isHanded = handedValid(card, rec);
+  const isHanded = !!card.handed;
   const handedRef = useRef<HTMLSpanElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   /** the Hand button (or the handed text) holds the keyboard */
@@ -153,9 +151,9 @@ function HandRow({ card }: { card: Card }) {
         Next step: <b>{card.nextStep ?? "not set"}</b>
       </span>
       <span className="spacer" />
-      {isHanded && rec ? (
+      {isHanded ? (
         <span className="handed" data-testid="handed" tabIndex={-1} ref={handedRef}>
-          <span>Handed to the coordinator · {clock(new Date(rec.at).toISOString())}</span>
+          <span>Handed to the coordinator</span>
           <span className="muted">Hold and release to hand again</span>
         </span>
       ) : (
@@ -167,7 +165,7 @@ function HandRow({ card }: { card: Card }) {
             refocus.current = true;
             void runTriage(TRIAGE_ENTRIES.find((e) => e.id === "hand")!, [card]);
           }}
-          why={actionBlocked({ kind: "hand" }, [card], handed)}
+          why={actionBlocked({ kind: "hand" }, [card])}
         >
           Hand to agent <kbd>a</kbd>
         </Btn>
@@ -341,9 +339,9 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
   );
 }
 
-/** Start a coordinator per repo for these Cards, all repos at once (a Card's own button passes one Card). It starts with their numbers, so they count as handed; repos that failed stay on the toast for a retry. */
+/** Start a coordinator per repo for these Cards, all repos at once (a Card's own button passes one Card). It starts with their numbers, so the server sets their handed status; repos that failed stay on the toast for a retry. */
 export async function startCoordinator(cards: Card[]) {
-  const { setNotice, markHanded } = useStore.getState();
+  const { setNotice } = useStore.getState();
   const requests = startRequests(cards);
   const results = await Promise.allSettled(requests.map(({ repo, numbers }) => api.post(`/api/coordinator/start`, { repo, numbers })));
   const failed = requests.flatMap((r, i) => {
@@ -351,7 +349,6 @@ export async function startCoordinator(cards: Card[]) {
     return res.status === "rejected" ? [{ repo: r.repo, error: res.reason instanceof Error ? res.reason.message : String(res.reason) }] : [];
   });
   const failedRepos = failed.map((f) => f.repo);
-  markHanded(cards.filter((c) => !failedRepos.includes(c.repo)));
   const retry = cards.filter((c) => failedRepos.includes(c.repo));
   setNotice({ key: (retry[0] ?? cards[0]!).key, text: startNotice(requests.map((r) => r.repo).filter((r) => !failedRepos.includes(r)), failed), canStart: retry.length > 0, start: retry, failed: failed.length > 0 });
 }

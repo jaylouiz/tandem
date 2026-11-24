@@ -123,7 +123,8 @@ test("Hand to agent: the Card shows it was handed over, offers no second Push, h
   await toBoard(page);
   await card(page, 130).click();
   await handButton(page).click();
-  await expect(handed(page)).toContainText(/Handed to the coordinator · \d\d:\d\d/);
+  await expect(handed(page)).toHaveText(/^Handed to the coordinator\s*Hold and release to hand again$/); // the Next step stands before it in the same line, once
+  await expect(page.getByTestId("detail").getByTestId("hand-row")).toContainText("Next step: build");
   await expect(handed(page)).toContainText("Hold and release to hand again");
   await expect(handButton(page)).toHaveCount(0);
   await expect(toast(page, "Handed to the coordinator")).toBeVisible();
@@ -144,10 +145,36 @@ test("Hand to agent: the Card shows it was handed over, offers no second Push, h
   await expect(page.getByRole("option", { name: /Hand to agent/ })).toHaveCount(0);
 });
 
-test("Hand to agent: a failed Push rolls back with the reason and stays retryable", async ({ page }) => {
+test("Hand to agent is on GitHub (#18): the status Todo keeps the Card handed after a reload and in a second page; a status alone puts a Card in Build", async ({ page, context }) => {
+  await toBoard(page);
+  // handed before this page was opened: nothing in the page knows it, the issue's status does
+  await card(page, 132).click();
+  await expect(handed(page)).toContainText("Handed to the coordinator");
+  await expect(handButton(page)).toHaveCount(0);
+  await card(page, 130).click();
+  await handButton(page).click();
+  await expect(handed(page)).toContainText("Handed to the coordinator");
+  await page.reload();
+  await expect(handed(page)).toContainText("Handed to the coordinator");
+  const other = await context.newPage();
+  await toBoard(other);
+  await card(other, 130).click();
+  await expect(handed(other)).toContainText("Handed to the coordinator");
+  // moving it to Inbox and back takes the status with it: it can be handed again
+  await other.keyboard.press("i");
+  await expect(other.getByTestId("column-Inbox").locator(".card", { hasText: "Hand demo: delivered" })).toBeVisible();
+  await other.keyboard.press("b");
+  await expect(handButton(other)).toBeEnabled();
+  await expect(handed(other)).toHaveCount(0);
+  await expect(handed(page)).toHaveCount(0); // and the first page follows
+  // "In progress" without a phase label
+  await expect(page.getByTestId("column-Build").locator(".card", { hasText: "Undo for deleted tasks" })).toBeVisible();
+});
+
+test("Hand to agent: a failed status write or Push rolls back with the reason and stays retryable", async ({ page }) => {
+  await page.route("**/api/cards/**/start", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await toBoard(page);
   await card(page, 131).click();
-  await page.route("**/api/cards/**/start", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await handButton(page).click();
   await expect(toast(page, "Failed: boom")).toBeVisible();
   await expect(handed(page)).toHaveCount(0);
@@ -155,7 +182,7 @@ test("Hand to agent: a failed Push rolls back with the reason and stays retryabl
   await expect(handButton(page)).toBeFocused(); // the keyboard goes back to where it was
   await page.unroute("**/api/cards/**/start");
   await handButton(page).click();
-  await expect(handed(page)).toContainText("Handed to the coordinator ·");
+  await expect(handed(page)).toContainText("Handed to the coordinator");
 });
 
 test("Hand to agent: without a Run to send to nothing is handed; Start coordinator retries per repo and hands the Card once it starts", async ({ page }) => {
@@ -176,7 +203,7 @@ test("Hand to agent: without a Run to send to nothing is handed; Start coordinat
   await page.request.put("/api/repos/path", { data: { repo: "acme/agent-workflow", path: "/tmp/agent-workflow" }, headers: WRITE });
   await retry.click();
   await expect(toast(page, "Coordinator starting for acme/agent-workflow")).toBeVisible();
-  await expect(handed(page)).toContainText("Handed to the coordinator ·");
+  await expect(handed(page)).toContainText("Handed to the coordinator");
 });
 
 // ---- #19: multi-select and moving Cards (own Cards: Move demo A-H, #150-157) ----

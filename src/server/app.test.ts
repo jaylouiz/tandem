@@ -160,6 +160,170 @@ describe("triage", () => {
   });
 });
 
+describe("Hand to agent writes the native issue status (#18)", () => {
+  const status = async (repo: string, n: number) => (await source.fetchIssues(repo, null)).find((i) => i.number === n)!.status ?? null;
+  const B = "acme/agent-workflow"; // no Run for it: a Push is not delivered
+
+  it("sets Todo before the Push, and the Card is handed for every page and after a restart of the page", async () => {
+    const order: string[] = [];
+    const set = vi.spyOn(source, "setStatus");
+    set.mockImplementation(async (...a) => (order.push(`status ${a[2]}`), FixtureSource.prototype.setStatus.apply(source, a)));
+    vi.spyOn(pusher, "push").mockImplementation(async (...a) => (order.push("push"), FakePusher.prototype.push.apply(pusher, a)));
+    const before = (await source.fetchIssues("acme/app", null)).find((i) => i.number === 130)!.comments.length;
+    const res = await post("/api/cards/acme/app/130/start", {});
+    expect(await res.json()).toEqual({ push: { delivered: true, runId: "run_fake_acme/app", reason: null }, restoreError: null });
+    expect(order).toEqual(["status Todo", "push"]);
+    expect(set).toHaveBeenCalledWith("acme/app", 130, "Todo");
+    expect(await card(130)).toMatchObject({ handed: true, status: "Todo", phase: "Backlog" });
+    // a status is the whole write: no comment, so no marker an agent could read
+    expect((await source.fetchIssues("acme/app", null)).find((i) => i.number === 130)!.comments.length).toBe(before);
+    // GitHub has it: a fresh read of the repo (another device, a restart) shows the Card handed
+    await board.refreshAll(true);
+    expect((await card(130)).handed).toBe(true);
+  });
+
+  it("a status write that fails stops before the Push: nothing is sent, the Card is not handed, the reason comes back", async () => {
+    vi.spyOn(source, "setStatus").mockRejectedValue(new Error("GitHub GraphQL: viewer cannot set status"));
+    const res = await post("/api/cards/acme/app/130/start", {});
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("GitHub GraphQL: viewer cannot set status");
+    expect(pusher.sent).toEqual([]);
+    expect(await card(130)).toMatchObject({ handed: false, status: null });
+  });
+
+  it("a Push that finds no Run puts the status back: Backlog for an issue that had none, the old one otherwise", async () => {
+    const set = vi.spyOn(source, "setStatus");
+    const res = await post(`/api/cards/${B}/40/start`, {});
+    expect(await res.json()).toEqual({ push: { delivered: false, runId: null, reason: NO_RUN }, restoreError: null });
+    expect(set.mock.calls.map((c) => c[2])).toEqual(["Todo", "Backlog"]);
+    expect(await status(B, 40)).toBe("Backlog");
+    expect((await (await view()).cards.find((c) => c.repo === B && c.number === 40))!.handed).toBe(false);
+    await source.setStatus(B, 40, "In review");
+    await board.refreshAll(true);
+    set.mockClear();
+    await post(`/api/cards/${B}/40/start`, {});
+    expect(set.mock.calls.map((c) => c[2])).toEqual(["Todo", "In review"]);
+    expect(await status(B, 40)).toBe("In review");
+  });
+
+  it("a Push that throws puts the status back and is reported as not delivered", async () => {
+    vi.spyOn(pusher, "push").mockRejectedValue(new Error("could not reach Orca"));
+    const res = await post("/api/cards/acme/app/130/start", {});
+    expect(await res.json()).toEqual({ push: { delivered: false, runId: null, reason: "could not reach Orca" }, restoreError: null });
+    expect(await status("acme/app", 130)).toBe("Backlog");
+    expect((await card(130)).handed).toBe(false);
+  });
+
+  it("a status that cannot be put back is named: the Card keeps Todo and says so", async () => {
+    const real = source.setStatus.bind(source);
+    vi.spyOn(source, "setStatus").mockImplementation(async (repo, n, s) => {
+      if (s !== "Todo") throw new Error("GitHub could not be reached");
+      return real(repo, n, s);
+    });
+    const res = await post(`/api/cards/${B}/40/start`, {});
+    expect(await res.json()).toMatchObject({ push: { delivered: false }, restoreError: `${B}#40 keeps the status Todo: GitHub could not be reached` });
+    expect(await status(B, 40)).toBe("Todo");
+  });
+
+  it("a Card that is handed already is pushed again without a second status write (a retry from another page)", async () => {
+    const set = vi.spyOn(source, "setStatus");
+    const res = await post("/api/cards/acme/app/132/start", {});
+    expect((await res.json()).push).toMatchObject({ delivered: true });
+    expect(set).not.toHaveBeenCalled();
+    expect((await card(132)).handed).toBe(true);
+  });
+
+  it("a repo that offers no statuses: the Push goes out, nothing is written, the Card is not shown as handed", async () => {
+    const set = vi.spyOn(source, "setStatus").mockResolvedValue(false);
+    const res = await post("/api/cards/acme/app/130/start", {});
+    expect(await res.json()).toEqual({ push: { delivered: true, runId: "run_fake_acme/app", reason: null }, restoreError: null });
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(await card(130)).toMatchObject({ handed: false, status: null });
+    // and an undelivered Push has nothing to put back
+    set.mockClear();
+    await post(`/api/cards/${B}/40/start`, {});
+    expect(set).toHaveBeenCalledTimes(1);
+  });
+
+  it("Start coordinator hands its Cards: Todo for each, put back when the start fails", async () => {
+    store.setRepoPath(B, "/tmp/agent-workflow");
+    expect((await post("/api/coordinator/start", { repo: B, numbers: [40, 21] })).status).toBe(200);
+    expect([await status(B, 40), await status(B, 21)]).toEqual(["Todo", "Todo"]);
+    const cards = (await view()).cards.filter((c) => c.repo === B && [40, 21].includes(c.number));
+    expect(cards.map((c) => c.handed)).toEqual([true, true]);
+
+    await source.setStatus(B, 40, "Backlog");
+    await source.setStatus(B, 21, "Backlog");
+    await board.refreshAll(true);
+    vi.spyOn(pusher, "startCoordinator").mockRejectedValue(new Error("orca agent launch failed"));
+    const res = await post("/api/coordinator/start", { repo: B, numbers: [40, 21] });
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("orca agent launch failed");
+    expect([await status(B, 40), await status(B, 21)]).toEqual(["Backlog", "Backlog"]);
+  });
+
+  it("Start coordinator leaves a Card that has started work at its status and hands the others", async () => {
+    store.setRepoPath(B, "/tmp/agent-workflow");
+    await source.setStatus(B, 40, "In progress");
+    await source.setStatus(B, 21, "In review");
+    await board.refreshAll(true);
+    const set = vi.spyOn(source, "setStatus");
+    expect((await post("/api/coordinator/start", { repo: B, numbers: [40, 21, 22] })).status).toBe(200);
+    expect(set.mock.calls.map((c) => [c[1], c[2]])).not.toContainEqual([40, "Todo"]);
+    expect(set.mock.calls.map((c) => [c[1], c[2]])).not.toContainEqual([21, "Todo"]);
+    expect([await status(B, 40), await status(B, 21), await status(B, 22)]).toEqual(["In progress", "In review", "Todo"]);
+  });
+
+  it("Start coordinator whose second status write fails starts nothing and puts the first back", async () => {
+    store.setRepoPath(B, "/tmp/agent-workflow");
+    const start = vi.spyOn(pusher, "startCoordinator");
+    const real = source.setStatus.bind(source);
+    vi.spyOn(source, "setStatus").mockImplementation(async (repo, n, s) => {
+      if (n === 21 && s === "Todo") throw new Error("boom");
+      return real(repo, n, s);
+    });
+    const res = await post("/api/coordinator/start", { repo: B, numbers: [40, 21] });
+    expect(res.status).toBe(500);
+    expect(start).not.toHaveBeenCalled();
+    expect([await status(B, 40), await status(B, 21)]).toEqual(["Backlog", null]);
+  });
+
+  it("re-steering a handed Card writes the status with the labels; hold and release leaves it ready to hand again", async () => {
+    await post("/api/cards/acme/app/132/labels", { add: ["on-hold"], remove: [], status: "Backlog" });
+    expect(await card(132)).toMatchObject({ handed: false, status: "Backlog", onHold: true });
+    await post("/api/cards/acme/app/132/labels", { add: [], remove: ["on-hold"] });
+    expect(await card(132)).toMatchObject({ handed: false, status: "Backlog", onHold: false });
+    expect(await status("acme/app", 132)).toBe("Backlog");
+    // hand -> re-steer -> hand again
+    await post("/api/cards/acme/app/132/start", {});
+    expect((await card(132)).handed).toBe(true);
+  });
+
+  it("a label write without a status leaves the status alone; a bad status is refused before anything is written", async () => {
+    const set = vi.spyOn(source, "setStatus");
+    await post("/api/cards/acme/app/132/labels", { add: ["priority:1"], remove: [] });
+    expect(set).not.toHaveBeenCalled();
+    expect((await card(132)).handed).toBe(true);
+    const labels = vi.spyOn(source, "addLabels");
+    for (const status of [3, "", "  ", null, ["Backlog"]]) expect((await post("/api/cards/acme/app/132/labels", { add: ["x"], remove: [], status })).status, JSON.stringify(status)).toBe(400);
+    expect(labels).not.toHaveBeenCalled();
+  });
+
+  it("a status write that fails after the labels went through reports it, and the Board shows the labels as written", async () => {
+    vi.spyOn(source, "setStatus").mockRejectedValue(new Error("boom"));
+    const res = await post("/api/cards/acme/app/132/labels", { add: ["on-hold"], remove: [], status: "Backlog" });
+    expect(res.status).toBe(500);
+    expect(await card(132)).toMatchObject({ onHold: true, status: "Todo", handed: false });
+  });
+
+  it("a status changed on GitHub reaches the Board with the next poll", async () => {
+    expect((await card(103)).phase).toBe("Backlog");
+    await source.setStatus("acme/app", 103, "In progress"); // an agent, or the developer on github.com
+    await board.refreshAll(false);
+    expect(await card(103)).toMatchObject({ phase: "Build", status: "In progress" });
+  });
+});
+
 describe("launch", () => {
   it("counts pages that notify by themselves while their stream is open", async () => {
     const pages = new PageClients();

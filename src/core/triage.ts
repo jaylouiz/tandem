@@ -1,6 +1,6 @@
 // Triage actions on Cards (brief jobs 7 and 8). Pure: which labels an action writes, which Cards it applies to,
 // and how a Card looks right after the write (optimistic). The UI (buttons, keys, palette, bulk) only calls this.
-import { phaseOf, nextStepOf, priorityOf } from "./card.ts";
+import { handedOf, phaseOf, nextStepOf, priorityOf } from "./card.ts";
 import type { WorkflowConfig } from "./config.ts";
 import { NO_RUN, type Card, type NextStep, type RawIssue } from "./types.ts";
 
@@ -13,33 +13,18 @@ export type TriageAction =
 export interface LabelChange {
   add: string[];
   remove: string[];
+  /** the native issue status to set with the labels: a handed Card that is re-steered goes back to the workflow's `unhandedStatus` (#18) */
+  status?: string;
 }
 
 const laneLabels = (cfg: WorkflowConfig) => Object.keys(cfg.nextStep);
 const laneOf = (step: NextStep, cfg: WorkflowConfig) => Object.entries(cfg.nextStep).find(([, s]) => s === step)?.[0] ?? null;
 
-/** A successful "Hand to agent" the coordinator has not picked up yet (Push leaves no trace on GitHub). */
-export interface HandedRecord {
-  at: number;
-  nextStep: NextStep;
-}
+/** A handed Card that is re-steered (another Next step, a hold, a move) is no longer handed: the write takes its status back, so it can be handed again. */
+const unhand = (card: Card, change: LabelChange, cfg: WorkflowConfig): LabelChange => (card.handed ? { ...change, status: cfg.unhandedStatus } : change);
 
-/** The record counts only while it can still be true: Backlog, open, not on hold, same Next step. GitHub's Phase takes over once the coordinator starts. */
-export const handedValid = (card: Card, rec: HandedRecord | undefined): rec is HandedRecord =>
-  !!rec && card.state === "open" && card.phase === "Backlog" && !card.onHold && card.nextStep === rec.nextStep;
-
-/** `handed` without the records whose Card moved on (or is gone from `cards`); the same object when nothing changed. */
-export function pruneHanded(handed: Record<string, HandedRecord>, cards: Card[]): Record<string, HandedRecord> {
-  const live = new Map(cards.map((c) => [c.key, c]));
-  const keep = Object.entries(handed).filter(([k, rec]) => {
-    const c = live.get(k);
-    return c ? handedValid(c, rec) : false;
-  });
-  return keep.length === Object.keys(handed).length ? handed : Object.fromEntries(keep);
-}
-
-/** Why an action does not apply to a Card, or null when it does. `handed` is the Card's record, if any. */
-export function skipReason(action: TriageAction, card: Card, handed?: HandedRecord): string | null {
+/** Why an action does not apply to a Card, or null when it does. */
+export function skipReason(action: TriageAction, card: Card): string | null {
   if (card.state === "closed" || card.phase === "Done") return "Done";
   if (action.kind === "hold") return null;
   if (action.kind === "fog") return card.phase === "Inbox" ? null : card.phase;
@@ -48,7 +33,7 @@ export function skipReason(action: TriageAction, card: Card, handed?: HandedReco
     if (card.fog) return "needs wayfinder";
     if (!card.nextStep) return "no Next step";
     if (card.waiting) return "waiting on you";
-    if (handedValid(card, handed)) return "already handed";
+    if (card.handed) return "already handed";
   }
   return null;
 }
@@ -85,11 +70,11 @@ export interface Plan {
 }
 
 /** Apply an action to a set of Cards. Hold and fog are toggles for the set: release only when every target is held. */
-export function planTriage(action: TriageAction, cards: Card[], cfg: WorkflowConfig, handed: Record<string, HandedRecord> = {}): Plan {
+export function planTriage(action: TriageAction, cards: Card[], cfg: WorkflowConfig): Plan {
   const plan: Plan = { steps: [], unchanged: [], skipped: [] };
   const ok: Card[] = [];
   for (const card of cards) {
-    const reason = skipReason(action, card, handed[card.key]);
+    const reason = skipReason(action, card);
     if (reason) plan.skipped.push({ card, reason });
     else ok.push(card);
   }
@@ -98,7 +83,7 @@ export function planTriage(action: TriageAction, cards: Card[], cfg: WorkflowCon
   for (const card of ok) {
     const change = triageLabels(action, card, cfg, release);
     if (action.kind === "hand") plan.steps.push({ card, change });
-    else if (change.add.length || change.remove.length) plan.steps.push({ card, change });
+    else if (change.add.length || change.remove.length) plan.steps.push({ card, change: action.kind === "next" || action.kind === "hold" ? unhand(card, change, cfg) : change });
     else plan.unchanged.push(card);
   }
   return plan;
@@ -107,12 +92,17 @@ export function planTriage(action: TriageAction, cards: Card[], cfg: WorkflowCon
 /** The Card as it will look once `change` is written. */
 export function relabel(card: Card, change: LabelChange, cfg: WorkflowConfig): Partial<Card> {
   const labels = [...new Set([...card.labels.filter((l) => !change.remove.includes(l)), ...change.add])];
-  const stub = { state: card.state, stateReason: null, labels } as RawIssue;
+  const status = change.status ?? card.status;
+  const stub = { state: card.state, stateReason: null, labels, status } as RawIssue;
+  const phase = phaseOf(stub, card.pullRequest, cfg);
+  const onHold = cfg.holdLabels.some((l) => labels.includes(l));
   return {
     labels,
-    phase: phaseOf(stub, card.pullRequest, cfg),
+    status,
+    handed: handedOf({ state: card.state, status, phase, onHold }, cfg),
+    phase,
     nextStep: nextStepOf(labels, cfg),
-    onHold: cfg.holdLabels.some((l) => labels.includes(l)),
+    onHold,
     priority: priorityOf(labels, cfg),
     fog: labels.includes(cfg.fogLabel),
   };
@@ -161,19 +151,19 @@ export function planMove(cards: Card[], to: MoveTarget, cfg: WorkflowConfig, ste
       }
       const change = triageLabels({ kind: "next", step: s }, card, cfg);
       if (!change.add.length && !change.remove.length) plan.same.push(card);
-      else plan.steps.push({ card, change });
+      else plan.steps.push({ card, change: unhand(card, change, cfg) });
     } else if (card.phase === "Inbox") {
       plan.same.push(card);
     } else if (!inbox) {
       plan.skipped.push({ card, reason: "no Inbox label in the Phase rules" });
     } else {
-      plan.steps.push({ card, change: { add: card.labels.includes(inbox) ? [] : [inbox], remove: card.labels.filter((l) => laneLabels(cfg).includes(l)) } });
+      plan.steps.push({ card, change: unhand(card, { add: card.labels.includes(inbox) ? [] : [inbox], remove: card.labels.filter((l) => laneLabels(cfg).includes(l)) }, cfg) });
     }
   }
   return plan;
 }
 
-/** The change that takes `change` back (Undo). */
+/** The change that takes `change` back (Undo). Labels only: a Card that lost its handed status with the move is not handed again by an Undo. */
 export const invertChange = (change: LabelChange): LabelChange => ({ add: change.remove, remove: change.add });
 
 const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1);

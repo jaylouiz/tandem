@@ -20,11 +20,10 @@ const entry = (id: string) => TRIAGE_ENTRIES.find((e) => e.id === id)!;
 const STEPS = ["design", "specify", "build"] as const;
 
 export function MoreMenu({ card }: { card: Card }) {
-  const handed = useStore((s) => s.handed);
   const hold = useStore((s) => s.board?.workflow.holdLabel ?? "on-hold");
   const open = card.phase !== "Done";
   const heldByWorkflow = card.onHold && !card.labels.includes(hold);
-  const blocked = (id: string) => actionBlocked(entry(id).action, [card], handed);
+  const blocked = (id: string) => actionBlocked(entry(id).action, [card]);
   const holdWhy = heldByWorkflow ? "On hold through a workflow label. Remove that label on GitHub to release it." : blocked("hold");
   const run = (id: string) => void runTriage(entry(id), [card]);
   // a Card in UX Design or Build takes no Next step: said once under the group's heading, not under each of the three

@@ -1,9 +1,10 @@
 // Triage on the web side, independent of any layout: buttons, keys and the palette all call `runTriage`.
 // The targets are the marked Cards, else the selected Card.
 import { useMemo } from "react";
+import type { WorkflowConfig } from "../core/config.ts";
 import { NO_RUN, PHASES, type Card, type NextStep } from "../core/types.ts";
-import { handNotice, invertChange, moveNotice, planMove, planTriage, relabel, skipReason, type HandedRecord, type MovePlan, type MoveTarget, type Plan, type TriageAction, type Unreached } from "../core/triage.ts";
-import { api, currentCards, useCards, useStore, writeCard } from "./store.ts";
+import { handNotice, invertChange, moveNotice, planMove, planTriage, relabel, skipReason, type MovePlan, type MoveTarget, type Plan, type TriageAction, type Unreached } from "../core/triage.ts";
+import { api, currentCards, useCards, dropPending, useStore, writeCard, type PushResult } from "./store.ts";
 
 export interface TriageEntry {
   id: string;
@@ -43,12 +44,12 @@ export function useTriageTargets(): Card[] {
   return useMemo(() => pickTargets(cards, marked, selected), [cards, marked, selected]);
 }
 
-/** Whether `action` does anything for at least one target (buttons and palette entries disable on false). `handed` is the store's record map. */
-export const applicable = (action: TriageAction, targets: Card[], handed: Record<string, HandedRecord>) => targets.some((c) => skipReason(action, c, handed[c.key]) === null);
+/** Whether `action` does anything for at least one target (buttons and palette entries disable on false). */
+export const applicable = (action: TriageAction, targets: Card[]) => targets.some((c) => skipReason(action, c) === null);
 
 /** Why `action` does nothing for `targets` (a disabled button's title), or null when at least one target takes it. */
-export function actionBlocked(action: TriageAction, targets: Card[], handed: Record<string, HandedRecord>): string | null {
-  const reasons = targets.map((c) => skipReason(action, c, handed[c.key]));
+export function actionBlocked(action: TriageAction, targets: Card[]): string | null {
+  const reasons = targets.map((c) => skipReason(action, c));
   return reasons.some((r) => r === null) ? null : `Not applicable: ${[...new Set(reasons)].join(", ")}`;
 }
 
@@ -77,41 +78,43 @@ function summary(action: string, plan: Plan, total: number, failed: string[], fi
   return `${done} of ${total} updated${skipped}${unchanged}${bad}`;
 }
 
+/** How a Card looks from "Hand to agent" on, until the snapshot shows the status GitHub has. */
+export const handedPatch = (cfg: WorkflowConfig): Partial<Card> => ({ status: cfg.handedStatus, handed: true });
+
 /** Run a triage action on `only` (a Card's own buttons) or the current targets (keys, palette): optimistic, written per Card, rolled back per Card on failure. */
 export async function runTriage(entry: TriageEntry, only?: Card[]) {
   const s = useStore.getState();
   const cfg = s.board?.workflow;
   const targets = only ?? triageTargets(s);
   if (!cfg || !targets.length) return;
-  const plan = planTriage(entry.action, targets, cfg, s.handed);
+  const plan = planTriage(entry.action, targets, cfg);
   const failed: string[] = [];
   const undelivered: Card[] = [];
   const unreached: Unreached[] = [];
   const handed: Card[] = [];
   const hand = entry.action.kind === "hand";
-  // the Card shows as handed at once; a failed or undelivered Push takes it back
-  if (hand) s.markHanded(plan.steps.map((st) => st.card));
   await Promise.all(
     plan.steps.map(async ({ card, change }) => {
       if (hand) {
-        try {
-          const { push } = await api.post(`${api.cardPath(card)}/start`);
-          // only "no Run found" offers a start; a Push Orca did not take says why (starting a coordinator would not fix it)
-          if (push?.delivered) handed.push(card);
-          else if (push?.reason && push.reason !== NO_RUN) unreached.push({ card, reason: push.reason });
-          else undelivered.push(card);
-        } catch (e) {
-          failed.push(e instanceof Error ? e.message : String(e));
-        }
+        // the Card shows as handed at once (the server sets the handed status before it pushes); a failed write or a Push that did not
+        // arrive takes it back: the patch is rolled back, or the next snapshot carries the status the server restored
+        const res = await writeCard(card, handedPatch(cfg), () => api.post(`${api.cardPath(card)}/start`));
+        if (!res.ok) return void failed.push(res.error);
+        const { push, restoreError } = res.value as { push: PushResult | null; restoreError?: string | null };
+        // only "no Run found" offers a start; a Push Orca did not take says why (starting a coordinator would not fix it)
+        if (push?.delivered) handed.push(card);
+        else if (push?.reason && push.reason !== NO_RUN) unreached.push({ card, reason: push.reason });
+        else undelivered.push(card);
+        // not handed after all: the snapshot with the restored status may have come before this answer, so the patch goes here
+        if (!push?.delivered) dropPending(card.key);
+        if (restoreError) failed.push(restoreError);
         return;
       }
       const res = await writeCard(card, relabel(card, change, cfg), () => api.post(`${api.cardPath(card)}/labels`, change));
-      // a Next step or hold re-steers the Card: its handed record goes once the write holds (a rolled-back write leaves the Card handed)
+      // a Next step or hold re-steers a handed Card: `change.status` takes its handed status back with the labels
       if (!res.ok) failed.push(res.error);
-      else if (entry.action.kind === "next" || entry.action.kind === "hold") s.clearHanded([card.key]);
     }),
   );
-  if (hand) s.clearHanded(plan.steps.filter((st) => !handed.includes(st.card)).map((st) => st.card.key));
   let text = summary(outcomeOf(entry, plan), plan, targets.length, failed, targets[0]!);
   if (hand && plan.steps.length) text = handNotice(handed, undelivered, failed, unreached);
   s.setNotice({ key: (undelivered[0] ?? unreached[0]?.card ?? targets[0]!).key, text, canStart: undelivered.length > 0, start: undelivered, failed: failed.length > 0 || unreached.length > 0 });
@@ -163,8 +166,6 @@ export async function runMove(to: MoveTarget, only?: Card[]) {
       else failed.push(res.error);
     }),
   );
-  // a moved Card is re-steered: its handed record goes (the Card is no longer where it was handed)
-  s.clearHanded(moved.map((m) => m.card.key));
   const undo = moved.length
     ? () => {
         const errors: string[] = [];

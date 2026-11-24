@@ -31,7 +31,6 @@ function PaletteBody() {
   const repos = useStore((s) => s.board?.repos ?? NO_REPOS);
   const cards = useCards();
   const targets = useTriageTargets();
-  const handed = useStore((s) => s.handed);
   const cfg = useStore((s) => s.board?.workflow);
   const moveStep = useStore((s) => s.moveStep);
   const view = useStore((s) => s.view);
@@ -64,13 +63,13 @@ function PaletteBody() {
           : {
               targets: targets.length,
               moves: cfg ? MOVE_ENTRIES.filter((e) => moveBlocked(e.to, targets, cfg, moveStep) === null) : [],
-              entries: TRIAGE_ENTRIES.filter((e) => applicable(e.action, targets, handed)),
+              entries: TRIAGE_ENTRIES.filter((e) => applicable(e.action, targets)),
               seen: unseenLooks(targets).length > 0,
               unseen: seenLooks(targets).length > 0,
             },
         setTheme,
       }),
-    [view, focus, selected, failed, marked, repoCount, lanes, filter, live, targets, cfg, moveStep, handed],
+    [view, focus, selected, failed, marked, repoCount, lanes, filter, live, targets, cfg, moveStep],
   );
   const groups = [...new Set(actions.map((a) => a.group))];
   const item = (a: PaletteAction) => {

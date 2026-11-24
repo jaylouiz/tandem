@@ -13,7 +13,6 @@ export function MarkBar() {
   const cards = useCards();
   const marked = useStore((s) => s.marked);
   const clear = useStore((s) => s.clearMarks);
-  const handed = useStore((s) => s.handed);
   const cfg = useStore((s) => s.board?.workflow);
   const step = useStore((s) => s.moveStep);
   const setStep = useStore((s) => s.setMoveStep);
@@ -56,7 +55,7 @@ export function MarkBar() {
       )}
       {(show(backlogWhy) || show(inboxWhy)) && <span className="sel-sep" aria-hidden />}
       {(["hold", "hand"] as const).map((id) => {
-        const why = actionBlocked(entry(id).action, targets, handed);
+        const why = actionBlocked(entry(id).action, targets);
         if (!show(why)) return null;
         return (
           <Btn key={id} className="btn ghost" why={why} title={entry(id).label} onClick={() => void runTriage(entry(id))}>

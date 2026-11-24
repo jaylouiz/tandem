@@ -14,7 +14,10 @@ beforeAll(async () => {
 afterEach(() => vi.unstubAllGlobals());
 
 const mk = (repo: string, number: number): Card =>
-  ({ key: `${repo}#${number}`, repo, number, state: "open", labels: ["ready"], phase: "Backlog", nextStep: "build", onHold: false, waiting: null, fog: false, pullRequest: null }) as unknown as Card;
+  ({ key: `${repo}#${number}`, repo, number, state: "open", labels: ["ready"], status: "Backlog", handed: false, phase: "Backlog", nextStep: "build", onHold: false, waiting: null, fog: false, pullRequest: null }) as unknown as Card;
+/** the Card as the page shows it: the server's Card under its optimistic patch */
+const shown = (c: Card) => store.currentCards(store.useStore.getState()).find((x) => x.key === c.key)!;
+const asHanded = (c: Card): Card => ({ ...c, status: "Todo", handed: true });
 const hand = () => triage.TRIAGE_ENTRIES.find((e) => e.id === "hand")!;
 const reply = (body: unknown, status = 200) => async () => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -22,52 +25,58 @@ describe("Hand to agent: handed state", () => {
   const a = mk("o/with", 1);
   const b = mk("o/without", 2);
   beforeEach(() => {
-    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a, b], repos: [], sync: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [], selected: a.key });
+    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a, b], repos: [], sync: {} } as unknown as BoardView, pending: {}, notice: null, marked: [], selected: a.key });
   });
 
-  it("a delivered Push keeps the Card handed and a second run does nothing", async () => {
-    vi.stubGlobal("fetch", reply({ push: { delivered: true, runId: "r", reason: null } }));
+  it("a delivered Push shows the Card handed (status Todo) and a second run does nothing", async () => {
+    vi.stubGlobal("fetch", reply({ push: { delivered: true, runId: "r", reason: null }, restoreError: null }));
     await triage.runTriage(hand(), [a]);
-    expect(store.useStore.getState().handed[a.key]?.nextStep).toBe("build");
+    expect(shown(a)).toMatchObject({ handed: true, status: "Todo" });
     expect(store.useStore.getState().notice?.text).toBe("Handed to the coordinator · build");
     const fetched = vi.fn(reply({ push: null }));
     vi.stubGlobal("fetch", fetched);
-    await triage.runTriage(hand(), [a]);
+    await triage.runTriage(hand(), [shown(a)]);
     expect(fetched).not.toHaveBeenCalled();
     expect(store.useStore.getState().notice?.text).toBe("Not applicable: already handed");
   });
 
-  it("shows as handed while the Push is on its way", async () => {
+  it("shows as handed while the write and the Push are on their way", async () => {
     let release!: () => void;
     vi.stubGlobal("fetch", () => new Promise<Response>((r) => (release = () => r(new Response(JSON.stringify({ push: { delivered: true } }), { headers: { "content-type": "application/json" } })))));
     const run = triage.runTriage(hand(), [a]);
-    expect(store.useStore.getState().handed[a.key]).toBeDefined();
+    expect(shown(a).handed).toBe(true);
     release();
     await run;
   });
 
-  it("a failed Push rolls back with the reason, and can be retried", async () => {
-    vi.stubGlobal("fetch", reply({ error: "boom" }, 500));
+  it("a failed status write or Push rolls back with the reason, and can be retried", async () => {
+    vi.stubGlobal("fetch", reply({ error: "GitHub GraphQL: boom" }, 500));
     await triage.runTriage(hand(), [a]);
-    expect(store.useStore.getState().handed[a.key]).toBeUndefined();
-    expect(store.useStore.getState().notice).toMatchObject({ text: "Failed: boom", canStart: false, failed: true });
+    expect(shown(a)).toMatchObject({ handed: false, status: "Backlog" });
+    expect(store.useStore.getState().notice).toMatchObject({ text: "Failed: GitHub GraphQL: boom", canStart: false, failed: true });
     vi.stubGlobal("fetch", reply({ push: { delivered: true } }));
     await triage.runTriage(hand(), [a]);
-    expect(store.useStore.getState().handed[a.key]).toBeDefined();
+    expect(shown(a).handed).toBe(true);
   });
 
   it("an undelivered Push rolls back and offers Start coordinator", async () => {
-    vi.stubGlobal("fetch", reply({ push: { delivered: false, runId: null, reason: NO_RUN } }));
+    vi.stubGlobal("fetch", reply({ push: { delivered: false, runId: null, reason: NO_RUN }, restoreError: null }));
     await triage.runTriage(hand(), [b]);
-    expect(store.useStore.getState().handed[b.key]).toBeUndefined();
+    expect(shown(b).handed).toBe(false);
     expect(store.useStore.getState().notice).toMatchObject({ text: "Not handed: no Orca Run found for without", canStart: true, start: [b] });
+  });
+
+  it("an undelivered Push whose status could not be put back says so", async () => {
+    vi.stubGlobal("fetch", reply({ push: { delivered: false, runId: null, reason: NO_RUN }, restoreError: "o/without#2 keeps the status Todo: boom" }));
+    await triage.runTriage(hand(), [b]);
+    expect(store.useStore.getState().notice).toMatchObject({ text: "No Orca Run found for without; 1 failed: o/without#2 keeps the status Todo: boom", failed: true });
   });
 
   it("an unreachable Orca rolls back, names Orca and does not offer Start coordinator (#63)", async () => {
     const why = "could not reach Orca: orca terminal list timed out";
     vi.stubGlobal("fetch", reply({ push: { delivered: false, runId: null, reason: why } }));
     await triage.runTriage(hand(), [b]);
-    expect(store.useStore.getState().handed[b.key]).toBeUndefined();
+    expect(shown(b).handed).toBe(false);
     expect(store.useStore.getState().notice).toMatchObject({ text: `Not handed over (${why})`, canStart: false, failed: true });
   });
 
@@ -79,7 +88,7 @@ describe("Hand to agent: handed state", () => {
       reply({ push: url.includes("/o/with/") ? { delivered: true } : url.includes("/o/without/") ? { delivered: false, reason: NO_RUN } : { delivered: false, reason: why } })(),
     );
     await triage.runTriage(hand(), [a, b, c]);
-    expect(Object.keys(store.useStore.getState().handed)).toEqual([a.key]);
+    expect([a, b, c].map((x) => shown(x).handed)).toEqual([true, false, false]);
     expect(store.useStore.getState().notice).toMatchObject({
       text: `Handed 1 Card to the coordinator; no Orca Run found for without; 1 Card not handed over (${why})`,
       canStart: true,
@@ -90,27 +99,36 @@ describe("Hand to agent: handed state", () => {
   it("a bulk run hands what reached a coordinator and names the rest in one notice", async () => {
     vi.stubGlobal("fetch", async (url: string) => (url.includes("/o/with/") ? reply({ push: { delivered: true } })() : reply({ push: { delivered: false } })()));
     await triage.runTriage(hand(), [a, b]);
-    expect(Object.keys(store.useStore.getState().handed)).toEqual([a.key]);
+    expect([a, b].map((x) => shown(x).handed)).toEqual([true, false]);
     expect(store.useStore.getState().notice?.text).toBe("Handed 1 Card to the coordinator; no Orca Run found for without");
-  });
-
-  it("a Next step or Hold on the Card drops the record, so release brings the button back", async () => {
-    store.useStore.getState().markHanded([a]);
-    vi.stubGlobal("fetch", reply({ ok: true }));
-    await triage.runTriage(triage.TRIAGE_ENTRIES.find((e) => e.id === "hold")!, [a]);
-    expect(store.useStore.getState().handed[a.key]).toBeUndefined();
   });
 });
 
 describe("re-steering a handed Card", () => {
-  const a = mk("o/with", 1);
-  it("a hold whose write fails leaves the Card handed, so it is not offered a second Push", async () => {
-    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a], repos: [], sync: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [] });
-    store.useStore.getState().markHanded([a]);
-    vi.stubGlobal("fetch", reply({ error: "boom" }, 500));
-    await triage.runTriage(triage.TRIAGE_ENTRIES.find((e) => e.id === "hold")!, [a]);
-    expect(store.useStore.getState().handed[a.key]).toBeDefined();
+  const a = asHanded(mk("o/with", 1));
+  const seed = () => store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a], repos: [], sync: {} } as unknown as BoardView, pending: {}, notice: null, marked: [] });
+  const entry = (id: string) => triage.TRIAGE_ENTRIES.find((e) => e.id === id)!;
+
+  it("a Hold or another Next step sends the status Backlog with the labels, so release brings the button back", async () => {
+    seed();
+    const fetched = vi.fn(reply({ ok: true }));
+    vi.stubGlobal("fetch", fetched);
+    await triage.runTriage(entry("hold"), [a]);
+    expect(JSON.parse(String((fetched.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ add: ["on-hold"], remove: [], status: "Backlog" });
+    expect(shown(a)).toMatchObject({ handed: false, status: "Backlog", onHold: true });
+    seed();
+    await triage.runTriage(entry("next-specify"), [a]);
+    expect(JSON.parse(String((fetched.mock.calls[1] as unknown as [string, RequestInit])[1].body))).toEqual({ add: ["needs-spec"], remove: ["ready"], status: "Backlog" });
+    expect(shown(a).handed).toBe(false);
   });
+
+  it("a hold whose write fails leaves the Card handed, so it is not offered a second Push", async () => {
+    seed();
+    vi.stubGlobal("fetch", reply({ error: "boom" }, 500));
+    await triage.runTriage(entry("hold"), [a]);
+    expect(shown(a)).toMatchObject({ handed: true, status: "Todo" });
+  });
+
 });
 
 describe("moving Cards between Inbox and Backlog", () => {
@@ -118,7 +136,7 @@ describe("moving Cards between Inbox and Backlog", () => {
   const backlog = (n: number, over: Partial<Card> = {}) => ({ ...mk("o/r", n), labels: ["needs-spec"], nextStep: "specify", ...over }) as Card;
   const phaseOf = (c: Card) => store.currentCards(store.useStore.getState()).find((x) => x.key === c.key)!.phase;
   const seed = (cards: Card[], extra: Partial<ReturnType<typeof store.useStore.getState>> = {}) =>
-    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards, repos: [], sync: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [], moveStep: "keep", selected: null, ...extra });
+    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards, repos: [], sync: {} } as unknown as BoardView, pending: {}, notice: null, marked: [], moveStep: "keep", selected: null, ...extra });
 
   it("moves at once, writes the lane label per Card, clears the selection and offers Undo", async () => {
     const a = inbox(1);
@@ -178,17 +196,21 @@ describe("moving Cards between Inbox and Backlog", () => {
     expect(store.useStore.getState().notice?.undo).toBeUndefined(); // nothing moved, nothing to undo
   });
 
-  it("a moved Card loses its handed record; a Card that did not change keeps it", async () => {
-    const a = backlog(1);
-    const b = backlog(2);
+  it("a moved Card loses its handed status; a Card that did not change keeps it", async () => {
+    const a = asHanded(backlog(1));
+    const b = asHanded(backlog(2));
     seed([a, b]);
-    store.useStore.getState().markHanded([a, b]);
-    vi.stubGlobal("fetch", reply({ ok: true }));
+    const fetched = vi.fn(reply({ ok: true }));
+    vi.stubGlobal("fetch", fetched);
     await triage.runMove("Backlog", [a, b]); // keep: both stay as they are
-    expect(Object.keys(store.useStore.getState().handed).sort()).toEqual([a.key, b.key]);
+    expect(fetched).not.toHaveBeenCalled();
+    expect([a, b].map((x) => shown(x).handed)).toEqual([true, true]);
     store.useStore.setState({ moveStep: "build" });
     await triage.runMove("Backlog", [a]);
-    expect(Object.keys(store.useStore.getState().handed)).toEqual([b.key]);
+    expect(JSON.parse(String((fetched.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ add: ["ready"], remove: ["needs-spec"], status: "Backlog" });
+    expect([a, b].map((x) => shown(x).handed)).toEqual([false, true]);
+    await triage.runMove("Inbox", [b]);
+    expect(JSON.parse(String((fetched.mock.calls[1] as unknown as [string, RequestInit])[1].body))).toEqual({ add: ["inbox"], remove: ["needs-spec"], status: "Backlog" });
   });
 
   it("moveBlocked names why a button is disabled", () => {
@@ -202,7 +224,7 @@ describe("moving Cards between Inbox and Backlog", () => {
 describe("toast copy names the outcome (#46)", () => {
   const entry = (id: string) => triage.TRIAGE_ENTRIES.find((e) => e.id === id)!;
   const c = mk("o/r", 7);
-  const put = (card: Card) => store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [card], repos: [], sync: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [], selected: card.key });
+  const put = (card: Card) => store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [card], repos: [], sync: {} } as unknown as BoardView, pending: {}, notice: null, marked: [], selected: card.key });
 
   it("Hold says Held, and on a held Card Released", async () => {
     put(c);

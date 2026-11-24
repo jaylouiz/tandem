@@ -16,6 +16,8 @@ export interface RawIssue {
   state: "open" | "closed";
   stateReason: "completed" | "not_planned" | "reopened" | null;
   labels: string[];
+  /** GitHub's native issue status by name ("In progress"); null or absent when the issue has none, the repo offers none or it could not be read (#18) */
+  status?: string | null;
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -160,6 +162,10 @@ export interface Card {
   url: string;
   state: "open" | "closed";
   labels: string[];
+  /** GitHub's native issue status by name, or null (#18) */
+  status: string | null;
+  /** handed to an agent and not started yet: the status is the workflow's `handedStatus`, the Card open, in Backlog and not on hold */
+  handed: boolean;
   phase: Phase;
   nextStep: NextStep | null;
   onHold: boolean;

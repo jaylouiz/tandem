@@ -7,7 +7,6 @@ import type { ShotsTarget } from "../core/gallery.ts";
 import { nextAfterAnswer } from "./answered.ts";
 import { appPath, navigation, parseRoute, VIEWS, type Nav } from "./route.ts";
 import { closeToast } from "./ui/Toast.tsx";
-import { pruneHanded, type HandedRecord } from "../core/triage.ts";
 import { NO_RUN, type ActivityEntry, type BoardView, type Card, type NextStep, type Phase } from "../core/types.ts";
 
 export type View = "waiting" | "board" | "settings";
@@ -30,7 +29,6 @@ export const NO_REPOS: string[] = [];
 export const NO_ACTIVITY: Record<string, ActivityEntry> = {};
 const NO_FAILURES: Record<string, string> = {};
 const NO_DRAFTS: Record<string, Draft> = {};
-export const NO_HANDED: Record<string, HandedRecord> = {};
 
 export { draftKey } from "../core/drafts.ts";
 const NO_DAYS: Record<string, boolean> = {};
@@ -108,10 +106,6 @@ interface State {
   /** card key -> patch applied over the server's card until the next snapshot that reflects the write */
   pending: Record<string, Partial<Card>>;
   notice: PushNotice | null;
-  /** card key -> a Push the coordinator has not picked up yet; only a bridge until GitHub shows it (`handedValid`) */
-  handed: Record<string, HandedRecord>;
-  markHanded: (cards: Card[]) => void;
-  clearHanded: (keys: string[]) => void;
   /** Cards marked for bulk triage (keys); not persisted */
   marked: string[];
   toggleMark: (key: string) => void;
@@ -248,18 +242,6 @@ export const useStore = create<State>((set) => ({
   toggleLane: (repo) => set((s) => ({ collapsedLanes: { ...s.collapsedLanes, [repo]: !s.collapsedLanes[repo] } })),
   pending: {},
   notice: null,
-  handed: NO_HANDED,
-  markHanded: (cards) =>
-    set((s) => {
-      const at = Date.now();
-      const add = cards.filter((c) => c.nextStep).map((c) => [c.key, { at, nextStep: c.nextStep! }] as const);
-      return add.length ? { handed: { ...s.handed, ...Object.fromEntries(add) } } : {};
-    }),
-  clearHanded: (keys) =>
-    set((s) => {
-      const rest = Object.fromEntries(Object.entries(s.handed).filter(([k]) => !keys.includes(k)));
-      return Object.keys(rest).length === Object.keys(s.handed).length ? {} : { handed: Object.keys(rest).length ? rest : NO_HANDED };
-    }),
   marked: [],
   toggleMark: (key) => set((s) => ({ marked: s.marked.includes(key) ? s.marked.filter((k) => k !== key) : [...s.marked, key] })),
   setMarks: (marked) => set({ marked }),
@@ -350,11 +332,10 @@ function open() {
     const board = JSON.parse((e as MessageEvent).data) as BoardView;
     // a snapshot built after a write finished already contains it; writes still in flight keep their patch
     useStore.setState((s) => {
-      const handed = pruneHanded(s.handed, board.cards);
       const drafts = pruneDrafts(s.drafts, board.cards);
       const repoFilter = validFilter(s.repoFilter, board.repos);
       if (repoFilter !== s.repoFilter) storeFilter(repoFilter);
-      return { board, repoFilter, connected: true, drafts: Object.keys(drafts).length ? drafts : NO_DRAFTS, pending: Object.fromEntries(Object.entries(s.pending).filter(([k]) => inflight.has(k))), handed: handed === s.handed ? handed : Object.keys(handed).length ? handed : NO_HANDED };
+      return { board, repoFilter, connected: true, drafts: Object.keys(drafts).length ? drafts : NO_DRAFTS, pending: Object.fromEntries(Object.entries(s.pending).filter(([k]) => inflight.has(k))) };
     });
   });
   es.onerror = () => useStore.setState({ connected: false });
@@ -498,6 +479,16 @@ export async function write<T>(run: () => Promise<T>, opts: WriteOptions = {}): 
   } finally {
     applied?.settle?.();
   }
+}
+
+/** Take a Card's optimistic patch back after a write that went through but did not do what the patch shows (a hand-over whose Push did not arrive). A write still in flight keeps it. */
+export function dropPending(key: string) {
+  if (inflight.has(key)) return;
+  useStore.setState((s) => {
+    if (!(key in s.pending)) return {};
+    const { [key]: _, ...rest } = s.pending;
+    return { pending: rest };
+  });
 }
 
 /** `write` for a Card (callers word their own failure message, e.g. one for a bulk set, so no notice by default): its patch shows over the server's Card until a snapshot reflects the write, and is rolled back on failure. */

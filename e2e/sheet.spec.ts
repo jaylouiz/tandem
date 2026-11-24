@@ -181,7 +181,7 @@ test("states: a Backlog Card is one line with its Next step and Hand to agent; a
   await expect(row).toContainText("Next step: build");
   await expect(row.getByRole("button", { name: /Hand to agent/ })).toBeVisible();
   await row.getByRole("button", { name: /Hand to agent/ }).click();
-  await expect(detail(page).getByTestId("handed")).toContainText(/^Handed to the coordinator · \d\d:\d\d/);
+  await expect(detail(page).getByTestId("handed")).toContainText("Handed to the coordinator");
 
   await open(page, 108);
   await expect(detail(page).getByTestId("panel-look")).toBeVisible();
