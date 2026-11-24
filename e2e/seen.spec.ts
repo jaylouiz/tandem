@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, test, type Page, toast } from "./fixtures.ts";
 
 // Waiting on me and Seen (#30, #31, #32). Look Cards 160-165 belong to these tests;
 // 108 and 119 are the unseen demo Looks: opening them with a click, j or k marks them Seen.
@@ -7,7 +7,6 @@ const rowButton = (page: Page, n: number) => row(page, n).locator("xpath=..").ge
 const list = (page: Page) => page.getByTestId("waiting-list");
 const detail = (page: Page) => page.getByTestId("detail");
 const mod = process.platform === "darwin" ? "Meta" : "Control";
-const toast = (page: Page, text: string) => page.getByTestId("toast").filter({ hasText: text });
 /** Opens a Card through the palette: it opens the Card but does not mark a Look Seen. */
 const viaPalette = async (page: Page, text: string) => {
   await expect(page.getByTestId("waiting-list").locator(".qrow").first()).toBeVisible(); // the Board has loaded
@@ -157,4 +156,17 @@ test("the key l marks the marked Cards Seen; one failure rolls back with one mes
   await expect(row(page, 163)).toBeVisible(); // rolled back
   await expect(toast(page, "1 of 2 marked Seen. Failed: boom")).toBeVisible();
   await expect(page.getByTestId("markbar")).toBeHidden();
+});
+
+test("a Waiting on me row is 52px and carries its kind for assistive tech only (#9)", async ({ page }) => {
+  await page.goto("/");
+  const first = list(page).locator(".qrow").first();
+  await expect(first).toBeVisible();
+  const boxes = await list(page).locator(".qrow").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+  expect(boxes.length).toBeGreaterThan(5);
+  for (const h of boxes) expect(h).toBe(52);
+  const chip = first.locator(".kind-chip");
+  await expect(chip).not.toHaveText(""); // still in the row, for the screen reader
+  const { width, height } = (await chip.boundingBox())!;
+  expect(Math.max(width, height)).toBeLessThanOrEqual(1);
 });

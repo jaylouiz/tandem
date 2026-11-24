@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, test, type Page, toast } from "./fixtures.ts";
 
 // Process mode: the blockers on the left, the open Card on the right.
 const row = (page: Page, n: number) => page.locator(`[data-card="acme/app#${n}"]`);
@@ -54,7 +54,7 @@ test("a digit picks a decision option, ⌘↵ sends, the next blocker opens; a f
   await panel.locator("textarea").fill("with a note"); // last, so the focus is in the field for ⌘↵
   await page.route("**/api/cards/acme/app/117/answer", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await page.keyboard.press("ControlOrMeta+Enter");
-  await expect(page.getByTestId("toast").filter({ hasText: "Failed: boom" })).toBeVisible();
+  await expect(toast(page, "Failed: boom")).toBeVisible();
   await open(page, 117);
   await expect(page.getByTestId("not-sent")).toContainText("boom");
   await expect(panel.locator("textarea")).toHaveValue("with a note");
@@ -67,7 +67,7 @@ test("a digit picks a decision option, ⌘↵ sends, the next blocker opens; a f
   await panel.getByTestId("push-toggle").check();
   await panel.locator("textarea").focus();
   await page.keyboard.press("ControlOrMeta+Enter"); // send the kept draft again
-  await expect(page.getByTestId("toast").filter({ hasText: "pushed to the coordinator" })).toBeVisible();
+  await expect(toast(page, "pushed to the coordinator")).toBeVisible();
   await expect(page.getByTestId("detail")).not.toHaveAttribute("aria-label", "Card acme/app#117"); // the next blocker opened
   await expect(list(page).locator(".group-head", { hasText: "Awaiting pickup" })).toBeVisible();
   await expect(page.locator('[data-card="acme/app#117"] .kind-chip')).toHaveText("Awaiting pickup");

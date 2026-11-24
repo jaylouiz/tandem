@@ -1,9 +1,8 @@
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, test, type Page, toast } from "./fixtures.ts";
 
 // The toast stack (#43, ADR 0005, src/web/ui/Toast.tsx). Time stands still here (`page.clock`): a toast goes only when the test runs the clock, so
 // "still there after 2 min" and "gone after 4 s" do not depend on how fast the machine is. It uses the Backlog
 // Cards "Toast demo A-E" (#190-194), moves them to the Inbox; the plain toast it needs comes from "Refresh from GitHub" (writes nothing).
-const toast = (page: Page, text: string) => page.getByTestId("toast").filter({ hasText: text });
 const card = (page: Page, letter: string) => page.getByTestId("board").locator(".card", { hasText: `Toast demo ${letter}` });
 const backlog = (page: Page) => page.getByTestId("column-Backlog");
 const inbox = (page: Page) => page.getByTestId("column-Inbox");
@@ -104,7 +103,7 @@ test("a failure stays until dismissed and is announced as an alert; Esc on the f
   await page.route("**/api/cards/**/labels", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await card(page, "A").click();
   await page.keyboard.press("i");
-  const failed = toast(page, "Failed: boom");
+  const failed = toast(page, "Nothing moved, 1 failed: boom"); // the move notice (src/core/triage.ts), not the single-Card "Failed: boom": the old case-insensitive match hid the difference
   await expect(failed).toBeVisible();
   await expect(failed).toHaveAttribute("data-tone", "failed");
   await expect(page.getByRole("alert").filter({ hasText: "Failed: boom" })).toHaveCount(1); // announced urgently, not as a status

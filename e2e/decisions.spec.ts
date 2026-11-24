@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, test, type Page, toast } from "./fixtures.ts";
 
 // Agent decisions never block the agent (agent-workflow), so they are not Waiting on me: a quiet line in Now,
 // the decisions themselves in Decided. This spec uses 107 (one new decision) and
@@ -55,7 +55,7 @@ test("accept from Decided by keyboard: 1, ⌘↵; the line goes and the decision
   await page.keyboard.press("1");
   await expect(panel.getByRole("button", { name: /Accept all/ })).toHaveClass(/selected/);
   await page.keyboard.press("ControlOrMeta+Enter");
-  await expect(page.getByTestId("toast").filter({ hasText: "Feedback given" })).toBeVisible();
+  await expect(toast(page, "Feedback given")).toBeVisible();
   await expect(panel).toHaveCount(0);
   await expect(page.getByTestId("decided").locator(".decided-row", { hasText: "D1" })).toContainText("Accepted");
   await page.keyboard.press("["); // back to Now: no line left
@@ -73,7 +73,7 @@ test("challenge from Decided by keyboard: 3 picks D4, ⌘↵ sends once; D2 stay
   await expect(panel.getByRole("button", { name: /Challenge D4/ })).toHaveClass(/selected/);
   await panel.locator("textarea").fill("Cap at 10 minutes");
   await page.keyboard.press("ControlOrMeta+Enter");
-  await expect(page.getByTestId("toast").filter({ hasText: "Feedback given" })).toBeVisible();
+  await expect(toast(page, "Feedback given")).toBeVisible();
   await expect(page.getByTestId("decided").locator(".decided-row", { hasText: "D4" })).toContainText("Challenged");
   // D2 is still new, so the panel stays: without the challenged text and with nothing left to send twice
   await expect(panel).toContainText("D2");

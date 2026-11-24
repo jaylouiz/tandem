@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, test, type Page, toast } from "./fixtures.ts";
 
 // The URL reflects view, open Card, tab and Repo filter (#48). Read-only: it opens Cards of the demo
 // data (blockers it picks from the snapshot; Board Card 107; the unseen Look 108) and changes nothing on any of them.
@@ -93,14 +93,14 @@ test("a Card that is not on the Board closes with a notice and does not add a Ba
   await page.goto("/waiting");
   await loaded(page);
   await page.goto(`/board/${K}/99999`);
-  await expect(page.getByTestId("toast").filter({ hasText: `${K}#99999 is not on the Board` })).toBeVisible();
+  await expect(toast(page, `${K}#99999 is not on the Board`)).toBeVisible();
   await expect(detail(page)).toHaveCount(0);
   expect(url(page)).toBe("/board");
   await page.goBack();
   await expect.poll(() => url(page)).toBe("/waiting");
   // a repo that is not on the Board at all
   await page.goto("/board/nobody/nothing/1");
-  await expect(page.getByTestId("toast").filter({ hasText: "nobody/nothing#1 is not on the Board" })).toBeVisible();
+  await expect(toast(page, "nobody/nothing#1 is not on the Board")).toBeVisible();
 });
 
 test("/, a trailing slash and an unknown path end on a valid URL without an extra Back stop", async ({ page }) => {

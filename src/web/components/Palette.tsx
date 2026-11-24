@@ -7,6 +7,7 @@ import { panelKeys } from "../panelKeys.ts";
 import { liveFocusKeys } from "../focus/keys.ts";
 import { seenLooks, unseenLooks } from "../seen.ts";
 import { NO_REPOS, openCard, useStore, useCard, useCards } from "../store.ts";
+import { setTheme } from "../theme.ts";
 import { Dialog } from "../ui/Dialog.tsx";
 import { canUndo } from "../ui/Toast.tsx";
 import { MOVE_ENTRIES, TRIAGE_ENTRIES, applicable, moveBlocked, useTriageTargets } from "../triage.ts";
@@ -21,15 +22,6 @@ export function Palette() {
     </Dialog>
   );
 }
-
-const setTheme = (t: "light" | "dark" | null) => {
-  if (t) document.documentElement.dataset.theme = t;
-  else delete document.documentElement.dataset.theme;
-  try {
-    if (t) localStorage.setItem("tandem.theme", t);
-    else localStorage.removeItem("tandem.theme");
-  } catch {}
-};
 
 /** Mounted only while the Palette is open (inside the Dialog's popup), so its store subscriptions cost nothing otherwise. */
 function PaletteBody() {
