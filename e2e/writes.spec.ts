@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, test, type Page, toast } from "./fixtures.ts";
 
 // Writes outside a Card (#44): Settings, Capture and Refresh keep the change only if the write succeeded, and say what failed.
 // Every PUT/POST here is mocked, so the fixture server is never changed.
@@ -18,7 +18,7 @@ test("a failed repo toggle rolls back and names the repo", async ({ page }) => {
   const box = page.getByRole("checkbox", { name: "acme/app" });
   await expect(box).toBeChecked();
   await box.click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Could not remove acme/app from the Board: boom" })).toBeVisible();
+  await expect(toast(page, "Could not remove acme/app from the Board: boom")).toBeVisible();
   await expect(box).toBeChecked();
 });
 
@@ -44,7 +44,7 @@ test("a failed local path goes back to the saved one and says so", async ({ page
   await fail(page, "**/api/repos/path");
   await input.fill("/tmp/other-path");
   await input.blur();
-  await expect(page.getByTestId("toast").filter({ hasText: "Could not save the local path for acme/app: boom" })).toBeVisible();
+  await expect(toast(page, "Could not save the local path for acme/app: boom")).toBeVisible();
   await expect(input).toHaveValue("/tmp/saved-path");
 });
 
@@ -66,7 +66,7 @@ test("a failed Capture keeps the dialog and its text, shows the error inline, an
   await ok(page, "**/api/issues", { number: 4404 });
   await dialog.getByRole("button", { name: "Capture" }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByTestId("toast").filter({ hasText: "Captured acme/agent-workflow#4404 in the Inbox" })).toBeVisible();
+  await expect(toast(page, "Captured acme/agent-workflow#4404 in the Inbox")).toBeVisible();
 });
 
 test("Refresh from GitHub shows progress, then how it ended", async ({ page }) => {
@@ -83,11 +83,11 @@ test("Refresh from GitHub shows progress, then how it ended", async ({ page }) =
     await r.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "acme/app: rate limited" }) });
   });
   await run();
-  await expect(page.getByTestId("toast").filter({ hasText: "Refreshing from GitHub…" })).toBeVisible();
-  await expect(page.getByTestId("toast").filter({ hasText: "Could not refresh from GitHub: acme/app: rate limited" })).toBeVisible();
+  await expect(toast(page, "Refreshing from GitHub…")).toBeVisible();
+  await expect(toast(page, "Could not refresh from GitHub: acme/app: rate limited")).toBeVisible();
   await page.unroute("**/api/refresh");
   await run();
-  await expect(page.getByTestId("toast").filter({ hasText: "Refreshed from GitHub" })).toBeVisible();
+  await expect(toast(page, "Refreshed from GitHub")).toBeVisible();
 });
 
 test("a Capture closed while it was on its way still says that it failed, and the text is there on the next Capture", async ({ page }) => {
@@ -103,7 +103,7 @@ test("a Capture closed while it was on its way still says that it failed, and th
   await dialog.getByRole("button", { name: "Capture" }).click();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
-  await expect(page.getByTestId("toast").filter({ hasText: "Could not capture the idea in acme/agent-workflow: GitHub said no" })).toBeVisible();
+  await expect(toast(page, "Could not capture the idea in acme/agent-workflow: GitHub said no")).toBeVisible();
   await page.keyboard.press("c");
   await expect(dialog.getByPlaceholder("Title")).toHaveValue("Closed too early");
   await expect(dialog.getByTestId("capture-error")).toHaveCount(0); // no banner from the last time
@@ -124,7 +124,7 @@ test("a toggle that failed does not ride along with the next one", async ({ page
   });
   await boxes(page).first().click(); // agent-workflow off: fails
   await boxes(page).last().click(); // app off while the first is still on its way
-  await expect(page.getByTestId("toast").filter({ hasText: "Could not remove acme/agent-workflow from the Board: boom" })).toBeVisible();
+  await expect(toast(page, "Could not remove acme/agent-workflow from the Board: boom")).toBeVisible();
   await expect.poll(() => bodies.length).toBe(2);
   expect(bodies[0]).toEqual(["acme/app"]);
   expect(bodies[1]).toEqual(["acme/agent-workflow"]); // the server never saw the failed toggle's removal

@@ -1,4 +1,4 @@
-import { expect, test, WRITE, type Page } from "./fixtures.ts";
+import { expect, test, WRITE, type Page, toast } from "./fixtures.ts";
 
 // Feedback stability (#39, #40, #51). Uses Cards 170-177 (see src/core/fixtures.ts).
 const row = (page: Page, n: number) => page.locator(`[data-card="acme/app#${n}"]`);
@@ -146,7 +146,7 @@ test("#51: a click on Approve, Hold or Send back only picks; Send writes once", 
   await pr.locator("textarea").fill("needs a test");
   await expect(send).toBeEnabled();
   await send.click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Feedback given" })).toBeVisible();
+  await expect(toast(page, "Feedback given")).toBeVisible();
   expect(sent).toHaveLength(1);
   expect(sent[0]).toContain("send-back");
 });
@@ -166,6 +166,6 @@ test("#51: Accept all picks and Send writes, in Decided", async ({ page }) => {
   await page.waitForTimeout(300);
   expect(sent).toHaveLength(0);
   await send.click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Feedback given" })).toBeVisible();
+  await expect(toast(page, "Feedback given")).toBeVisible();
   expect(sent).toHaveLength(1);
 });

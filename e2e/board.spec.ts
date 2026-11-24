@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures.ts";
+import { expect, test, toast } from "./fixtures.ts";
 
 // Every test starts on boot-state demo data (e2e/fixtures.ts).
 
@@ -28,7 +28,7 @@ test("answer a decision request in place and Push", async ({ page }) => {
   await panel.locator("textarea").fill("with a note");
   await page.route("**/api/cards/acme/app/117/answer", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await panel.getByRole("button", { name: "Answer" }).click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Failed: boom" })).toBeVisible();
+  await expect(toast(page, "Failed: boom")).toBeVisible();
   await page.locator('[data-card="acme/app#105"]').click();
   await expect(panel).toContainText("How should conflicting edits be resolved?");
   await expect(panel.locator("textarea")).toHaveValue("");
@@ -36,7 +36,7 @@ test("answer a decision request in place and Push", async ({ page }) => {
   await expect(panel.getByRole("button", { name: "Answer" })).toBeDisabled();
   await panel.getByRole("button", { name: /B: field-level merge/ }).click();
   await panel.getByRole("button", { name: "Answer" }).click();
-  await expect(page.getByTestId("toast").filter({ hasText: "pushed to the coordinator" })).toBeVisible();
+  await expect(toast(page, "pushed to the coordinator")).toBeVisible();
   // the answered Card moves to Awaiting pickup and the next blocker opens
   await expect(page.getByTestId("detail")).not.toHaveAttribute("aria-label", "Card acme/app#105");
   await page.locator('[data-card="acme/app#105"]').click();
@@ -105,7 +105,7 @@ test("gallery by keyboard only: variants, viewport, pick, send", async ({ page }
   await expect(gallery).toBeFocused(); // its keys are the popup's: they need the focus in it
   await page.keyboard.press("ControlOrMeta+Enter");
   await expect(gallery).toBeHidden();
-  await expect(page.getByTestId("toast").filter({ hasText: "Feedback given" })).toBeVisible();
+  await expect(toast(page, "Feedback given")).toBeVisible();
   // the answered round moves to "earlier": the old palette request does not open a gallery there
   await page.locator('[data-card="acme/app#110"]').click();
   await page.keyboard.press("]");
@@ -188,7 +188,7 @@ test("react to a design round with the keyboard gallery", async ({ page }) => {
   await expect(gallery).toBeHidden();
   await panel.getByRole("button", { name: "Pick" }).nth(1).click();
   await panel.getByRole("button", { name: "Send reaction" }).click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Feedback given" })).toBeVisible();
+  await expect(toast(page, "Feedback given")).toBeVisible();
 });
 
 test("board shows the five Phases and capture lands in the Inbox", async ({ page }) => {

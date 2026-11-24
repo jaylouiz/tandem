@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, test, type Page, toast } from "./fixtures.ts";
 
 // Drag and drop (#49): the targets match the dragged set, and the Board scrolls while a drag is held at its edge.
 // Read-only on the fixture data: every drag here is cancelled with Esc, or released on a column that refuses it.
@@ -57,13 +57,13 @@ test("targets (#49): a Card that cannot move has no valid column, and the column
   // released on a refusing column: nothing moves and the notice gives the same reason the column showed
   await page.mouse.move((await centre(page.getByTestId("column-Backlog"))).x, 400, { steps: 4 });
   await page.mouse.up();
-  await expect(page.getByTestId("toast").filter({ hasText: "Not applicable: Build" })).toBeVisible();
+  await expect(toast(page, "Not applicable: Build")).toBeVisible();
   await expect(page.locator("[data-drop]")).toHaveCount(0);
   // a Build Card released over Build (where it already is) still gets the column's refusal
   await pickUp(page, 127);
   await page.mouse.move((await centre(page.getByTestId("column-Build"))).x, 400, { steps: 4 });
   await page.mouse.up();
-  await expect(page.getByTestId("toast").filter({ hasText: "Agents move Cards here: use Hand to agent" })).toBeVisible();
+  await expect(toast(page, "Agents move Cards here: use Hand to agent")).toBeVisible();
 });
 
 test("targets (#49): the set decides: a fog Card cannot go to Backlog, its own column is no target, a movable Card has one", async ({ page }) => {

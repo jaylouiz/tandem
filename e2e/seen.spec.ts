@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures.ts";
+import { expect, test, type Page, toast } from "./fixtures.ts";
 
 // Waiting on me and Seen (#30, #31, #32). Look Cards 160-165 belong to these tests;
 // 108 and 119 are the unseen demo Looks: opening them with a click, j or k marks them Seen.
@@ -7,7 +7,6 @@ const rowButton = (page: Page, n: number) => row(page, n).locator("xpath=..").ge
 const list = (page: Page) => page.getByTestId("waiting-list");
 const detail = (page: Page) => page.getByTestId("detail");
 const mod = process.platform === "darwin" ? "Meta" : "Control";
-const toast = (page: Page, text: string) => page.getByTestId("toast").filter({ hasText: text });
 /** Opens a Card through the palette: it opens the Card but does not mark a Look Seen. */
 const viaPalette = async (page: Page, text: string) => {
   await expect(page.getByTestId("waiting-list").locator(".qrow").first()).toBeVisible(); // the Board has loaded

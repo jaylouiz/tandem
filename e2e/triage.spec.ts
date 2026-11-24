@@ -1,4 +1,4 @@
-import { expect, test, WRITE } from "./fixtures.ts";
+import { expect, test, WRITE, toast } from "./fixtures.ts";
 
 // Triage: each test starts on boot-state demo data (e2e/fixtures.ts) and moves Cards 101, 102, 111, 21 or captured ideas.
 const card = (page: import("./fixtures.ts").Page, n: number) => page.locator(`[data-card="acme/app#${n}"]`);
@@ -37,7 +37,7 @@ test("bulk: x marks Cards and one key triages them all", async ({ page }) => {
   await page.getByTestId("column-Inbox").locator(".card", { hasText: "Bulk B" }).click({ modifiers: [process.platform === "darwin" ? "Meta" : "Control"] });
   await expect(page.getByTestId("markbar")).toContainText("2 selected");
   await page.keyboard.press("b");
-  await expect(page.getByTestId("toast").filter({ hasText: "2 of 2 updated" })).toBeVisible();
+  await expect(toast(page, "2 of 2 updated")).toBeVisible();
   for (const title of ["Bulk A", "Bulk B"]) {
     await expect(page.getByTestId("column-Backlog").locator(".card", { hasText: title })).toContainText("Next: build");
   }
@@ -49,7 +49,7 @@ test("a failed write rolls the Card back and says so", async ({ page }) => {
   await page.route("**/api/cards/**/labels", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await card(page, 102).click();
   await page.keyboard.press("d");
-  await expect(page.getByTestId("toast").filter({ hasText: "Failed: boom" })).toBeVisible();
+  await expect(toast(page, "Failed: boom")).toBeVisible();
   await expect(page.getByTestId("column-Inbox")).toContainText("Fog: rethink recurring tasks");
 });
 
@@ -59,7 +59,7 @@ test("a bulk set skips Cards the action does not fit and counts them", async ({ 
   await page.keyboard.press("x");
   await card(page, 106).click({ modifiers: [process.platform === "darwin" ? "Meta" : "Control"] });
   await page.keyboard.press("s");
-  await expect(page.getByTestId("toast").filter({ hasText: "1 of 2 updated, 1 skipped (Build)" })).toBeVisible();
+  await expect(toast(page, "1 of 2 updated, 1 skipped (Build)")).toBeVisible();
 });
 
 test("the palette lists triage actions with their keys, only with a target", async ({ page }) => {
@@ -119,7 +119,7 @@ test("fog Cards show the wayfinder command and are not handed to agents", async 
   await card(page, 116).click();
   await expect(page.getByTestId("fog-hint")).toContainText("/wayfinder 116");
   await page.keyboard.press("a");
-  await expect(page.getByTestId("toast").filter({ hasText: "Not applicable" })).toBeVisible();
+  await expect(toast(page, "Not applicable")).toBeVisible();
 });
 
 const handed = (page: import("./fixtures.ts").Page) => page.getByTestId("detail").getByTestId("handed");
@@ -132,11 +132,11 @@ test("Hand to agent: the Card shows it was handed over, offers no second Push, h
   await expect(handed(page)).toContainText(/Handed to the coordinator · build · \d\d:\d\d/);
   await expect(handed(page)).toContainText("Hold and release to hand again");
   await expect(handButton(page)).toHaveCount(0);
-  await expect(page.getByTestId("toast").filter({ hasText: "Handed to the coordinator" })).toBeVisible();
+  await expect(toast(page, "Handed to the coordinator")).toBeVisible();
   // the keyboard stays where the button was
   await expect(handed(page)).toBeFocused();
   await page.keyboard.press("a");
-  await expect(page.getByTestId("toast").filter({ hasText: "Not applicable: already handed" })).toBeVisible();
+  await expect(toast(page, "Not applicable: already handed")).toBeVisible();
   await page.keyboard.press("h");
   await expect(card(page, 130)).toContainText("On hold");
   await page.keyboard.press("h");
@@ -155,7 +155,7 @@ test("Hand to agent: a failed Push rolls back with the reason and stays retryabl
   await card(page, 131).click();
   await page.route("**/api/cards/**/start", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await handButton(page).click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Failed: boom" })).toBeVisible();
+  await expect(toast(page, "Failed: boom")).toBeVisible();
   await expect(handed(page)).toHaveCount(0);
   await expect(handButton(page)).toBeEnabled();
   await expect(handButton(page)).toBeFocused(); // the keyboard goes back to where it was
@@ -168,20 +168,20 @@ test("Hand to agent: without a Run to send to nothing is handed; Start coordinat
   await toBoard(page);
   await page.getByTestId("column-Backlog").locator(".card", { hasText: "Hand demo: no coordinator" }).click();
   await handButton(page).click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Not handed: no Orca Run found for agent-workflow" })).toBeVisible();
+  await expect(toast(page, "Not handed: no Orca Run found for agent-workflow")).toBeVisible();
   await expect(handed(page)).toHaveCount(0);
   await expect(handButton(page)).toBeEnabled();
-  const start = page.getByTestId("toast").filter({ hasText: "no Orca Run found" }).getByRole("button", { name: "Start coordinator" });
+  const start = toast(page, "no Orca Run found").getByRole("button", { name: "Start coordinator" });
   // no checkout known yet: the start fails, nothing is handed, the toast keeps the retry
   await start.click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Could not start coordinator for acme/agent-workflow: No local checkout known" })).toBeVisible();
+  await expect(toast(page, "Could not start coordinator for acme/agent-workflow: No local checkout known")).toBeVisible();
   await expect(handed(page)).toHaveCount(0);
   // the failure is a toast of its own (it stays, an alert is aria-hidden until the region has focus, so the retry is found by tag): the retry is on it
-  const retry = page.getByTestId("toast").filter({ hasText: "Could not start coordinator" }).locator("button", { hasText: "Start coordinator" });
+  const retry = toast(page, "Could not start coordinator").locator("button", { hasText: "Start coordinator" });
   await expect(retry).toBeVisible();
   await page.request.put("/api/repos/path", { data: { repo: "acme/agent-workflow", path: "/tmp/agent-workflow" }, headers: WRITE });
   await retry.click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Coordinator starting for acme/agent-workflow" })).toBeVisible();
+  await expect(toast(page, "Coordinator starting for acme/agent-workflow")).toBeVisible();
   await expect(handed(page)).toContainText("Handed to the coordinator · build");
 });
 
@@ -312,14 +312,14 @@ test("Move to Backlog with a picked Next step, then Undo", async ({ page }) => {
   await card(page, 154).click({ modifiers: [ctrl] });
   await bar(page).getByRole("combobox", { name: "Next step for moved Cards" }).selectOption("build");
   await bar(page).getByRole("button", { name: /Move to Backlog/ }).click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Moved 2 Cards to Backlog (Build)" })).toBeVisible();
+  await expect(toast(page, "Moved 2 Cards to Backlog (Build)")).toBeVisible();
   for (const n of [153, 154]) {
     await expect(backlog(page).locator(`[data-card="acme/app#${n}"]`)).toContainText("Next: build");
     await expect(inbox(page).locator(`[data-card="acme/app#${n}"]`)).toHaveCount(0);
   }
   await expect(bar(page)).toBeHidden();
-  await page.getByTestId("toast").filter({ hasText: "Moved 2 Cards" }).getByRole("button", { name: "Undo" }).click();
-  await expect(page.getByTestId("toast").filter({ hasText: "Move undone" })).toBeVisible();
+  await toast(page, "Moved 2 Cards").getByRole("button", { name: "Undo" }).click();
+  await expect(toast(page, "Move undone")).toBeVisible();
   for (const n of [153, 154]) {
     await expect(inbox(page).locator(`[data-card="acme/app#${n}"]`)).toHaveCount(1);
     await expect(card(page, n)).not.toContainText("Next:");
@@ -344,7 +344,7 @@ test("drag a selected Card: the whole selection moves to Backlog, a refusing col
   await expect(page.getByTestId("drag-ghost")).toContainText("Move demo");
   await expect(page.getByTestId("drop-note")).toHaveText("Agents move Cards here: use Hand to agent");
   await page.mouse.up();
-  await expect(page.getByTestId("toast").filter({ hasText: "Agents move Cards here" })).toBeVisible();
+  await expect(toast(page, "Agents move Cards here")).toBeVisible();
   await expect(inbox(page).locator('[data-card="acme/app#155"]')).toHaveCount(1);
   await expect(bar(page)).toContainText("2 selected"); // a refused drop keeps the selection
   const from2 = await card(page, 155).boundingBox();
@@ -353,9 +353,9 @@ test("drag a selected Card: the whole selection moves to Backlog, a refusing col
   await page.mouse.move(to!.x + 40, to!.y + 80, { steps: 6 });
   await expect(page.getByTestId("drop-note")).toHaveText("Move 2 Cards here");
   await page.mouse.up();
-  await expect(page.getByTestId("toast").filter({ hasText: "Moved 2 Cards to Backlog (Specify)" })).toBeVisible();
+  await expect(toast(page, "Moved 2 Cards to Backlog (Specify)")).toBeVisible();
   for (const n of [155, 156]) await expect(backlog(page).locator(`[data-card="acme/app#${n}"]`)).toContainText("Next: specify");
-  await page.getByTestId("toast").filter({ hasText: "Moved 2 Cards" }).getByRole("button", { name: "Undo" }).click();
+  await toast(page, "Moved 2 Cards").getByRole("button", { name: "Undo" }).click();
   await expect(inbox(page).locator('[data-card="acme/app#156"]')).toHaveCount(1);
 });
 
@@ -378,7 +378,7 @@ test("a failed move rolls the Card back and says why", async ({ page }) => {
   await page.route("**/api/cards/**/labels", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await card(page, 150).click();
   await page.keyboard.press("m");
-  await expect(page.getByTestId("toast").filter({ hasText: "Nothing moved, 1 failed: boom" })).toBeVisible();
+  await expect(toast(page, "Nothing moved, 1 failed: boom")).toBeVisible();
   await expect(inbox(page).locator('[data-card="acme/app#150"]')).toHaveCount(1);
 });
 
