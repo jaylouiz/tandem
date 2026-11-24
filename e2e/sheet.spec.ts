@@ -269,3 +269,16 @@ test("the digits belong to the ask panel; on a Card without one they do nothing 
   await expect(page.locator(".toast")).toHaveCount(0);
   await expect(page.locator('.card[data-card="acme/app#103"] .chip', { hasText: /^P2$/ })).toBeVisible(); // still read from the label, on the Board
 });
+
+test("J9: a variant of an older design round keeps its screenshots side by side and its summary readable in the 400px pane", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto("/board/acme/app/104");
+  const variant = detail(page).getByTestId("panel-design-round").locator(".variant").first();
+  const thumbs = variant.locator(".thumb");
+  await expect(thumbs).toHaveCount(2);
+  const [a, b] = [(await thumbs.nth(0).boundingBox())!, (await thumbs.nth(1).boundingBox())!];
+  expect(Math.round(a.y)).toBe(Math.round(b.y)); // desktop and mobile in one row
+  expect(a.height).toBeLessThan(140);
+  const sum = variant.locator(".variant-sum");
+  expect(await sum.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true); // wraps instead of cutting off on one line
+});
