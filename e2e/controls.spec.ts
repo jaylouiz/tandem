@@ -143,7 +143,8 @@ test("Waiting on me group heads stick while the rows scroll", async ({ page }) =
   await page.goto("/");
   const list = page.locator(".split-list");
   await expect(list).toBeVisible();
-  await list.evaluate((el) => (el.scrollTop = 200));
+  // the blockers have no head (the top bar says Waiting on me): scroll into the To look at group
+  await list.evaluate((el) => (el.scrollTop += el.querySelector(".group-head")!.getBoundingClientRect().top - el.getBoundingClientRect().top + 200));
   const top = await list.evaluate((el) => el.getBoundingClientRect().top);
   expect(await page.locator(".split-list .group-head").first().evaluate((el) => Math.round(el.getBoundingClientRect().top))).toBe(Math.round(top));
 });

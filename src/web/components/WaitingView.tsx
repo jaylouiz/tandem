@@ -115,11 +115,13 @@ function Start({ waiting, look }: { waiting: Card[]; look: Card[] }) {
   const kinds = KIND_ORDER.map((k) => [k, waiting.filter((c) => kindOf(c) === k).length] as const).filter(([, n]) => n > 0);
   const unseen = look.filter((c) => !c.seenAt).length;
   const total = waiting.length + unseen;
+  // the headline counts everything Focus goes through; the kinds under it are the blockers (the Looks are in the headline)
+  const headline = [waiting.length ? `${waiting.length} ${waiting.length === 1 ? "Card waits" : "Cards wait"} on you` : "", unseen ? `${unseen} to look at` : ""].filter(Boolean).join(" · ");
   return (
     <div className="empty pane-empty start" data-testid="waiting-start">
       {total > 0 ? (
         <>
-          <h2 className="start-title">{waiting.length ? `${waiting.length} ${waiting.length === 1 ? "Card waits" : "Cards wait"} on you` : `${unseen} to look at`}</h2>
+          <h2 className="start-title">{headline}</h2>
           <ul className="start-kinds">
             {kinds.map(([k, n]) => (
               <li key={k} data-kind={k}>
@@ -127,12 +129,6 @@ function Start({ waiting, look }: { waiting: Card[]; look: Card[] }) {
                 <b>{n}</b> {n === 1 ? KIND_LABEL[k] : KIND_MANY[k]}
               </li>
             ))}
-            {unseen > 0 && (
-              <li data-kind="look">
-                <KindGlyph kind="look" box />
-                <b>{unseen}</b> to look at
-              </li>
-            )}
           </ul>
           <button className="btn primary big" data-testid="focus-start" onClick={() => setFocus(true)}>
             Go through them one by one <kbd>{keyOf("focus")}</kbd>
@@ -174,7 +170,7 @@ function WaitingList({ cards }: { cards: Card[] }) {
     <div className="split" data-testid="waiting">
       <div className="split-list" ref={list} tabIndex={-1} data-testid="waiting-list" aria-label="Waiting on me">
         {!order.length && <Nothing />}
-        {waiting.length > 0 && <GroupHead label="Waiting on me" count={waiting.length} />}
+        {/* no "Waiting on me" head over the blockers: the top bar and the sidebar say it */}
         {waiting.map((c) => (
           <Row key={c.key} card={c} group={waiting} kind={kindOf(c)!} stop={c.key === stop} />
         ))}
