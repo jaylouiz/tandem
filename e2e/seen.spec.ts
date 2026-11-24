@@ -157,3 +157,16 @@ test("the key l marks the marked Cards Seen; one failure rolls back with one mes
   await expect(toast(page, "1 of 2 marked Seen. Failed: boom")).toBeVisible();
   await expect(page.getByTestId("markbar")).toBeHidden();
 });
+
+test("a Waiting on me row is 52px and carries its kind for assistive tech only (#9)", async ({ page }) => {
+  await page.goto("/");
+  const first = list(page).locator(".qrow").first();
+  await expect(first).toBeVisible();
+  const boxes = await list(page).locator(".qrow").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+  expect(boxes.length).toBeGreaterThan(5);
+  for (const h of boxes) expect(h).toBe(52);
+  const chip = first.locator(".kind-chip");
+  await expect(chip).not.toHaveText(""); // still in the row, for the screen reader
+  const { width, height } = (await chip.boundingBox())!;
+  expect(Math.max(width, height)).toBeLessThanOrEqual(1);
+});
