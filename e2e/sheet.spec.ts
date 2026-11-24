@@ -139,7 +139,7 @@ test("Activity: the state said once in its summary; the coordination log on dema
   await head(page, "activity").click();
   await expect(fold(page, "activity").getByTestId("coordination-log").locator(".timeline li").first()).toBeVisible();
   await open(page, 105, "board");
-  await expect(fold(page, "activity").locator(".fold-sum")).toHaveText(/^Parked · .+ · \d+[mhd] ago$/);
+  await expect(fold(page, "activity").locator(".fold-sum")).toHaveText(/^Parked · \d+[mhd] ago$/); // the ask says what it waits on
   await head(page, "activity").click();
   await expect(fold(page, "activity").getByTestId("coordination-log")).toHaveText("No coordination log for this issue.");
   // a Backlog Card has no agent activity: when it last moved
@@ -161,6 +161,18 @@ test("the log is loading until it arrives", async ({ page }) => {
   await expect(fold(page, "activity").locator(".timeline li").first()).toBeVisible();
 });
 
+test("J7: while an ask is on screen the Activity summary is state and age; a PR approval's number is the head chip only", async ({ page }) => {
+  await page.goto("/board/acme/app/117");
+  await expect(detail(page).getByTestId("panel-decision")).toBeVisible();
+  await expect(fold(page, "activity").locator(".fold-sum")).toHaveText(/^Parked · \S+( ago)?$/);
+  await page.goto("/board/acme/app/106");
+  await expect(detail(page).getByTestId("panel-pr-approval")).toBeVisible();
+  await expect(detail(page).locator(".sheet-tags")).toContainText("PR #210");
+  await expect(detail(page).getByTestId("panel-pr-approval").locator(".did")).toHaveCount(0);
+  await page.goto("/board/acme/app/107"); // nothing waits: the summary says what the agent last reported
+  await expect(fold(page, "activity").locator(".fold-sum")).toHaveText(/^\w+ · .+ · .+$/);
+});
+
 test("#20: right after an answer the Card says 'just now', never 'now ago'; Feedback given is one line with what was answered", async ({ page }) => {
   await page.goto("/board/acme/app/105");
   await expect(detail(page).getByTestId("panel-decision")).toBeVisible();
@@ -168,7 +180,7 @@ test("#20: right after an answer the Card says 'just now', never 'now ago'; Feed
   const line = detail(page).getByTestId("awaiting-pickup");
   await expect(line).toHaveText("Feedback given, awaiting pickup. You answered “Decision D1: B”, the run has not resumed.");
   await expect(detail(page).getByTestId("panel-decision")).toHaveCount(0);
-  await expect(fold(page, "activity").locator(".fold-sum")).toHaveText(/^Queued · .+ · just now$/);
+  await expect(fold(page, "activity").locator(".fold-sum")).toHaveText("Queued · just now"); // the line above says what it waits on: state and age only (J7)
   await expect(detail(page)).not.toContainText("now ago");
   // the answer is in Decided, quoted as written
   await head(page, "decided").click();
