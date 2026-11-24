@@ -490,6 +490,54 @@ describe("launch", () => {
       }
     });
 
+    it("a full fetch keeps a Done Card whose Look waits when it is older than the closed window; one inside the window that vanished is dropped", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, s } = await board();
+        const looks = () => b.view().cards.some((c) => c.number === 108 && c.needsLook);
+        expect(looks()).toBe(true);
+        s.gone.add(108);
+        b.rawIssue(REPO, 108)!.closedAt = new Date(Date.now() - 90 * 24 * HOUR).toISOString(); // GitHub still has it, the window does not reach it
+        vi.advanceTimersByTime(6 * HOUR);
+        await b.refreshAll(false);
+        expect(looks()).toBe(true);
+        b.rawIssue(REPO, 108)!.closedAt = new Date(Date.now() - 2 * 24 * HOUR).toISOString(); // inside the window and not fetched: it is gone
+        vi.advanceTimersByTime(6 * HOUR);
+        await b.refreshAll(false);
+        expect(b.rawIssue(REPO, 108)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("passes of one repo never overlap: a tick during a slow full fetch waits for it, a forced one runs after it", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, src } = await board();
+        vi.advanceTimersByTime(6 * HOUR);
+        const orig = src.fetchIssues;
+        let release!: () => void;
+        const gate = new Promise<void>((r) => (release = r));
+        let first = true;
+        const started: (string | null)[] = [];
+        src.fetchIssues = async (...a) => {
+          started.push(a[1]);
+          if (first) ((first = false), await gate);
+          return orig(...a);
+        };
+        const p1 = b.refresh(REPO, false);
+        const p2 = b.refresh(REPO, false); // the next tick: joins the running pass
+        const p3 = b.refresh(REPO, true); // a forced one: after it
+        await new Promise((r) => setTimeout(r, 0));
+        expect(started).toHaveLength(1);
+        release();
+        await Promise.all([p1, p2, p3]);
+        expect(started).toEqual([null, null]); // the due full fetch once, the forced one once
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("a cache written before full fetches were stamped gets one right away", async () => {
       process.env.TANDEM_HOME = mkdtempSync(join(tmpdir(), "tandem-nofull-"));
       const st = new Store({ repos: [REPO] });

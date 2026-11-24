@@ -20,6 +20,7 @@ export class Board {
   /** repo -> the last pass that reached GitHub (a poll that found nothing new counts) */
   private okAt: Record<string, string> = {};
   private syncing = new Set<string>();
+  private passes = new Map<string, Promise<void>>();
   private listeners = new Set<Listener>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private activity: Record<string, ActivityEntry> = {};
@@ -81,7 +82,21 @@ export class Board {
    * - after a failure: the ETag is not trusted (GitHub's answer may have been stored for a change whose fetch then failed),
    *   so the next poll fetches what changed since the last good sync, and its success clears the error (#2).
    */
-  async refresh(repo: string, force = false) {
+  async refresh(repo: string, force = false): Promise<void> {
+    // one pass per repo at a time: a tick that finds one running joins it, a forced refresh runs after it, so an older read never
+    // writes back over a newer one (a slow full fetch outlasts the 15 s tick)
+    const running = this.passes.get(repo);
+    if (running && !force) return running;
+    const pass = (running ? running.catch(() => {}) : Promise.resolve()).then(() => this.pass(repo, force));
+    this.passes.set(repo, pass);
+    try {
+      await pass;
+    } finally {
+      if (this.passes.get(repo) === pass) this.passes.delete(repo);
+    }
+  }
+
+  private async pass(repo: string, force: boolean) {
     const cached = this.cache[repo];
     // a cache from before the current sync fields lacks them: one full fetch fills them in, and until it does the cache is not current
     const oldShape = !!cached && cached.v !== CACHE_VERSION;
@@ -110,6 +125,16 @@ export class Board {
       const fresh = await this.source.fetchIssues(repo, since, this.workflow.closedLookbackDays);
       const merged = new Map((since ? (cached?.issues ?? []) : []).map((i) => [i.number, i]));
       for (const i of fresh) merged.set(i.number, i);
+      // a full fetch lists open issues and those closed within the window: a Done Card older than that whose Look still waits is not
+      // vanished, the window just does not reach it, so it stays until it is Seen (an absent one inside the window is gone)
+      if (!since) {
+        const cutoff = Date.now() - this.workflow.closedLookbackDays * 86_400_000;
+        for (const i of cached?.issues ?? []) {
+          if (merged.has(i.number) || i.state !== "closed" || !i.closedAt || Date.parse(i.closedAt) >= cutoff) continue;
+          const card = buildCard(i, this.workflow, this.store.seenAt(repo, i.number, i.closedAt));
+          if (card.needsLook && !card.seenAt) merged.set(i.number, i);
+        }
+      }
       // only a full fetch makes an old-shaped cache current, and only it counts as a reconcile; merged onto the cache, vanished issues stay
       this.cache[repo] = { v: since ? cached!.v : CACHE_VERSION, fullAt: since ? cached!.fullAt : started, syncedAt: started, issues: [...merged.values()] };
       if (!since) this.fullBackoff.delete(repo);
