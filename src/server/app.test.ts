@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { decisionFeedback, feedbackComment, prFeedback, roundFeedback, type Feedback } from "../core/answer.ts";
 import { parseMarker } from "../core/contract.ts";
-import { NO_COORDINATOR } from "../core/types.ts";
+import { NO_RUN } from "../core/types.ts";
 import { createApp } from "./app.ts";
 import { Board, type BoardView } from "./board.ts";
 import { FixtureSource, fixtureReset } from "./fixture.ts";
@@ -80,19 +80,18 @@ describe("feedback", () => {
     expect(pusher.sent).toEqual([]);
   });
 
-  it("reports no coordinator instead of failing", async () => {
+  it("reports that no Run was found instead of failing", async () => {
     const res = await post("/api/cards/acme/agent-workflow/21/start", {});
-    expect((await res.json()).push).toMatchObject({ delivered: false, reason: "no coordinator running" });
+    expect((await res.json()).push).toMatchObject({ delivered: false, reason: NO_RUN });
   });
 
-  it("a Push that disagrees with the Board's coordinators brings the Board in line (the Card pane says what the footer says)", async () => {
-    expect((await view()).coordinators).toEqual({}); // the Board has not looked yet
+  it("the Board carries no coordinator state, whatever a Push finds (#14)", async () => {
+    expect("coordinators" in (await view())).toBe(false);
     await post("/api/cards/acme/app/105/answer", { requestId: "D1", answer: "B" });
-    expect(Object.keys((await view()).coordinators)).toEqual(["acme/app"]);
-    pusher.live.clear(); // the coordinator went away since the Board looked
+    pusher.live.clear();
     const res = await post("/api/cards/acme/app/106/start", {});
-    expect((await res.json()).push).toMatchObject({ delivered: false, reason: NO_COORDINATOR });
-    expect((await view()).coordinators).toEqual({});
+    expect((await res.json()).push).toMatchObject({ delivered: false, reason: NO_RUN });
+    expect("coordinators" in (await view())).toBe(false);
   });
 
   it("accepts agent decisions by removing the label", async () => {
@@ -198,7 +197,7 @@ describe("launch", () => {
     const src = new FixtureSource();
     const orig = src.fetchIssues.bind(src);
     src.fetchIssues = async (repo, since, lookback) => (fetched.push(since), orig(repo, since, lookback));
-    st.saveCache({ "acme/app": { v: CACHE_VERSION, syncedAt: new Date().toISOString(), issues: await orig("acme/app", null) } });
+    st.saveCache({ "acme/app": { v: CACHE_VERSION, fullAt: new Date().toISOString(), syncedAt: new Date().toISOString(), issues: await orig("acme/app", null) } });
     const b = new Board(src, st, new FakePusher(new Set()), { pollMs: 60_000, persist: true });
     expect(b.view().cards.length).toBeGreaterThan(0); // cached Cards before any sync
     await b.start();
@@ -210,7 +209,7 @@ describe("launch", () => {
     expect(fetched).toEqual([null]); // an empty cache pays the full fetch once
   });
 
-  it("re-fetches in full once when the cache predates the wayfinder fields, so cached tickets get their parent", async () => {
+  it("re-fetches in full once when the cache was written by an older build (no version)", async () => {
     const home = mkdtempSync(join(tmpdir(), "tandem-old-cache-"));
     process.env.TANDEM_HOME = home;
     const st = new Store({ repos: ["acme/app"] });
@@ -218,14 +217,14 @@ describe("launch", () => {
     const src = new FixtureSource();
     const orig = src.fetchIssues.bind(src);
     src.fetchIssues = async (repo, since, lookback) => (fetched.push(since), orig(repo, since, lookback));
-    const old = (await orig("acme/app", null)).map(({ parent: _p, assignees: _a, blockedBy: _b, ...rest }) => rest);
-    st.saveCache({ "acme/app": { syncedAt: new Date().toISOString(), issues: old as never } }); // no `v`: an older build wrote it
+    // an older build also wrote fields that no longer exist (parent, assignees, blockedBy): they are read without error
+    const old = (await orig("acme/app", null)).map((i) => ({ ...i, parent: null, assignees: [], blockedBy: [] }));
+    st.saveCache({ "acme/app": { syncedAt: new Date().toISOString(), issues: old as never } }); // no `v`
     const b = new Board(src, st, new FakePusher(new Set()), { pollMs: 60_000, persist: true });
-    expect(b.view().maps[0]!.tickets).toEqual([]); // the stale copy joins no map...
+    expect(b.view().cards.length).toBeGreaterThan(0);
     await b.start();
     b.stop();
-    expect(fetched).toEqual([null]); // ...so the first sync is a full one
-    expect(b.view().maps.find((m) => m.number === 109)!.tickets).toHaveLength(7);
+    expect(fetched).toEqual([null]); // the first sync is a full one
     expect(st.loadCache()["acme/app"]!.v).toBe(CACHE_VERSION); // and the next start is incremental again
   });
 
@@ -315,6 +314,249 @@ describe("launch", () => {
     });
   });
 
+  describe("a failed poll (#2)", () => {
+    const REPO = "acme/app";
+    /** A Board with a current cache whose source can be made to fail: `changed()` (the ETag check) or `fetchIssues`. */
+    async function board() {
+      const st = new Store({ repos: [REPO] }, { memory: true });
+      const src = new FixtureSource();
+      const orig = src.fetchIssues.bind(src);
+      const calls: (string | null)[] = [];
+      const s = { failChanged: false, failFetch: false, changed: false };
+      src.changed = async () => {
+        if (s.failChanged) throw new Error("GitHub could not be reached: fetch failed (ENOTFOUND)");
+        return s.changed;
+      };
+      src.fetchIssues = async (repo, since, lookback) => {
+        calls.push(since);
+        if (s.failFetch) throw new Error("GitHub POST /graphql: 502 Bad Gateway");
+        return orig(repo, since, lookback);
+      };
+      const b = new Board(src, st, new FakePusher(new Set()), { pollMs: 15_000, persist: false });
+      await b.refreshAll(false); // no cache: the first full fetch
+      calls.length = 0;
+      return { b, src, s, calls, sync: () => b.view().sync[REPO]! };
+    }
+
+    it("a single failed poll shows no error; the next poll that works clears the streak, also when nothing changed", async () => {
+      const { b, s, calls, sync } = await board();
+      s.failChanged = true;
+      await b.refreshAll(false);
+      expect(sync()).toMatchObject({ error: null, errorAt: null }); // one blip: not shown
+      s.failChanged = false;
+      await b.refreshAll(false);
+      expect(sync()).toMatchObject({ error: null, errorAt: null });
+      expect(calls).toHaveLength(1); // after a failure the ETag is not trusted: one incremental fetch
+      expect(calls[0]).not.toBeNull();
+      await b.refreshAll(false);
+      expect(calls).toHaveLength(1); // healthy again: back to the quiet ETag poll
+    });
+
+    it("reports from the second failed poll in a row, with the time of the first, and recovers by itself on a quiet repo", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T11:05:00Z") });
+      try {
+        const { b, s, sync } = await board();
+        const okAt = sync().okAt;
+        s.failChanged = s.failFetch = true; // the network is down: the ETag check fails, and so does the fetch the next poll goes for
+        await b.refreshAll(false);
+        vi.advanceTimersByTime(15_000);
+        await b.refreshAll(false);
+        expect(sync()).toMatchObject({ error: "GitHub POST /graphql: 502 Bad Gateway", errorAt: "2026-11-24T11:05:00.000Z", okAt });
+        expect(b.view().cards.length).toBeGreaterThan(0); // the last synced Cards stay
+        // the network is back and nothing changed in the repo meanwhile: the error must not stick (it did until the repo's next change)
+        s.failChanged = s.failFetch = false;
+        vi.advanceTimersByTime(15_000);
+        const seen: BoardView[] = [];
+        b.subscribe((v) => seen.push(v));
+        await b.refreshAll(false);
+        await new Promise((r) => setTimeout(r, 0));
+        expect(sync()).toMatchObject({ error: null, errorAt: null, okAt: "2026-11-24T11:05:30.000Z" });
+        expect(seen.at(-1)?.sync[REPO]!.error).toBeNull(); // and the page is told
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a change whose fetch failed is not skipped: the next poll fetches although GitHub now answers 'not changed'", async () => {
+      const { b, src, s, calls, sync } = await board();
+      s.changed = true; // GitHub: something changed (the new ETag is stored by this answer)...
+      s.failFetch = true; // ...but fetching it fails
+      await b.refreshAll(false);
+      expect(calls).toHaveLength(1);
+      s.changed = false; // the next "changed?" compares against the stored ETag: not changed
+      s.failFetch = false;
+      await src.comment(REPO, 105, "D1: B"); // the change that was never fetched
+      await b.refreshAll(false);
+      expect(calls).toHaveLength(2);
+      expect(b.rawIssue(REPO, 105)!.comments.at(-1)!.body).toBe("D1: B");
+      expect(sync().error).toBeNull();
+    });
+
+    it("a refresh the developer asked for reports its failure at once", async () => {
+      const { b, s, sync } = await board();
+      s.failFetch = true;
+      await b.refresh(REPO, true);
+      expect(sync().error).toBe("GitHub POST /graphql: 502 Bad Gateway");
+      expect(sync().syncing).toBe(false);
+    });
+  });
+
+  describe("a scheduled full fetch (#16: an issue GitHub no longer has leaves the Board)", () => {
+    const REPO = "acme/app";
+    const HOUR = 3_600_000;
+    async function board() {
+      const st = new Store({ repos: [REPO] }, { memory: true });
+      const src = new FixtureSource();
+      const orig = src.fetchIssues.bind(src);
+      const calls: (string | null)[] = [];
+      const s = { gone: new Set<number>(), fail: false };
+      src.changed = async () => false;
+      src.fetchIssues = async (repo, since, lookback) => {
+        calls.push(since);
+        if (s.fail) throw new Error("GitHub POST /graphql: 502 Bad Gateway");
+        return (await orig(repo, since, lookback)).filter((i) => !s.gone.has(i.number));
+      };
+      const b = new Board(src, st, new FakePusher(new Set()), { pollMs: 15_000, persist: false });
+      await b.refreshAll(false);
+      calls.length = 0;
+      const waits = () => b.view().cards.some((c) => c.number === 105 && !!c.waiting);
+      return { b, s, calls, waits, src };
+    }
+
+    it("an incremental sync keeps a vanished issue; the full fetch after fullSyncHours drops it, quietly", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, s, calls, waits, src } = await board();
+        expect(waits()).toBe(true); // #105 waits on a decision
+        s.gone.add(105); // deleted, transferred, or the repo was recreated
+        src.changed = async () => true;
+        vi.advanceTimersByTime(HOUR);
+        await b.refreshAll(false);
+        expect(calls.at(-1)).not.toBeNull(); // incremental
+        expect(waits()).toBe(true); // nothing tells an incremental sync that it is gone
+        src.changed = async () => false;
+        vi.advanceTimersByTime(5 * HOUR);
+        const snaps: BoardView[] = [];
+        b.subscribe((v) => snaps.push(v));
+        await b.refreshAll(false); // 6 h after the last full fetch
+        await new Promise((r) => setTimeout(r, 0));
+        expect(calls.at(-1)).toBeNull(); // a full fetch, although "changed?" said no
+        expect(waits()).toBe(false);
+        expect(b.rawIssue(REPO, 105)).toBeNull();
+        expect(snaps.every((v) => !v.sync[REPO]!.syncing)).toBe(true); // quiet: never "Syncing"
+        const n = calls.length;
+        await b.refreshAll(false);
+        expect(calls).toHaveLength(n); // done for the next 6 h
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("an incremental fetch in between does not push the full fetch out", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, calls, src } = await board();
+        src.changed = async () => true;
+        for (let h = 1; h <= 5; h++) (vi.advanceTimersByTime(HOUR), await b.refreshAll(false));
+        expect(calls.every((c) => c !== null)).toBe(true);
+        vi.advanceTimersByTime(HOUR);
+        await b.refreshAll(false);
+        expect(calls.at(-1)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a failing full fetch keeps the Cards, backs off, and the Board stays in sync incrementally meanwhile", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, s, calls, waits } = await board();
+        vi.advanceTimersByTime(6 * HOUR);
+        s.fail = true;
+        await b.refreshAll(false);
+        expect(calls).toEqual([null]);
+        expect(waits()).toBe(true); // the Cards stay as they were
+        s.fail = false;
+        vi.advanceTimersByTime(15_000);
+        await b.refreshAll(false); // inside the back-off: after a failure, an incremental fetch instead of the ETag
+        expect(calls).toHaveLength(2);
+        expect(calls[1]).not.toBeNull();
+        expect(b.view().sync[REPO]!.error).toBeNull();
+        vi.advanceTimersByTime(60_000);
+        await b.refreshAll(false);
+        expect(calls.at(-1)).toBeNull(); // the full fetch is tried again after the back-off
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a full fetch keeps a Done Card whose Look waits when it is older than the closed window; one inside the window that vanished is dropped", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, s } = await board();
+        const looks = () => b.view().cards.some((c) => c.number === 108 && c.needsLook);
+        expect(looks()).toBe(true);
+        s.gone.add(108);
+        b.rawIssue(REPO, 108)!.closedAt = new Date(Date.now() - 90 * 24 * HOUR).toISOString(); // GitHub still has it, the window does not reach it
+        vi.advanceTimersByTime(6 * HOUR);
+        await b.refreshAll(false);
+        expect(looks()).toBe(true);
+        b.rawIssue(REPO, 108)!.closedAt = new Date(Date.now() - 2 * 24 * HOUR).toISOString(); // inside the window and not fetched: it is gone
+        vi.advanceTimersByTime(6 * HOUR);
+        await b.refreshAll(false);
+        expect(b.rawIssue(REPO, 108)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("passes of one repo never overlap: a tick during a slow full fetch waits for it, a forced one runs after it", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-24T08:00:00Z") });
+      try {
+        const { b, src } = await board();
+        vi.advanceTimersByTime(6 * HOUR);
+        const orig = src.fetchIssues;
+        let release!: () => void;
+        const gate = new Promise<void>((r) => (release = r));
+        let first = true;
+        const started: (string | null)[] = [];
+        src.fetchIssues = async (...a) => {
+          started.push(a[1]);
+          if (first) ((first = false), await gate);
+          return orig(...a);
+        };
+        const p1 = b.refresh(REPO, false);
+        const p2 = b.refresh(REPO, false); // the next tick: joins the running pass
+        const p3 = b.refresh(REPO, true); // a forced one: after it
+        await new Promise((r) => setTimeout(r, 0));
+        expect(started).toHaveLength(1);
+        release();
+        await Promise.all([p1, p2, p3]);
+        expect(started).toEqual([null, null]); // the due full fetch once, the forced one once
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a cache written before full fetches were stamped gets one right away", async () => {
+      process.env.TANDEM_HOME = mkdtempSync(join(tmpdir(), "tandem-nofull-"));
+      const st = new Store({ repos: [REPO] });
+      const src = new FixtureSource();
+      const orig = src.fetchIssues.bind(src);
+      const calls: (string | null)[] = [];
+      src.fetchIssues = async (repo, since, lookback) => (calls.push(since), orig(repo, since, lookback));
+      const ghost = { ...(await orig(REPO, null)).find((i) => i.number === 105)!, number: 423, title: "Visual UI Re-Design" }; // only the cache still has it
+      st.saveCache({ [REPO]: { v: CACHE_VERSION, syncedAt: new Date().toISOString(), issues: [...(await orig(REPO, null)), ghost] } }); // no `fullAt`
+      const b = new Board(src, st, new FakePusher(new Set()), { pollMs: 60_000, persist: true });
+      expect(b.view().cards.some((c) => c.number === 423 && !!c.waiting)).toBe(true);
+      await b.start();
+      b.stop();
+      expect(calls).toEqual([null]);
+      expect(b.view().cards.some((c) => c.number === 423)).toBe(false);
+      expect(st.loadCache()[REPO]!.fullAt).toBeTruthy();
+    });
+  });
+
   it("a quiet poll of cached repos never shows Syncing, so a write's snapshot cannot leave it stuck", async () => {
     const repos = await source.listRepos();
     const st = new Store({ repos });
@@ -387,42 +629,11 @@ describe("signed screenshot images", () => {
   });
 });
 
-describe("wayfinder maps", () => {
-  it("keeps the map and its tickets off the Board and serves them under maps", async () => {
+describe("wayfinder issues (#15: the maps view is gone, they stay off the Board)", () => {
+  it("an issue labelled wayfinder:map or wayfinder:<kind> is never a Card", async () => {
     const v = await view();
-    expect(v.cards.filter((c) => c.number === 109 || (c.number >= 120 && c.number <= 126) && c.repo === "acme/app")).toEqual([]);
-    const m = v.maps.find((x) => x.number === 109)!;
-    expect(m.tickets.filter((t) => t.status === "frontier").map((t) => t.number)).toEqual([121]);
-    expect(m.tickets).toHaveLength(7);
-  });
-});
-
-describe("wayfinder maps from the whole cache", () => {
-  const A = "acme/app";
-  const fresh = async () => {
-    const st = new Store({ repos: [A] });
-    const b = new Board(source, st, pusher, { pollMs: 60_000, persist: false });
-    await b.refreshAll(true);
-    return b;
-  };
-  const extra = (b: Board, number: number, p: object) => b.addIssue({ ...b.rawIssue(A, 105)!, number, labels: [], comments: [], pullRequests: [], parent: undefined, ...p } as never);
-
-  it("a sub-issue without a wayfinder label shows under its map and leaves the Board", async () => {
-    const b = await fresh();
-    extra(b, 300, { title: "Plain sub-issue", parent: 109 });
-    const v = b.view();
-    expect(v.maps.find((m) => m.number === 109)!.tickets.find((t) => t.number === 300)).toMatchObject({ kind: null, status: "frontier" });
-    expect(v.cards.find((c) => c.repo === A && c.number === 300)).toBeUndefined();
-  });
-
-  it("a regular issue as blocker: its title shows, and closing it unblocks the ticket", async () => {
-    const b = await fresh();
-    extra(b, 301, { title: "Plain blocker" });
-    b.patch(A, 123, (i) => (i.blockedBy = [{ number: 301, state: "open" }]));
-    const t = () => b.view().maps.find((m) => m.number === 109)!.tickets.find((x) => x.number === 123)!;
-    expect(t()).toMatchObject({ status: "blocked", blockedBy: [{ number: 301, title: "Plain blocker" }] });
-    b.patch(A, 301, (i) => ((i.state = "closed"), (i.stateReason = "completed")));
-    expect(t()).toMatchObject({ status: "frontier", blockedBy: [] });
+    expect(v.cards.filter((c) => c.repo === "acme/app" && (c.number === 109 || c.number === 121))).toEqual([]);
+    expect("maps" in v).toBe(false);
   });
 });
 
@@ -433,14 +644,13 @@ describe("fixture reset (E2E: every test starts on boot state)", () => {
     const push = new FakePusher(new Set(["acme/app"]));
     const b = new Board(src, st, push, { pollMs: 60_000, persist: false });
     await b.refreshAll(true);
-    await b.refreshCoordinators();
     const reset = withReset ? fixtureReset({ source: src, store: st, pusher: push, board: b, defaults: { repos: await src.listRepos() } }) : undefined;
     return { a: createApp({ board: b, source: src, store: st, pusher: push, reset, access }), b, st, push };
   };
   /** the parts of the snapshot a test can change; generatedAt and sync times differ per call */
   const state = (b: Board) => {
     const v = b.view();
-    return { repos: v.repos, cards: v.cards, coordinators: v.coordinators, maps: v.maps };
+    return { repos: v.repos, cards: v.cards };
   };
 
   // demo times are relative to "now": with a frozen clock two boots are identical
@@ -485,7 +695,7 @@ describe("fixture reset (E2E: every test starts on boot state)", () => {
     await a.request("/api/fixture/reset", { method: "POST", body: "{}", headers: WRITE });
     await new Promise((r) => setTimeout(r, 0));
     expect(seen).toHaveLength(1);
-    expect({ repos: seen[0]!.repos, cards: seen[0]!.cards, coordinators: seen[0]!.coordinators, maps: seen[0]!.maps }).toEqual(fresh);
+    expect({ repos: seen[0]!.repos, cards: seen[0]!.cards }).toEqual(fresh);
   });
 
   it("does not exist without a reset hook (GitHub mode)", async () => {

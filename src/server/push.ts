@@ -4,8 +4,15 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { NO_COORDINATOR, type Coordinator } from "../core/types.ts";
-export type { Coordinator };
+import { NO_RUN } from "../core/types.ts";
+
+/** The Run a Push for a repo is sent to: found at the moment of the Push, never shown as a state (#14). */
+interface Coordinator {
+  runId: string;
+  repo: string;
+  terminal: string;
+  worktreePath: string;
+}
 
 export type PushEvent = "feedback" | "start";
 
@@ -16,7 +23,6 @@ export interface PushResult {
 }
 
 export interface Pusher {
-  coordinators(): Promise<Record<string, Coordinator>>;
   /** local checkout paths Orca knows, per repo (to start a coordinator) */
   knownPaths(): Promise<Record<string, string>>;
   push(repo: string, number: number, event: PushEvent, text: string): Promise<PushResult>;
@@ -64,8 +70,8 @@ const RETRY_MS = 2_000;
 const STALE_MS = 120_000;
 
 /**
- * The one coordinator detection: the Board (Card pane, Awaiting pickup, Start coordinator) and Push both read `detected()`,
- * so they cannot disagree. A lookup that fails keeps the last answer instead of turning into "none running".
+ * Finds the Run to send to, only when a Push is sent (and the checkout paths Orca knows, for Settings). The Board never shows
+ * whether a coordinator runs (#14): the lookup can miss one. A lookup that fails keeps the last answer instead of turning into "none found".
  */
 export class OrcaPusher implements Pusher {
   private cache: Detected | null = null;
@@ -141,14 +147,6 @@ export class OrcaPusher implements Pusher {
     return this.inflight;
   }
 
-  async coordinators() {
-    try {
-      return (await this.detected()).value;
-    } catch {
-      return {}; // Orca not running: nothing to push to
-    }
-  }
-
   async knownPaths() {
     try {
       return (await this.detected()).paths;
@@ -161,14 +159,14 @@ export class OrcaPusher implements Pusher {
     let d: Detected;
     try {
       d = await this.detected();
-      // none in the cache: ask Orca once more before telling the developer nobody is there
+      // none in the cache: ask Orca once more before saying no Run was found
       if (!d.value[repo]) d = await this.detected(true);
     } catch (e) {
       return { delivered: false, runId: null, reason: `could not reach Orca: ${reasonOf(e)}` };
     }
     const c = d.value[repo];
-    // "no coordinator running" only from a complete answer: a stale or partial one cannot rule a coordinator out
-    if (!c) return { delivered: false, runId: null, reason: d.problem ?? NO_COORDINATOR };
+    // "no Run found" only from a complete answer: a stale or partial one cannot rule a Run out
+    if (!c) return { delivered: false, runId: null, reason: d.problem ?? NO_RUN };
     await orca(this.run, ["orchestration", "send", "--to", `run:${c.runId}`, "--type", "status", "--subject", pushSubject(repo, number, event), "--body", pushBody(repo, number, event, text)]);
     return { delivered: true, runId: c.runId, reason: null };
   }
@@ -179,26 +177,23 @@ export class OrcaPusher implements Pusher {
   }
 }
 
-/** Test and demo double: records pushes; a coordinator exists for the repos in `live`. */
+/** Test and demo double: records pushes; a Run to send to exists for the repos in `live`. */
 export class FakePusher implements Pusher {
   sent: { repo: string; number: number; event: PushEvent; text: string }[] = [];
   private initial: string[];
   constructor(public live = new Set<string>()) {
     this.initial = [...live];
   }
-  /** Back to the boot state: the starting coordinators, nothing sent. */
+  /** Back to the boot state: the starting Runs, nothing sent. */
   reset() {
     this.live = new Set(this.initial);
     this.sent = [];
-  }
-  async coordinators() {
-    return Object.fromEntries([...this.live].map((repo) => [repo, { runId: `run_fake_${repo}`, repo, terminal: "term_fake", worktreePath: `/tmp/${repo}` }]));
   }
   async knownPaths() {
     return Object.fromEntries([...this.live].map((repo) => [repo, `/tmp/${repo}`]));
   }
   async push(repo: string, number: number, event: PushEvent, text: string): Promise<PushResult> {
-    if (!this.live.has(repo)) return { delivered: false, runId: null, reason: NO_COORDINATOR };
+    if (!this.live.has(repo)) return { delivered: false, runId: null, reason: NO_RUN };
     this.sent.push({ repo, number, event, text });
     return { delivered: true, runId: `run_fake_${repo}`, reason: null };
   }

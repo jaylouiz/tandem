@@ -136,14 +136,14 @@ describe("the palette lists every key binding", () => {
       expect(ids, id).not.toContain(id);
     for (const id of ["go-board", "go-agents", "capture", "shortcuts", "refresh", "theme-dark", "clear-repo-filter"]) expect(ids, id).toContain(id);
     expect(none.find((a) => a.id === "clear-repo-filter")?.label).toBe("All repos");
-    // Maps and Settings have no Cards to walk or select
-    const maps = actions.paletteActions({ ...fullest(), view: "maps" }).map((a) => a.id);
-    for (const id of ["next", "previous", "select-all", "extend-down"]) expect(maps, id).not.toContain(id);
+    // Settings has no Cards to walk or select
+    const off = actions.paletteActions({ ...fullest(), view: "settings" }).map((a) => a.id);
+    for (const id of ["next", "previous", "select-all", "extend-down"]) expect(off, id).not.toContain(id);
     // a Card-scoped key does nothing there, so the palette neither offers Mark nor prints `o`, `[` or `]` for what it runs by hand
-    expect(maps).not.toContain("mark");
-    const onMaps = actions.paletteActions({ ...fullest(), view: "maps" });
-    expect(onMaps.find((a) => a.id === "open")?.binding).toBeUndefined();
-    const tabs = onMaps.filter((a) => a.id.startsWith("tab-"));
+    expect(off).not.toContain("mark");
+    const onSettings = actions.paletteActions({ ...fullest(), view: "settings" });
+    expect(onSettings.find((a) => a.id === "open")?.binding).toBeUndefined();
+    const tabs = onSettings.filter((a) => a.id.startsWith("tab-"));
     expect(tabs.length).toBeGreaterThan(0);
     for (const a of tabs) expect(a.keys, a.id).toBeUndefined();
   });
@@ -166,10 +166,10 @@ describe("the palette lists every key binding", () => {
     expect(entries.find((a) => a.id === "focus")?.label).toBe("Leave Focus: back to the list");
   });
 
-  it("runBinding leaves a Card-scoped binding alone on Maps and Settings", () => {
+  it("runBinding leaves a Card-scoped binding alone on Settings", () => {
     vi.stubGlobal("KeyboardEvent", class { constructor(public type: string, public init: { key?: string; metaKey?: boolean } = {}) {} get key() { return this.init.key; } });
     const st = useStore.getState();
-    st.setView("maps");
+    st.setView("settings");
     st.select("o/r#1"); // a Card opened from the palette or an Activity row
     keys.runBinding("mark");
     expect(useStore.getState().marked).toEqual([]);

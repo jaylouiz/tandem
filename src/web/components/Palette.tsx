@@ -6,7 +6,7 @@ import { keyOf } from "../keys.ts";
 import { panelKeys } from "../panelKeys.ts";
 import { liveFocusKeys } from "../focus/keys.ts";
 import { seenLooks, unseenLooks } from "../seen.ts";
-import { NO_COORDINATORS, NO_REPOS, openCard, useStore, useCard, useCards } from "../store.ts";
+import { NO_REPOS, openCard, useStore, useCard, useCards } from "../store.ts";
 import { Dialog } from "../ui/Dialog.tsx";
 import { canUndo } from "../ui/Toast.tsx";
 import { MOVE_ENTRIES, TRIAGE_ENTRIES, applicable, moveBlocked, useTriageTargets } from "../triage.ts";
@@ -48,7 +48,6 @@ function PaletteBody() {
   const marked = useStore((s) => s.marked.length);
   const lanes = useStore((s) => s.lanes);
   const repoCount = useStore((s) => s.board?.repos.length ?? 0);
-  const coordinators = useStore((s) => s.board?.coordinators ?? NO_COORDINATORS);
   const selected = useCard(useStore((s) => s.selected));
   const failed = useStore((s) => (selected ? !!s.failures[selected.key] : false));
   const live = panelKeys.current && selected && panelKeys.current.cardKey === selected.key ? panelKeys.current : null;
@@ -58,7 +57,7 @@ function PaletteBody() {
         view,
         focus,
         card: selected,
-        startable: !!selected?.awaitingPickup && !coordinators[selected.repo],
+        startable: !!selected?.awaitingPickup,
         failed,
         tab,
         marked,
@@ -81,7 +80,7 @@ function PaletteBody() {
             },
         setTheme,
       }),
-    [view, focus, selected, coordinators, failed, tab, marked, repoCount, lanes, filter, live, targets, cfg, moveStep, handed],
+    [view, focus, selected, failed, tab, marked, repoCount, lanes, filter, live, targets, cfg, moveStep, handed],
   );
   const groups = [...new Set(actions.map((a) => a.group))];
   const item = (a: PaletteAction) => {

@@ -3,7 +3,7 @@ import { STATE_DEFAULT_TEXT, STATE_LABEL, classifyActivity, parseLog, type Activ
 import { KIND_LABEL, askOf, decisionState, kindOf, sinceOf } from "../../core/ask.ts";
 import type { Card, DesignRound } from "../../core/types.ts";
 import type { ShotsTarget } from "../../core/gallery.ts";
-import { NO_COORDINATORS, TABS, api, useActivity, useCard, useNow, useStore } from "../store.ts";
+import { TABS, api, useActivity, useCard, useNow, useStore } from "../store.ts";
 import { useSigned } from "../signed.ts";
 import { handedValid, startNotice, startRequests } from "../../core/triage.ts";
 import { TRIAGE_ENTRIES, actionBlocked, runTriage } from "../triage.ts";
@@ -211,7 +211,6 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
   const setTab = useStore((s) => s.setTab);
   const failure = useStore((s) => s.failures[cardKey]);
   const clearFailure = useStore((s) => s.clearFailure);
-  const coordinators = useStore((s) => s.board?.coordinators ?? NO_COORDINATORS);
   const shotsRequest = useStore((s) => s.shotsRequest);
   const act = useActivityOf(card);
   const signed = useSigned(card);
@@ -243,7 +242,6 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
     if (shotsRequest?.key === cardKey) setTab(shotsRequest.target === "earlier" ? "decided" : "now");
   }, [shotsRequest, cardKey, setTab]);
   if (!card) return null;
-  const running = !!coordinators[card.repo];
   // screenshots with their signed sources (private repos), see signed.ts
   const rounds = card.rounds.map((r) => ({ ...r, screenshots: signed.shots(r.commentId, r.screenshots) }));
   const look = card.look ? { ...card.look, screenshots: signed.shots(card.look.commentId, card.look.screenshots) } : null;
@@ -327,17 +325,7 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
           {card.awaitingPickup && (
             <div className="section" data-testid="awaiting-pickup">
               <div className="section-title">Feedback given, awaiting pickup</div>
-              {running ? (
-                <div className="muted">The coordinator for {card.repo} is running and will resume this Card.</div>
-              ) : (
-                <div className="actions">
-                  <span className="muted">No coordinator is running for {card.repo}.</span>
-                  <span className="spacer" />
-                  <button className="btn primary" onClick={() => void startCoordinator([card])}>
-                    Start coordinator
-                  </button>
-                </div>
-              )}
+              <div className="muted">Nothing waits on you. The agents pick it up from GitHub.</div>
             </div>
           )}
 
@@ -346,7 +334,6 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
               <Triage key={card.key} card={card} />
               {card.phase === "Backlog" && !card.waiting && (
                 <div className="actions">
-                  <span className="muted">{running ? "Coordinator running" : "No coordinator running"}</span>
                   <span className="spacer" />
                   {handedValid(card, handedRec) ? (
                     <span className="handed" data-testid="handed" tabIndex={-1} ref={handedRef}>

@@ -124,27 +124,6 @@ function issue(repo: string, number: number, title: string, p: Partial<RawIssue>
   };
 }
 
-/** A decision ticket: a sub-issue of the demo map #109 with a wayfinder:<kind> label. */
-function wayfinderTicket(
-  repo: string,
-  number: number,
-  title: string,
-  kind: string,
-  p: { now: number; state?: "closed"; closedHAgo?: number; notPlanned?: boolean; assignees?: string[]; blockedBy?: RawIssue["blockedBy"] },
-): RawIssue {
-  const closed = p.state === "closed";
-  return issue(repo, number, title, {
-    now: p.now,
-    ageH: 200,
-    labels: [`wayfinder:${kind}`],
-    body: "## Question\n\nTo be resolved.",
-    parent: 109,
-    assignees: p.assignees ?? [],
-    blockedBy: p.blockedBy ?? [],
-    ...(closed ? { state: "closed" as const, stateReason: p.notPlanned ? ("not_planned" as const) : ("completed" as const), closedAt: ago(p.now, p.closedHAgo ?? 1) } : {}),
-  });
-}
-
 export function demoIssues(now = Date.now()): RawIssue[] {
   seq = 0; // same comment ids on every call, so a reset Board equals a freshly booted one
   const A = "acme/app";
@@ -401,18 +380,8 @@ export function demoIssues(now = Date.now()): RawIssue[] {
         updatedAt: ago(now, h),
       }),
     ),
-    issue(A, 109, "Wayfinder: offline mode", {
-      now,
-      ageH: 300,
-      labels: ["wayfinder:map"],
-      body: `## Destination\n\nA spec for working offline, ready for \`/specify-gh-issue\`.\n\n## Notes\n\n- Domain: tasks and sync.\n\n## Decisions so far\n\n<!-- one line per closed ticket -->\n\n- [Cache scope](https://github.com/${A}/issues/120): cache the last 200 tasks and everything edited offline.\n- [Conflict window](https://github.com/${A}/issues/125): last write wins inside five minutes, otherwise ask.\n\n## Not yet specified\n\n- What the offline banner says.\n\n## Out of scope\n\n- Offline Notion sync.`,
-    }),
-    wayfinderTicket(A, 120, "Cache scope", "grilling", { now, state: "closed", closedHAgo: 80 }),
-    wayfinderTicket(A, 121, "Which sync library fits?", "research", { now }),
-    wayfinderTicket(A, 122, "Conflict rules offline", "grilling", { now, assignees: ["demo-user"] }),
-    wayfinderTicket(A, 123, "Write the requirements", "task", { now, blockedBy: [{ number: 121, state: "open" }, { number: 122, state: "open" }, { number: 120, state: "closed" }] }),
-    wayfinderTicket(A, 124, "Offline banner look", "prototype", { now, state: "closed", closedHAgo: 40 }),
-    wayfinderTicket(A, 125, "Conflict window", "grilling", { now, state: "closed", closedHAgo: 20 }),
-    wayfinderTicket(A, 126, "Background sync on mobile", "research", { now, state: "closed", closedHAgo: 10, notPlanned: true }),
+    // wayfinder issues (a map and a decision ticket): never Cards
+    issue(A, 109, "Wayfinder: offline mode", { now, ageH: 300, labels: ["wayfinder:map"], body: "## Destination\n\nA spec for working offline." }),
+    issue(A, 121, "Which sync library fits?", { now, ageH: 200, labels: ["wayfinder:research"], body: "## Question\n\nTo be resolved." }),
   ];
 }

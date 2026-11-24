@@ -164,14 +164,14 @@ test("Hand to agent: a failed Push rolls back with the reason and stays retryabl
   await expect(handed(page)).toContainText("Handed to the coordinator · build");
 });
 
-test("Hand to agent: without a coordinator nothing is handed; Start coordinator retries per repo and hands the Card once it starts", async ({ page }) => {
+test("Hand to agent: without a Run to send to nothing is handed; Start coordinator retries per repo and hands the Card once it starts", async ({ page }) => {
   await toBoard(page);
   await page.getByTestId("column-Backlog").locator(".card", { hasText: "Hand demo: no coordinator" }).click();
   await handButton(page).click();
-  await expect(page.getByTestId("toast").filter({ hasText: "No coordinator running" })).toBeVisible();
+  await expect(page.getByTestId("toast").filter({ hasText: "Not handed: no Orca Run found for agent-workflow" })).toBeVisible();
   await expect(handed(page)).toHaveCount(0);
   await expect(handButton(page)).toBeEnabled();
-  const start = page.getByTestId("toast").filter({ hasText: "No coordinator running" }).getByRole("button", { name: "Start coordinator" });
+  const start = page.getByTestId("toast").filter({ hasText: "no Orca Run found" }).getByRole("button", { name: "Start coordinator" });
   // no checkout known yet: the start fails, nothing is handed, the toast keeps the retry
   await start.click();
   await expect(page.getByTestId("toast").filter({ hasText: "Could not start coordinator for acme/agent-workflow: No local checkout known" })).toBeVisible();

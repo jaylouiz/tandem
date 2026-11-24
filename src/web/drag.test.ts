@@ -23,7 +23,7 @@ const closed = mk(4, { phase: "Done", state: "closed" });
 
 describe("drop targets follow the dragged set", () => {
   beforeEach(() => {
-    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [inbox, backlog, build, closed], repos: [], sync: {}, coordinators: {} } as unknown as BoardView, moveStep: "keep" });
+    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [inbox, backlog, build, closed], repos: [], sync: {} } as unknown as BoardView, moveStep: "keep" });
   });
 
   it("agent-owned Phases refuse with their reason, whatever is dragged", () => {

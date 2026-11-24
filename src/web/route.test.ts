@@ -26,7 +26,8 @@ describe("parseRoute", () => {
     expect(at("/").view).toBeNull();
     expect(at("/nope/a/b/1").view).toBeNull();
     expect(at("/waiting/").view).toBe("waiting");
-    expect(at("/maps/").view).toBe("maps");
+    expect(at("/board/").view).toBe("board");
+    expect(at("/maps").view).toBeNull(); // the Wayfinder maps view is gone (#15): an old bookmark follows the remembered view
   });
   it("drops a Card on /settings and a path that is not a Card", () => {
     expect(at("/settings/o/r/1").selected).toBeNull();
@@ -54,7 +55,7 @@ describe("formatRoute", () => {
     expect(formatRoute(state)).toBe("/waiting");
     expect(formatRoute({ ...state, view: "board", selected: "o/r#4" })).toBe("/board/o/r/4");
     expect(formatRoute({ ...state, view: "board", selected: "o/r#4", tab: "decided", repoFilter: "o/r" })).toBe("/board/o/r/4?tab=decided&repo=o/r");
-    expect(formatRoute({ ...state, view: "maps", repoFilter: "o/r" })).toBe("/maps?repo=o/r");
+    expect(formatRoute({ ...state, view: "board", repoFilter: "o/r" })).toBe("/board?repo=o/r");
   });
   it("has no Card segment on Settings and no tab without a Card", () => {
     expect(formatRoute({ ...state, view: "settings", selected: "o/r#4", tab: "issue" })).toBe("/settings");
@@ -64,7 +65,7 @@ describe("formatRoute", () => {
     for (const s of [
       { view: "waiting", selected: "acme/tandem#48", tab: "activity", repoFilter: null },
       { view: "board", selected: null, tab: "now", repoFilter: "a.b/c_d" },
-      { view: "maps", selected: "o/r#1", tab: "issue", repoFilter: "o/r" },
+      { view: "board", selected: "o/r#1", tab: "issue", repoFilter: "o/r" },
     ] as const) {
       const u = new URL(formatRoute(s), "http://x");
       const r = parseRoute(u.pathname, u.search);

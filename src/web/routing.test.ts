@@ -30,7 +30,7 @@ beforeAll(async () => {
 const tick = () => new Promise<void>((r) => queueMicrotask(r));
 const get = () => store.useStore.getState();
 const card = (n: number, repo = "o/r") => ({ key: `${repo}#${n}`, repo, number: n }) as Card;
-const board = (cards: Card[], sync: Record<string, { at: string | null; syncing: boolean }> = { "o/r": { at: "t", syncing: false } }, repos = ["o/r"]) => ({ cards, repos, sync, maps: [], activity: {} }) as unknown as BoardView;
+const board = (cards: Card[], sync: Record<string, { at: string | null; syncing: boolean }> = { "o/r": { at: "t", syncing: false } }, repos = ["o/r"]) => ({ cards, repos, sync, activity: {} }) as unknown as BoardView;
 
 describe("the first page", () => {
   it("takes view, Card, tab and filter from the URL, and keeps them while the board loads", async () => {
@@ -116,11 +116,11 @@ describe("history entries", () => {
 
   it("a URL the app would not write ends on a valid one by replace", async () => {
     entries.splice(0, entries.length, "/waiting", "/nonsense/");
-    mem.set("tandem.view", "maps");
+    mem.set("tandem.view", "board");
     at = 1;
     popstate();
     await tick();
-    expect(entries).toEqual(["/waiting", "/maps"]); // `/` and unknown paths follow the remembered view
+    expect(entries).toEqual(["/waiting", "/board"]); // `/` and unknown paths follow the remembered view
     expect(at).toBe(1);
   });
 });

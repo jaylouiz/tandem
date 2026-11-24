@@ -20,7 +20,7 @@ export function MarkBar() {
   const waiting = useStore((s) => s.view === "waiting");
   const onCards = useStore((s) => showsCards(s.view));
   const targets = cards.filter((c) => marked.includes(c.key));
-  if (!onCards || !targets.length || !cfg) return null; // Maps and Settings list no Cards: no bar
+  if (!onCards || !targets.length || !cfg) return null; // Settings lists no Cards: no bar
   const [toBacklog, toInbox] = MOVE_ENTRIES;
   const backlogWhy = moveBlocked("Backlog", targets, cfg, step);
   const inboxWhy = moveBlocked("Inbox", targets, cfg, step);

@@ -2,7 +2,7 @@
 // and how a Card looks right after the write (optimistic). The UI (buttons, keys, palette, bulk) only calls this.
 import { phaseOf, nextStepOf, priorityOf } from "./card.ts";
 import type { WorkflowConfig } from "./config.ts";
-import type { Card, NextStep, RawIssue } from "./types.ts";
+import { NO_RUN, type Card, type NextStep, type RawIssue } from "./types.ts";
 
 export type TriageAction =
   | { kind: "next"; step: NextStep }
@@ -200,13 +200,13 @@ export function moveNotice(plan: MovePlan, to: MoveTarget, cfg: WorkflowConfig, 
 
 const repoName = (card: Card) => card.repo.split("/")[1]!;
 
-/** A Card whose Push Orca did not take for another reason than "no coordinator running" (Orca unreachable, a Run unreadable): starting a coordinator would not help. */
+/** A Card whose Push Orca did not take for another reason than "no Orca Run found" (Orca unreachable, a Run unreadable): starting a coordinator would not help. */
 export interface Unreached {
   card: Card;
   reason: string;
 }
 
-/** The notice after "Hand to agent": what reached a coordinator, for which repos none runs, which Pushes failed on Orca itself (`unreached`, with the first reason), and what failed. */
+/** The notice after "Hand to agent": what reached a coordinator, for which repos no Run was found to send to, which Pushes failed on Orca itself (`unreached`, with the first reason), and what failed. */
 export function handNotice(handed: Card[], undelivered: Card[], failed: string[] = [], unreached: Unreached[] = []): string {
   const bad = failed.length ? `${failed.length} failed: ${failed[0]}` : "";
   if (!handed.length && !undelivered.length && !unreached.length) return failed.length === 1 ? `Failed: ${failed[0]}` : bad;
@@ -217,7 +217,7 @@ export function handNotice(handed: Card[], undelivered: Card[], failed: string[]
   else if (handed.length) parts.push(`Handed ${handed.length} ${handed.length === 1 ? "Card" : "Cards"} to the coordinator`);
   if (undelivered.length) {
     const bare = !handed.length && !unreached.length && repos.length === 1 && undelivered.length === 1 && !failed.length;
-    parts.push(bare ? "No coordinator running" : `${parts.length ? "no" : "No"} coordinator running for ${repos.join(", ")}`);
+    parts.push(bare ? `Not handed: ${NO_RUN} for ${repos[0]}` : `${parts.length ? "no" : "No"} Orca Run found for ${repos.join(", ")}`);
   }
   if (unreached.length) {
     const who = only && unreached.length === 1 ? "Not handed over" : `${unreached.length} ${unreached.length === 1 ? "Card" : "Cards"} not handed over`;

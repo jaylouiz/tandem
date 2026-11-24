@@ -1,7 +1,7 @@
 // Triage on the web side, independent of any layout: buttons, keys and the palette all call `runTriage`.
 // The targets are the marked Cards, else the selected Card.
 import { useMemo } from "react";
-import { NO_COORDINATOR, PHASES, type Card, type NextStep } from "../core/types.ts";
+import { NO_RUN, PHASES, type Card, type NextStep } from "../core/types.ts";
 import { handNotice, invertChange, moveNotice, planMove, planTriage, relabel, skipReason, type HandedRecord, type MovePlan, type MoveTarget, type Plan, type TriageAction, type Unreached } from "../core/triage.ts";
 import { api, currentCards, useCards, useStore, writeCard } from "./store.ts";
 
@@ -100,9 +100,9 @@ export async function runTriage(entry: TriageEntry, only?: Card[]) {
       if (hand) {
         try {
           const { push } = await api.post(`${api.cardPath(card)}/start`);
-          // only an answered "nobody is there" offers a start; a Push Orca did not take says why (starting a coordinator would not fix it)
+          // only "no Run found" offers a start; a Push Orca did not take says why (starting a coordinator would not fix it)
           if (push?.delivered) handed.push(card);
-          else if (push?.reason && push.reason !== NO_COORDINATOR) unreached.push({ card, reason: push.reason });
+          else if (push?.reason && push.reason !== NO_RUN) unreached.push({ card, reason: push.reason });
           else undelivered.push(card);
         } catch (e) {
           failed.push(e instanceof Error ? e.message : String(e));

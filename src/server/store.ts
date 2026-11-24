@@ -21,11 +21,13 @@ export interface LocalState {
 }
 
 /** Bump when a sync starts reading more issue fields: an older cache lacks them and is re-fetched in full once. */
-export const CACHE_VERSION = 2; // 2: parent, assignees, blockedBy (wayfinder maps)
+export const CACHE_VERSION = 2; // 2: parent, assignees, blockedBy (wayfinder maps, removed since: an older or newer cache reads the same)
 
 export interface RepoCache {
   /** absent in a cache written before versions existed */
   v?: number;
+  /** when the repo was last fetched in full (the only pass that drops issues GitHub no longer has); absent in an older cache: a full fetch is due */
+  fullAt?: string;
   syncedAt: string;
   issues: RawIssue[];
 }

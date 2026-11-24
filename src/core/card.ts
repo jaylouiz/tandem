@@ -17,6 +17,9 @@ function matches(issue: RawIssue, pr: RawPullRequest | null, when: PhaseConditio
   return true;
 }
 
+/** A wayfinder map or one of its decision tickets (the `/wayfinder` skill's issues): never in a lane, so never a Card. */
+export const isWayfinderIssue = (i: RawIssue, cfg: WorkflowConfig) => i.labels.some((l) => l === cfg.wayfinderMapLabel || l.startsWith(cfg.wayfinderTicketPrefix));
+
 export function phaseOf(issue: RawIssue, pr: RawPullRequest | null, cfg: WorkflowConfig): Phase {
   return cfg.phaseRules.find((r) => matches(issue, pr, r.when))?.phase ?? "Inbox";
 }

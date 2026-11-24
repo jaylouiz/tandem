@@ -40,7 +40,12 @@ test("answer a decision request in place and Push", async ({ page }) => {
   // the answered Card moves to Awaiting pickup and the next blocker opens
   await expect(page.getByTestId("detail")).not.toHaveAttribute("aria-label", "Card acme/app#105");
   await page.locator('[data-card="acme/app#105"]').click();
-  await expect(page.getByTestId("awaiting-pickup")).toBeVisible();
+  // the Card says its own state; nothing claims that a coordinator runs or not, and no button starts one from here (#14)
+  const pickup = page.getByTestId("awaiting-pickup");
+  await expect(pickup).toContainText("Feedback given, awaiting pickup");
+  await expect(pickup).toContainText("Nothing waits on you");
+  await expect(pickup.getByRole("button")).toHaveCount(0);
+  await expect(page.getByTestId("detail")).not.toContainText(/coordinator (is )?running/i);
 });
 
 test("gallery by keyboard only: variants, viewport, pick, send", async ({ page }) => {
@@ -218,14 +223,15 @@ test("the Look panel has no Mark Seen button: Seen is marked from the list, the 
 test("each main nav entry has a decorative leading icon and keeps its accessible name (#38)", async ({ page }) => {
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Views" });
-  for (const name of [/^Waiting on me/, "Board", "Wayfinder maps", "Settings"]) {
+  for (const name of [/^Waiting on me/, "Board", "Settings"]) {
     const item = nav.getByRole("button", { name });
     await expect(item.locator('svg.nav-icon[aria-hidden="true"]')).toBeVisible();
     // the icon is the first thing in the row, before the label
     expect(await item.evaluate((el) => el.firstElementChild?.tagName.toLowerCase())).toBe("svg");
   }
-  // four different shapes
+  // three different shapes, and no entry for the removed Wayfinder maps view (#15)
   const shapes = await nav.locator("svg.nav-icon").evaluateAll((els) => els.map((e) => e.innerHTML));
-  expect(new Set(shapes).size).toBe(4);
-  expect(shapes).toHaveLength(4);
+  expect(new Set(shapes).size).toBe(3);
+  expect(shapes).toHaveLength(3);
+  await expect(nav.getByRole("button", { name: "Wayfinder maps" })).toHaveCount(0);
 });

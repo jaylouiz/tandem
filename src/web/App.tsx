@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { waitingId } from "../core/card.ts";
+import { syncFailure, syncFailureStatus } from "../core/sync.ts";
 import type { Card } from "../core/types.ts";
 import { AgentOverlay, AgentsLine } from "./components/AgentOverlay.tsx";
 import { BoardView, LaneToggle, boardNavGroups } from "./components/BoardView.tsx";
 import { DragGhost } from "./components/DragGhost.tsx";
 import { Capture } from "./components/Capture.tsx";
 import { CardPane } from "./components/CardPane.tsx";
-import { MapsView } from "./components/MapsView.tsx";
 import { MarkBar } from "./components/MarkBar.tsx";
 import { Palette } from "./components/Palette.tsx";
 import { Shortcuts } from "./components/Shortcuts.tsx";
 import { Settings } from "./components/Settings.tsx";
 import { RepoFilterChip, Repos } from "./components/Repos.tsx";
 import { WaitingView, queueOf } from "./components/WaitingView.tsx";
-import { NavIcon, shortRepo } from "./components/bits.tsx";
+import { NavIcon, clock, shortRepo } from "./components/bits.tsx";
 import { InfoPopover } from "./ui/Tooltip.tsx";
 import { handleKey, keyCtxRef, keyOf, type KeyCtx } from "./keys.ts";
 import { useNoticeToasts } from "./notices.ts";
@@ -21,7 +21,7 @@ import { useScrollMemory } from "./scroll.ts";
 import { blockerCount, groupsOf, openCard, reconnect, syncProgress, useAllCards, useCards, useLaneView, useStore, type LaneView, type View } from "./store.ts";
 import { ToastRegion } from "./ui/Toast.tsx";
 
-const TITLES: Record<View, string> = { waiting: "Waiting on me", board: "Board", maps: "Wayfinder maps", settings: "Settings" };
+const TITLES: Record<View, string> = { waiting: "Waiting on me", board: "Board", settings: "Settings" };
 
 /** The Cards of the view in on-screen order, split into the lists a ⌘A marks (Board columns, Waiting on me groups). */
 function navGroups(view: View, cards: Card[], openDays: Record<string, boolean>, linger: string | null, lanes: LaneView | null, focus: boolean): Card[][] {
@@ -146,7 +146,6 @@ export function App() {
   const nav: [View, string, number | null, number | null][] = [
     ["waiting", "Waiting on me", waitingCount, allWaiting],
     ["board", "Board", null, null],
-    ["maps", "Wayfinder maps", null, null],
     ["settings", "Settings", null, null],
   ];
 
@@ -231,12 +230,17 @@ export function App() {
               label="Sync errors"
               className="chip danger"
               testId="sync-error"
-              detail={errors.map(([r, s]) => (
-                <div key={r} className="sync-err">
-                  <strong>{r}</strong>
-                  <span className="muted">{s.error}</span>
-                </div>
-              ))}
+              detail={errors.map(([r, s]) => {
+                const f = syncFailure(s.error!);
+                return (
+                  <div key={r} className="sync-err">
+                    <strong>{r}</strong>
+                    <span>{f.what}</span>
+                    <span className="muted">{syncFailureStatus(s, clock)}</span>
+                    {f.detail !== f.what && <span className="faint">{f.detail}</span>}
+                  </div>
+                );
+              })}
             >
               Sync error · {errors.length}
             </InfoPopover>
@@ -265,8 +269,6 @@ export function App() {
               </div>
             ) : view === "board" ? (
               <BoardView cards={cards} />
-            ) : view === "maps" ? (
-              <MapsView />
             ) : (
               <Settings />
             )}

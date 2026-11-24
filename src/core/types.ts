@@ -21,11 +21,6 @@ export interface RawIssue {
   closedAt: string | null;
   comments: RawComment[];
   pullRequests: RawPullRequest[];
-  /** Sub-issue parent in the same repo (a wayfinder ticket's map). Absent in caches written before wayfinder maps. */
-  parent?: number | null;
-  assignees?: string[];
-  /** Issues in the same repo that block this one (native issue dependencies). */
-  blockedBy?: { number: number; state: "open" | "closed" }[];
 }
 
 export interface RawComment {
@@ -163,37 +158,6 @@ export interface Card {
   seenAt: string | null;
 }
 
-export type TicketKind = "research" | "prototype" | "grilling" | "task";
-/** frontier: open, unblocked, unclaimed. decided: closed completed. dropped: closed not planned. */
-export type TicketStatus = "frontier" | "claimed" | "blocked" | "decided" | "dropped";
-
-/** A wayfinder decision ticket: a sub-issue of a map. Not a Card (GLOSSARY: Ticket). */
-export interface WayfinderTicket {
-  number: number;
-  title: string;
-  url: string;
-  kind: TicketKind | null;
-  status: TicketStatus;
-  assignees: string[];
-  /** open blockers (empty unless status is blocked) */
-  blockedBy: { number: number; title: string }[];
-  /** the map index's one-line answer, for decided tickets */
-  gist: string | null;
-  closedAt: string | null;
-}
-
-export interface WayfinderMap {
-  key: string; // owner/repo#n
-  repo: string;
-  number: number;
-  title: string;
-  url: string;
-  body: string;
-  state: "open" | "closed";
-  updatedAt: string;
-  tickets: WayfinderTicket[];
-}
-
 /** The last line of an issue's coordination log (`decide.sh log`): what the agent last reported and when. */
 export interface ActivityEntry {
   /** ISO time of that line (the file's mtime when the line has none), or null */
@@ -205,21 +169,18 @@ export interface BoardSnapshot {
   generatedAt: string;
   repos: string[];
   cards: Card[];
-  /** wayfinder maps with their tickets; maps and tickets are never Cards */
-  maps: WayfinderMap[];
-  /** repo -> last successful refresh, an error, and whether a refresh is running now */
-  sync: Record<string, { at: string | null; error: string | null; syncing: boolean }>;
+  /**
+   * repo -> `at`: the last sync that brought issues in; `okAt`: the last pass that reached GitHub (also one that found nothing new);
+   * `error`: what failed, from the second failed pass in a row, with `errorAt` the first of them; `syncing`: a refresh the developer waits for runs now
+   */
+  sync: Record<string, { at: string | null; okAt: string | null; error: string | null; errorAt: string | null; syncing: boolean }>;
 }
 
-/** `PushResult.reason` when Orca answered and no coordinator runs for the repo (any other reason: the Push itself failed). */
-export const NO_COORDINATOR = "no coordinator running";
-
-export interface Coordinator {
-  runId: string;
-  repo: string;
-  terminal: string;
-  worktreePath: string;
-}
+/**
+ * `PushResult.reason` when Orca answered and Tandem found no Run to send to for the repo (any other reason: the Push itself failed).
+ * A fact about this one Push, never a claim that no coordinator runs: Tandem does not know that (#14).
+ */
+export const NO_RUN = "no Orca Run found";
 
 /** What the server streams to the web app. */
 export interface BoardView extends BoardSnapshot {
@@ -227,8 +188,6 @@ export interface BoardView extends BoardSnapshot {
   workflow: WorkflowConfig;
   viewer: string | null;
   source: "github" | "fixture";
-  /** repo -> the live /orchestrate-gh-issues coordinator Tandem Pushes to */
-  coordinators: Record<string, Coordinator>;
   /** card key -> the last coordination log line, for open Cards in UX Design and Build that have a log */
   activity: Record<string, ActivityEntry>;
 }

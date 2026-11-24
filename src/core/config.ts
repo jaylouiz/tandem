@@ -43,6 +43,8 @@ export interface WorkflowConfig {
   stuckAfterHours: number;
   /** how far back closed issues are fetched */
   closedLookbackDays: number;
+  /** hours between two full fetches of a repo: the pass that drops issues GitHub no longer has (deleted, transferred, the repo recreated) */
+  fullSyncHours: number;
 }
 
 export const DEFAULT_WORKFLOW: WorkflowConfig = {
@@ -68,6 +70,7 @@ export const DEFAULT_WORKFLOW: WorkflowConfig = {
   seenRetentionDays: 7,
   stuckAfterHours: 3,
   closedLookbackDays: 60,
+  fullSyncHours: 6,
 };
 
 export function mergeWorkflow(override: Partial<WorkflowConfig> | undefined): WorkflowConfig {

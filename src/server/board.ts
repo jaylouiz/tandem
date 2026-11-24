@@ -1,10 +1,9 @@
 // Keeps raw GitHub data fresh per opted-in repo and turns it into Board snapshots (ADR 0002).
 // Cold start serves the on-disk cache at once; a poll loop asks each repo "changed?" cheaply and
 // refetches only issues updated since the last sync.
-import { buildCard, onBoard } from "../core/card.ts";
-import { isWayfinderIssue, buildMaps } from "../core/wayfinder.ts";
+import { buildCard, isWayfinderIssue, onBoard } from "../core/card.ts";
 import { mergeWorkflow, type WorkflowConfig } from "../core/config.ts";
-import type { ActivityEntry, BoardSnapshot, BoardView, Card, Coordinator, RawIssue } from "../core/types.ts";
+import type { ActivityEntry, BoardSnapshot, BoardView, Card, RawIssue } from "../core/types.ts";
 import { readLogActivity, type ActivityReader } from "./activity.ts";
 import type { Pusher } from "./push.ts";
 import type { Source } from "./source.ts";
@@ -16,18 +15,21 @@ type Listener = (view: BoardView) => void;
 
 export class Board {
   private cache: Record<string, RepoCache>;
-  private errors: Record<string, string | null> = {};
+  /** repo -> the current streak of failed passes (`at`: its first failure). Gone with the first pass that works */
+  private failures: Record<string, { message: string; at: string; count: number; loud: boolean }> = {};
+  /** repo -> the last pass that reached GitHub (a poll that found nothing new counts) */
+  private okAt: Record<string, string> = {};
   private syncing = new Set<string>();
+  private passes = new Map<string, Promise<void>>();
   private listeners = new Set<Listener>();
   private timer: ReturnType<typeof setInterval> | null = null;
-  private coordinators: Record<string, Coordinator> = {};
   private activity: Record<string, ActivityEntry> = {};
   private viewer: string | null = null;
   private emitQueued = false;
   /** reset() holds the snapshots back: its steps would each emit a half-reset Board */
   private muted = false;
-  /** repo -> when its stale-cache full refetch may run again; a failing one backs off instead of retrying every tick */
-  private staleBackoff = new Map<string, { until: number; delay: number }>();
+  /** repo -> when a due full fetch may run again; a failing one backs off instead of retrying every tick */
+  private fullBackoff = new Map<string, { until: number; delay: number }>();
 
   constructor(
     private source: Source,
@@ -56,9 +58,6 @@ export class Board {
 
   private async tick() {
     await this.refreshAll(false);
-    const before = JSON.stringify(this.coordinators);
-    this.coordinators = await this.pusher.coordinators();
-    if (JSON.stringify(this.coordinators) !== before) this.emit();
     await this.refreshActivity();
   }
 
@@ -73,45 +72,97 @@ export class Board {
     await Promise.all(this.store.state.repos.map((r) => this.refresh(r, force)));
   }
 
-  /** Fetch a repo when it changed (or `force`), merging updated issues into the cache. */
-  async refresh(repo: string, force = false) {
-    // only a loud refresh (forced, or no cache yet) shows as Syncing; a quiet poll of a cached repo would
-    // otherwise leave the flag set in any snapshot emitted before it ends, with no emit after the "unchanged" path
-    // a cache from before the current sync fields lacks them (e.g. a ticket's `parent`): one full fetch fills them in
-    // a failing refetch backs off (1 min, doubling to 30), and polls in between take the quiet ETag path
-    const stale = !!this.cache[repo] && this.cache[repo]!.v !== CACHE_VERSION;
-    const backedOff = stale && (this.staleBackoff.get(repo)?.until ?? 0) > Date.now();
-    force ||= stale && !backedOff;
-    const loud = force || !this.cache[repo];
+  /**
+   * Fetch a repo when it changed (or `force`), merging updated issues into the cache.
+   *
+   * Three kinds of pass:
+   * - quiet poll: ask "changed?" (ETag), fetch the issues updated since the last sync only when it says yes;
+   * - full fetch: replaces the repo's cache, so an issue GitHub no longer has (deleted, transferred, the repo recreated) leaves
+   *   the Board (#16). Run when there is no cache, on `force`, for a cache of an older shape, and every `fullSyncHours`;
+   * - after a failure: the ETag is not trusted (GitHub's answer may have been stored for a change whose fetch then failed),
+   *   so the next poll fetches what changed since the last good sync, and its success clears the error (#2).
+   */
+  async refresh(repo: string, force = false): Promise<void> {
+    // one pass per repo at a time: a tick that finds one running joins it, a forced refresh runs after it, so an older read never
+    // writes back over a newer one (a slow full fetch outlasts the 15 s tick)
+    const running = this.passes.get(repo);
+    if (running && !force) return running;
+    const pass = (running ? running.catch(() => {}) : Promise.resolve()).then(() => this.pass(repo, force));
+    this.passes.set(repo, pass);
+    try {
+      await pass;
+    } finally {
+      if (this.passes.get(repo) === pass) this.passes.delete(repo);
+    }
+  }
+
+  private async pass(repo: string, force: boolean) {
+    const cached = this.cache[repo];
+    // a cache from before the current sync fields lacks them: one full fetch fills them in, and until it does the cache is not current
+    const oldShape = !!cached && cached.v !== CACHE_VERSION;
+    const fullDue = !!cached && (oldShape || !cached.fullAt || Date.now() - Date.parse(cached.fullAt) >= this.workflow.fullSyncHours * 3_600_000);
+    // a failing full fetch backs off (1 min, doubling to 30), and polls in between stay incremental
+    const backedOff = fullDue && (this.fullBackoff.get(repo)?.until ?? 0) > Date.now();
+    const full = force || !cached || (fullDue && !backedOff);
+    // only a refresh the developer waits for (forced, no cache yet, an old-shaped cache) shows as Syncing: a quiet poll or a scheduled full
+    // fetch would otherwise leave the flag set in any snapshot emitted before it ends, with no emit after the "unchanged" path
+    const loud = force || !cached || (oldShape && !backedOff);
     if (loud) {
       this.syncing.add(repo);
       this.emit();
     }
+    let changed = loud;
     try {
-      const cached = this.cache[repo];
-      if (cached && !force && !(await this.source.changed(repo))) return;
+      // an old-shaped cache in back-off keeps the cheap ETag path (its failure stays reported until the full fetch works)
+      const trustEtag = oldShape || !this.failures[repo];
+      if (cached && !full && trustEtag && !(await this.source.changed(repo))) {
+        if (!oldShape) changed = this.recovered(repo) || changed;
+        return;
+      }
       const started = new Date().toISOString();
       // a minute of overlap so an update racing the last sync is not missed
-      const since = cached && !force ? new Date(Date.parse(cached.syncedAt) - 60_000).toISOString() : null;
+      const since = cached && !full ? new Date(Date.parse(cached.syncedAt) - 60_000).toISOString() : null;
       const fresh = await this.source.fetchIssues(repo, since, this.workflow.closedLookbackDays);
       const merged = new Map((since ? (cached?.issues ?? []) : []).map((i) => [i.number, i]));
       for (const i of fresh) merged.set(i.number, i);
-      // only a full fetch makes an old-shaped cache current; merged onto it, the old issues still lack the new fields
-      this.cache[repo] = { v: since ? cached!.v : CACHE_VERSION, syncedAt: started, issues: [...merged.values()] };
-      if (!since) this.staleBackoff.delete(repo);
-      // an incremental merge onto an old-shaped cache is no recovery: the failing full refetch stays reported
-      if (this.cache[repo]!.v === CACHE_VERSION) this.errors[repo] = null;
-      if (this.opts.persist) this.store.saveCache(this.cache);
-    } catch (e) {
-      this.errors[repo] = e instanceof Error ? e.message : String(e);
-      if (stale && force) {
-        const delay = Math.min((this.staleBackoff.get(repo)?.delay ?? 30_000) * 2, 30 * 60_000);
-        this.staleBackoff.set(repo, { until: Date.now() + delay, delay });
+      // a full fetch lists open issues and those closed within the window: a Done Card older than that whose Look still waits is not
+      // vanished, the window just does not reach it, so it stays until it is Seen (an absent one inside the window is gone)
+      if (!since) {
+        const cutoff = Date.now() - this.workflow.closedLookbackDays * 86_400_000;
+        for (const i of cached?.issues ?? []) {
+          if (merged.has(i.number) || i.state !== "closed" || !i.closedAt || Date.parse(i.closedAt) >= cutoff) continue;
+          const card = buildCard(i, this.workflow, this.store.seenAt(repo, i.number, i.closedAt));
+          if (card.needsLook && !card.seenAt) merged.set(i.number, i);
+        }
       }
+      // only a full fetch makes an old-shaped cache current, and only it counts as a reconcile; merged onto the cache, vanished issues stay
+      this.cache[repo] = { v: since ? cached!.v : CACHE_VERSION, fullAt: since ? cached!.fullAt : started, syncedAt: started, issues: [...merged.values()] };
+      if (!since) this.fullBackoff.delete(repo);
+      // an incremental merge onto an old-shaped cache is no recovery: the failing full refetch stays reported
+      if (this.cache[repo]!.v === CACHE_VERSION) this.recovered(repo);
+      if (this.opts.persist) this.store.saveCache(this.cache);
+      changed = true;
+    } catch (e) {
+      const before = this.failures[repo];
+      // shown from the second failed poll in a row: one blip heals on the next tick. A fetch the developer waits for reports at once
+      this.failures[repo] = { message: e instanceof Error ? e.message : String(e), at: before?.at ?? new Date().toISOString(), count: (before?.count ?? 0) + 1, loud: loud || !!before?.loud };
+      if (fullDue && full) {
+        const delay = Math.min((this.fullBackoff.get(repo)?.delay ?? 30_000) * 2, 30 * 60_000);
+        this.fullBackoff.set(repo, { until: Date.now() + delay, delay });
+      }
+      changed = true;
     } finally {
       if (loud) this.syncing.delete(repo);
+      if (changed) this.emit();
     }
-    this.emit();
+  }
+
+  /** A pass that worked: the repo is reachable again. Returns whether there was a failure to clear. */
+  private recovered(repo: string) {
+    this.okAt[repo] = new Date().toISOString();
+    if (!this.failures[repo]) return false;
+    delete this.failures[repo];
+    return true;
   }
 
   /** Back to a cold start (fixture/E2E): drop everything synced, read the source again, then tell the listeners once. */
@@ -119,11 +170,11 @@ export class Board {
     this.muted = true;
     try {
       this.cache = {};
-      this.errors = {};
+      this.failures = {};
+      this.okAt = {};
       this.syncing.clear();
-      this.staleBackoff.clear();
+      this.fullBackoff.clear();
       await this.refreshAll(true);
-      await this.refreshCoordinators();
       await this.refreshActivity();
     } finally {
       this.muted = false;
@@ -142,7 +193,7 @@ export class Board {
   }
 
   addIssue(issue: RawIssue) {
-    (this.cache[issue.repo] ??= { v: CACHE_VERSION, syncedAt: new Date(0).toISOString(), issues: [] }).issues.push(issue);
+    (this.cache[issue.repo] ??= { v: CACHE_VERSION, fullAt: new Date(0).toISOString(), syncedAt: new Date(0).toISOString(), issues: [] }).issues.push(issue);
     this.emit();
   }
 
@@ -160,15 +211,13 @@ export class Board {
     const now = new Date();
     const cards: Card[] = [];
     const sync: BoardSnapshot["sync"] = {};
-    const all = this.store.state.repos.flatMap((repo) => this.cache[repo]?.issues ?? []);
-    // maps read the whole cache: a blocker or sub-issue need not carry a wayfinder label
-    const maps = buildMaps(all, cfg);
-    const tickets = new Set(maps.flatMap((m) => m.tickets.map((t) => `${m.repo}#${t.number}`)));
     for (const repo of this.store.state.repos) {
       const c = this.cache[repo];
-      sync[repo] = { at: c?.syncedAt ?? null, error: this.errors[repo] ?? null, syncing: this.syncing.has(repo) };
+      const f = this.failures[repo];
+      const shown = f && (f.count >= 2 || f.loud) ? f : null;
+      sync[repo] = { at: c?.syncedAt ?? null, okAt: this.okAt[repo] ?? c?.syncedAt ?? null, error: shown?.message ?? null, errorAt: shown?.at ?? null, syncing: this.syncing.has(repo) };
       for (const i of c?.issues ?? []) {
-        if (isWayfinderIssue(i, cfg) || tickets.has(`${repo}#${i.number}`)) continue;
+        if (isWayfinderIssue(i, cfg)) continue;
         const card = buildCard(i, cfg, this.store.seenAt(repo, i.number, i.closedAt));
         if (onBoard(card, cfg, now)) cards.push(card);
       }
@@ -177,19 +226,12 @@ export class Board {
       generatedAt: now.toISOString(),
       repos: this.store.state.repos,
       cards,
-      maps,
       sync,
       viewer: this.viewer,
       workflow: cfg,
       source: this.source.kind,
-      coordinators: this.coordinators,
       activity: this.activity,
     };
-  }
-
-  async refreshCoordinators() {
-    this.coordinators = await this.pusher.coordinators();
-    this.emit();
   }
 
   subscribe(fn: Listener) {
