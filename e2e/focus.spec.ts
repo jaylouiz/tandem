@@ -80,7 +80,10 @@ test("a digit sends a decision at once: the tile showed the comment that is writ
   // every option shows, before it is clicked, the exact comment it will write
   await expect(page.getByTestId("tile-writes-1")).toHaveText("Decision D1: A");
   await expect(page.getByTestId("tile-writes-2")).toHaveText("Decision D1: B");
-  await expect(page.getByTestId("tile-2")).toContainText("The agent recommends this, confidence medium");
+  // the sheet's words: ★ Recommended in the tile head, the reason once under the tiles; no check where a click sends
+  await expect(page.getByTestId("tile-2").locator(".tile-rec")).toHaveText("Recommended");
+  await expect(page.getByTestId("cover-decision").getByTestId("why")).toHaveText("Why: confidence medium");
+  await expect(page.locator(".tile-check")).toHaveCount(0);
   await expect(bar(page)).toContainText("sends it at once");
   const total = (await count(page).textContent())!.split(" of ")[1]!;
   await page.keyboard.press("2");

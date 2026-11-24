@@ -1528,16 +1528,16 @@ details.disclose > summary::-webkit-details-marker { display: none; }
 .tile:active:not([aria-disabled="true"]) { background: var(--bg-active); }
 .tile[data-picked] { background: var(--accent-soft); box-shadow: 0 0 0 1.5px var(--accent); }
 .tile[aria-disabled="true"] { opacity: 0.6; cursor: default; }
-.tile-top { align-self: stretch; display: flex; align-items: center; gap: var(--s-2); }
+/* key cap, head, check on one line; ★ Recommended under the head, so a long head is never squeezed */
+.tile-top { align-self: stretch; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 2px var(--s-2); }
 .tile-top b { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.02em; }
-.tile-check { margin-left: auto; color: var(--accent); flex-shrink: 0; }
+.tile-check { grid-column: 3; margin-left: auto; color: var(--accent); flex-shrink: 0; }
 .tile-text { font-size: var(--fs-lg); line-height: 1.35; letter-spacing: -0.012em; text-wrap: pretty; }
 .tile-writes,
 .sendbar-written code,
 .receipt code { font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; padding: 2px 6px; border-radius: var(--radius); background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); color: var(--text-muted); text-align: left; }
 .tile-writes i { font-family: var(--font); color: var(--text-faint); }
-.tile-rec { margin-top: auto; padding-top: var(--s-1); display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-muted); }
-.tile-rec i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.tile-rec { grid-row: 2; grid-column: 2 / -1; display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); font-weight: 500; color: var(--accent); white-space: nowrap; }
 
 /* a PR's evidence and a Look's checks: quiet facts under a label */
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--s-3) var(--s-5); }
