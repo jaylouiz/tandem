@@ -1,5 +1,5 @@
 // The URL as the page's address (#48): which view, which Card, which tab and which Repo filter. Pure: the store sync is `routing.ts`.
-//   /waiting  /board  /maps  /settings                 the view
+//   /waiting  /board  /settings                        the view
 //   /<view>/<owner>/<repo>/<n>                          with the open Card (key `owner/repo#n`)
 //   ?tab=decided|activity|issue                         the Card pane's tab (Now = no parameter)
 //   ?repo=<owner/repo>                                  the Repo filter (All repos = no parameter)
@@ -11,7 +11,7 @@ export const BASE = ((import.meta as { env?: { BASE_URL?: string } }).env?.BASE_
 /** The page's path as the routes know it: without the mount point. */
 export const appPath = (pathname: string, base = BASE): string => (base && (pathname === base || pathname.startsWith(`${base}/`)) ? pathname.slice(base.length) || "/" : pathname);
 
-export const VIEWS: readonly View[] = ["waiting", "board", "maps", "settings"];
+export const VIEWS: readonly View[] = ["waiting", "board", "settings"];
 const TAB_PARAMS: readonly Tab[] = ["decided", "activity", "issue"];
 
 /** What a URL says. `view` is null for `/` and for a path that names no view: the caller picks the remembered one. */

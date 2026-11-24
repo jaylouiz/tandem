@@ -143,12 +143,6 @@ const NAV_ICON: Record<View, ReactNode> = {
       <path d="M6 2.5v11M10 2.5v11" />
     </>
   ),
-  maps: (
-    <>
-      <path d="M1.8 4l4.2-1.5 4 1.5 4.2-1.5v9.5L10 13.5 6 12l-4.2 1.5z" />
-      <path d="M6 2.5V12M10 4v9.5" />
-    </>
-  ),
   settings: (
     <>
       <path d="M2 4.5h6.2M11.8 4.5H14M2 11.5h2.2M7.8 11.5H14" />

@@ -8,10 +8,10 @@ import { nextAfterAnswer } from "./answered.ts";
 import { appPath, navigation, parseRoute, VIEWS, type Nav } from "./route.ts";
 import { closeToast } from "./ui/Toast.tsx";
 import { pruneHanded, type HandedRecord } from "../core/triage.ts";
-import { NO_COORDINATOR, type ActivityEntry, type BoardView, type Card, type Coordinator, type NextStep, type Phase, type WayfinderMap } from "../core/types.ts";
+import { NO_RUN, type ActivityEntry, type BoardView, type Card, type NextStep, type Phase } from "../core/types.ts";
 
-export type View = "waiting" | "board" | "maps" | "settings";
-/** The views that list Cards: only there the Card keys and the Selection bar are live (Maps and Settings have none to act on). */
+export type View = "waiting" | "board" | "settings";
+/** The views that list Cards: only there the Card keys and the Selection bar are live (Settings has none to act on). */
 export const showsCards = (v: View) => v === "waiting" || v === "board";
 export type Tab = "now" | "decided" | "activity" | "issue";
 export type Modal = "palette" | "capture" | "agents" | "shortcuts";
@@ -27,7 +27,6 @@ export const TABS: { id: Tab; label: string }[] = [
 
 // zustand selectors must never return a fresh []/{} literal (it re-renders forever): empty values live here
 export const NO_REPOS: string[] = [];
-export const NO_COORDINATORS: Record<string, Coordinator> = {};
 export const NO_ACTIVITY: Record<string, ActivityEntry> = {};
 const NO_FAILURES: Record<string, string> = {};
 const NO_DRAFTS: Record<string, Draft> = {};
@@ -392,12 +391,6 @@ export function useLaneView(): LaneView | null {
   return useMemo(() => laneView({ board, repoFilter, lanes, collapsedLanes }), [board, repoFilter, lanes, collapsedLanes]);
 }
 
-export function useMaps(): WayfinderMap[] {
-  const board = useStore((s) => s.board);
-  const repo = useStore((s) => s.repoFilter);
-  return (board?.maps ?? []).filter((m) => !repo || m.repo === repo);
-}
-
 /** The sidebar's Waiting on me count and the per-Repo counts: real blockers only. A Look (To look at) waits on nobody, so it is not counted (#46 D1, GLOSSARY). */
 export const blockerCount = (cards: Card[]): number => waitingOnMe(cards).length;
 
@@ -556,9 +549,9 @@ export async function giveFeedback(card: Card, action: string, body: Record<stri
   useStore.getState().clearFailure(card.key);
   const push = res.value.push;
   if (push && !push.delivered) {
-    // only an answered "nobody is there" offers a start; a Push that failed says why (starting a coordinator would not fix it)
-    const none = push.reason === NO_COORDINATOR;
-    setNotice({ key: card.key, text: `Feedback given, awaiting pickup: ${none ? NO_COORDINATOR : `could not push (${push.reason})`}`, canStart: none });
+    // the Feedback is on GitHub either way. Only "no Run found" offers a start; a Push that failed says why (starting a coordinator would not fix it)
+    const none = push.reason === NO_RUN;
+    setNotice({ key: card.key, text: `Feedback given, not pushed: ${none ? `${NO_RUN} for ${card.repo.split("/")[1]}` : push.reason}`, canStart: none });
   } else if (useStore.getState().focus) {
     // Focus: the next Card and the progress say it went through; a toast per answer would pile up over the sheet. What needs the developer (above) still shows.
   } else if (push?.delivered) {
@@ -571,7 +564,7 @@ export async function giveFeedback(card: Card, action: string, body: Record<stri
 
 /**
  * Open a Card on purpose from outside the lists (palette, notification, Agent activity): one new history entry (#48).
- * Settings has no Card pane, so it goes to the Board first (`opts.view` names another view); Maps shows the pane itself.
+ * Settings has no Card pane, so it goes to the Board first (`opts.view` names another view).
  */
 export function openCard(key: string, opts: { view?: View; tab?: Tab } = {}) {
   const s = useStore.getState();

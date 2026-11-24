@@ -18,9 +18,6 @@ query($owner: String!, $name: String!, $cursor: String, $since: DateTime, $state
       nodes {
         number title body url state stateReason createdAt updatedAt closedAt
         labels(first: 30) { nodes { name } }
-        parent { number repository { nameWithOwner } }
-        assignees(first: 5) { nodes { login } }
-        blockedBy(first: 20) { nodes { number state repository { nameWithOwner } } }
         comments(last: 80) { nodes { id body createdAt url author { login } } }
         closedByPullRequestsReferences(first: 5, includeClosedPrs: true) {
           nodes { number title url state isDraft body updatedAt labels(first: 15) { nodes { name } } }
@@ -45,9 +42,6 @@ interface GqlIssue {
   updatedAt: string;
   closedAt: string | null;
   labels: { nodes: { name: string }[] };
-  parent: { number: number; repository: { nameWithOwner: string } } | null;
-  assignees: { nodes: { login: string }[] };
-  blockedBy: { nodes: { number: number; state: "OPEN" | "CLOSED"; repository: { nameWithOwner: string } }[] };
   comments: { nodes: { id: string; body: string; createdAt: string; url: string; author: { login: string } | null }[] };
   closedByPullRequestsReferences: {
     nodes: { number: number; title: string; url: string; state: "OPEN" | "CLOSED" | "MERGED"; isDraft: boolean; body: string; updatedAt: string; labels: { nodes: { name: string }[] } }[];
@@ -64,12 +58,6 @@ export function toRawIssue(repo: string, i: GqlIssue): RawIssue {
     state: i.state === "OPEN" ? "open" : "closed",
     stateReason: i.stateReason ? (i.stateReason.toLowerCase() as RawIssue["stateReason"]) : null,
     labels: i.labels.nodes.map((l) => l.name),
-    // wayfinder sub-issues and blocking: only same-repo links are kept
-    parent: i.parent && i.parent.repository.nameWithOwner.toLowerCase() === repo.toLowerCase() ? i.parent.number : null,
-    assignees: i.assignees.nodes.map((a) => a.login),
-    blockedBy: i.blockedBy.nodes
-      .filter((b) => b.repository.nameWithOwner.toLowerCase() === repo.toLowerCase())
-      .map((b) => ({ number: b.number, state: b.state === "OPEN" ? "open" : "closed" })),
     createdAt: i.createdAt,
     updatedAt: i.updatedAt,
     closedAt: i.closedAt,
@@ -181,9 +169,6 @@ export class GitHubSource implements Source {
       state: "open",
       stateReason: null,
       labels,
-      parent: null,
-      assignees: [],
-      blockedBy: [],
       createdAt: i.created_at,
       updatedAt: i.updated_at,
       closedAt: null,

@@ -6,7 +6,6 @@ import { BoardView, LaneToggle, boardNavGroups } from "./components/BoardView.ts
 import { DragGhost } from "./components/DragGhost.tsx";
 import { Capture } from "./components/Capture.tsx";
 import { CardPane } from "./components/CardPane.tsx";
-import { MapsView } from "./components/MapsView.tsx";
 import { MarkBar } from "./components/MarkBar.tsx";
 import { Palette } from "./components/Palette.tsx";
 import { Shortcuts } from "./components/Shortcuts.tsx";
@@ -21,7 +20,7 @@ import { useScrollMemory } from "./scroll.ts";
 import { blockerCount, groupsOf, openCard, reconnect, syncProgress, useAllCards, useCards, useLaneView, useStore, type LaneView, type View } from "./store.ts";
 import { ToastRegion } from "./ui/Toast.tsx";
 
-const TITLES: Record<View, string> = { waiting: "Waiting on me", board: "Board", maps: "Wayfinder maps", settings: "Settings" };
+const TITLES: Record<View, string> = { waiting: "Waiting on me", board: "Board", settings: "Settings" };
 
 /** The Cards of the view in on-screen order, split into the lists a ⌘A marks (Board columns, Waiting on me groups). */
 function navGroups(view: View, cards: Card[], openDays: Record<string, boolean>, linger: string | null, lanes: LaneView | null, focus: boolean): Card[][] {
@@ -146,7 +145,6 @@ export function App() {
   const nav: [View, string, number | null, number | null][] = [
     ["waiting", "Waiting on me", waitingCount, allWaiting],
     ["board", "Board", null, null],
-    ["maps", "Wayfinder maps", null, null],
     ["settings", "Settings", null, null],
   ];
 
@@ -265,8 +263,6 @@ export function App() {
               </div>
             ) : view === "board" ? (
               <BoardView cards={cards} />
-            ) : view === "maps" ? (
-              <MapsView />
             ) : (
               <Settings />
             )}

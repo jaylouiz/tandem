@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { NO_COORDINATOR, type Card } from "../core/types.ts";
+import { NO_RUN, type Card } from "../core/types.ts";
 
 // The store reads localStorage when it loads: stub the browser globals first, then import it.
 const mem = new Map<string, string>();
@@ -43,13 +43,13 @@ describe("giveFeedback: the footer after the Push", () => {
     expect(await push({ delivered: true, runId: "r", reason: null })).toMatchObject({ text: "Feedback given and pushed to the coordinator", canStart: false });
   });
 
-  it("Orca answered that none runs: offers to start one", async () => {
-    expect(await push({ delivered: false, runId: null, reason: NO_COORDINATOR })).toMatchObject({ text: "Feedback given, awaiting pickup: no coordinator running", canStart: true });
+  it("no Run found for the repo: says the Push was not sent and offers to start a coordinator", async () => {
+    expect(await push({ delivered: false, runId: null, reason: NO_RUN })).toMatchObject({ text: "Feedback given, not pushed: no Orca Run found for r", canStart: true });
   });
 
   it("a Push that failed says why and does not claim nobody is running", async () => {
     const n = await push({ delivered: false, runId: null, reason: "could not reach Orca: orca terminal list timed out" });
-    expect(n).toMatchObject({ text: "Feedback given, awaiting pickup: could not push (could not reach Orca: orca terminal list timed out)", canStart: false });
+    expect(n).toMatchObject({ text: "Feedback given, not pushed: could not reach Orca: orca terminal list timed out", canStart: false });
   });
 });
 

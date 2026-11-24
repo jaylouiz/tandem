@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_WORKFLOW } from "../core/config.ts";
-import type { BoardView, Card } from "../core/types.ts";
+import { NO_RUN, type BoardView, type Card } from "../core/types.ts";
 
 // The store reads localStorage when it loads: stub the browser globals first, then import it.
 const mem = new Map<string, string>();
@@ -22,7 +22,7 @@ describe("Hand to agent: handed state", () => {
   const a = mk("o/with", 1);
   const b = mk("o/without", 2);
   beforeEach(() => {
-    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a, b], repos: [], sync: {}, coordinators: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [], selected: a.key });
+    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a, b], repos: [], sync: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [], selected: a.key });
   });
 
   it("a delivered Push keeps the Card handed and a second run does nothing", async () => {
@@ -57,10 +57,10 @@ describe("Hand to agent: handed state", () => {
   });
 
   it("an undelivered Push rolls back and offers Start coordinator", async () => {
-    vi.stubGlobal("fetch", reply({ push: { delivered: false, runId: null, reason: "no coordinator running" } }));
+    vi.stubGlobal("fetch", reply({ push: { delivered: false, runId: null, reason: NO_RUN } }));
     await triage.runTriage(hand(), [b]);
     expect(store.useStore.getState().handed[b.key]).toBeUndefined();
-    expect(store.useStore.getState().notice).toMatchObject({ text: "No coordinator running", canStart: true, start: [b] });
+    expect(store.useStore.getState().notice).toMatchObject({ text: "Not handed: no Orca Run found for without", canStart: true, start: [b] });
   });
 
   it("an unreachable Orca rolls back, names Orca and does not offer Start coordinator (#63)", async () => {
@@ -74,14 +74,14 @@ describe("Hand to agent: handed state", () => {
   it("a bulk run with one handed, one without coordinator and one unreachable reads each right, and starts only the one without (#63)", async () => {
     const c = mk("o/down", 3);
     const why = "could not reach Orca: boom";
-    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a, b, c], repos: [], sync: {}, coordinators: {} } as unknown as BoardView });
+    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a, b, c], repos: [], sync: {} } as unknown as BoardView });
     vi.stubGlobal("fetch", async (url: string) =>
-      reply({ push: url.includes("/o/with/") ? { delivered: true } : url.includes("/o/without/") ? { delivered: false, reason: "no coordinator running" } : { delivered: false, reason: why } })(),
+      reply({ push: url.includes("/o/with/") ? { delivered: true } : url.includes("/o/without/") ? { delivered: false, reason: NO_RUN } : { delivered: false, reason: why } })(),
     );
     await triage.runTriage(hand(), [a, b, c]);
     expect(Object.keys(store.useStore.getState().handed)).toEqual([a.key]);
     expect(store.useStore.getState().notice).toMatchObject({
-      text: `Handed 1 Card to the coordinator; no coordinator running for without; 1 Card not handed over (${why})`,
+      text: `Handed 1 Card to the coordinator; no Orca Run found for without; 1 Card not handed over (${why})`,
       canStart: true,
       start: [b],
     });
@@ -91,7 +91,7 @@ describe("Hand to agent: handed state", () => {
     vi.stubGlobal("fetch", async (url: string) => (url.includes("/o/with/") ? reply({ push: { delivered: true } })() : reply({ push: { delivered: false } })()));
     await triage.runTriage(hand(), [a, b]);
     expect(Object.keys(store.useStore.getState().handed)).toEqual([a.key]);
-    expect(store.useStore.getState().notice?.text).toBe("Handed 1 Card to the coordinator; no coordinator running for without");
+    expect(store.useStore.getState().notice?.text).toBe("Handed 1 Card to the coordinator; no Orca Run found for without");
   });
 
   it("a Next step or Hold on the Card drops the record, so release brings the button back", async () => {
@@ -105,7 +105,7 @@ describe("Hand to agent: handed state", () => {
 describe("re-steering a handed Card", () => {
   const a = mk("o/with", 1);
   it("a hold whose write fails leaves the Card handed, so it is not offered a second Push", async () => {
-    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a], repos: [], sync: {}, coordinators: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [] });
+    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [a], repos: [], sync: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [] });
     store.useStore.getState().markHanded([a]);
     vi.stubGlobal("fetch", reply({ error: "boom" }, 500));
     await triage.runTriage(triage.TRIAGE_ENTRIES.find((e) => e.id === "hold")!, [a]);
@@ -118,7 +118,7 @@ describe("moving Cards between Inbox and Backlog", () => {
   const backlog = (n: number, over: Partial<Card> = {}) => ({ ...mk("o/r", n), labels: ["needs-spec"], nextStep: "specify", ...over }) as Card;
   const phaseOf = (c: Card) => store.currentCards(store.useStore.getState()).find((x) => x.key === c.key)!.phase;
   const seed = (cards: Card[], extra: Partial<ReturnType<typeof store.useStore.getState>> = {}) =>
-    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards, repos: [], sync: {}, coordinators: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [], moveStep: "keep", selected: null, ...extra });
+    store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards, repos: [], sync: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [], moveStep: "keep", selected: null, ...extra });
 
   it("moves at once, writes the lane label per Card, clears the selection and offers Undo", async () => {
     const a = inbox(1);
@@ -202,7 +202,7 @@ describe("moving Cards between Inbox and Backlog", () => {
 describe("toast copy names the outcome (#46)", () => {
   const entry = (id: string) => triage.TRIAGE_ENTRIES.find((e) => e.id === id)!;
   const c = mk("o/r", 7);
-  const put = (card: Card) => store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [card], repos: [], sync: {}, coordinators: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [], selected: card.key });
+  const put = (card: Card) => store.useStore.setState({ board: { workflow: DEFAULT_WORKFLOW, cards: [card], repos: [], sync: {} } as unknown as BoardView, handed: store.NO_HANDED, pending: {}, notice: null, marked: [], selected: card.key });
 
   it("Hold says Held, and on a held Card Released", async () => {
     put(c);

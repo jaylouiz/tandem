@@ -1,10 +1,9 @@
 // Keeps raw GitHub data fresh per opted-in repo and turns it into Board snapshots (ADR 0002).
 // Cold start serves the on-disk cache at once; a poll loop asks each repo "changed?" cheaply and
 // refetches only issues updated since the last sync.
-import { buildCard, onBoard } from "../core/card.ts";
-import { isWayfinderIssue, buildMaps } from "../core/wayfinder.ts";
+import { buildCard, isWayfinderIssue, onBoard } from "../core/card.ts";
 import { mergeWorkflow, type WorkflowConfig } from "../core/config.ts";
-import type { ActivityEntry, BoardSnapshot, BoardView, Card, Coordinator, RawIssue } from "../core/types.ts";
+import type { ActivityEntry, BoardSnapshot, BoardView, Card, RawIssue } from "../core/types.ts";
 import { readLogActivity, type ActivityReader } from "./activity.ts";
 import type { Pusher } from "./push.ts";
 import type { Source } from "./source.ts";
@@ -20,7 +19,6 @@ export class Board {
   private syncing = new Set<string>();
   private listeners = new Set<Listener>();
   private timer: ReturnType<typeof setInterval> | null = null;
-  private coordinators: Record<string, Coordinator> = {};
   private activity: Record<string, ActivityEntry> = {};
   private viewer: string | null = null;
   private emitQueued = false;
@@ -56,9 +54,6 @@ export class Board {
 
   private async tick() {
     await this.refreshAll(false);
-    const before = JSON.stringify(this.coordinators);
-    this.coordinators = await this.pusher.coordinators();
-    if (JSON.stringify(this.coordinators) !== before) this.emit();
     await this.refreshActivity();
   }
 
@@ -77,7 +72,7 @@ export class Board {
   async refresh(repo: string, force = false) {
     // only a loud refresh (forced, or no cache yet) shows as Syncing; a quiet poll of a cached repo would
     // otherwise leave the flag set in any snapshot emitted before it ends, with no emit after the "unchanged" path
-    // a cache from before the current sync fields lacks them (e.g. a ticket's `parent`): one full fetch fills them in
+    // a cache from before the current sync fields lacks them (a field added to the sync later): one full fetch fills them in
     // a failing refetch backs off (1 min, doubling to 30), and polls in between take the quiet ETag path
     const stale = !!this.cache[repo] && this.cache[repo]!.v !== CACHE_VERSION;
     const backedOff = stale && (this.staleBackoff.get(repo)?.until ?? 0) > Date.now();
@@ -123,7 +118,6 @@ export class Board {
       this.syncing.clear();
       this.staleBackoff.clear();
       await this.refreshAll(true);
-      await this.refreshCoordinators();
       await this.refreshActivity();
     } finally {
       this.muted = false;
@@ -160,15 +154,11 @@ export class Board {
     const now = new Date();
     const cards: Card[] = [];
     const sync: BoardSnapshot["sync"] = {};
-    const all = this.store.state.repos.flatMap((repo) => this.cache[repo]?.issues ?? []);
-    // maps read the whole cache: a blocker or sub-issue need not carry a wayfinder label
-    const maps = buildMaps(all, cfg);
-    const tickets = new Set(maps.flatMap((m) => m.tickets.map((t) => `${m.repo}#${t.number}`)));
     for (const repo of this.store.state.repos) {
       const c = this.cache[repo];
       sync[repo] = { at: c?.syncedAt ?? null, error: this.errors[repo] ?? null, syncing: this.syncing.has(repo) };
       for (const i of c?.issues ?? []) {
-        if (isWayfinderIssue(i, cfg) || tickets.has(`${repo}#${i.number}`)) continue;
+        if (isWayfinderIssue(i, cfg)) continue;
         const card = buildCard(i, cfg, this.store.seenAt(repo, i.number, i.closedAt));
         if (onBoard(card, cfg, now)) cards.push(card);
       }
@@ -177,19 +167,12 @@ export class Board {
       generatedAt: now.toISOString(),
       repos: this.store.state.repos,
       cards,
-      maps,
       sync,
       viewer: this.viewer,
       workflow: cfg,
       source: this.source.kind,
-      coordinators: this.coordinators,
       activity: this.activity,
     };
-  }
-
-  async refreshCoordinators() {
-    this.coordinators = await this.pusher.coordinators();
-    this.emit();
   }
 
   subscribe(fn: Listener) {

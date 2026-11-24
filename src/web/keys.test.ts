@@ -72,8 +72,8 @@ describe("the key table", () => {
     st().select(null);
   });
 
-  it("scopes every key that acts on Cards to the views that list Cards (not Maps, Settings)", () => {
-    const cardKeys = ["j", "k", "x", "l", "o", "m", "i", "d", "s", "b", "h", "w", "a", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "[", "]", "J", "K", "ArrowDown", "ArrowUp"];
+  it("scopes every key that acts on Cards to the views that list Cards (not Settings)", () => {
+    const cardKeys = ["j", "k", "x", "l", "o", "i", "d", "s", "b", "h", "w", "a", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "[", "]", "J", "K", "ArrowDown", "ArrowUp"];
     for (const k of cardKeys) for (const b of keys.BINDINGS.filter((b) => !b.chord && !b.mod && b.keys.includes(k))) expect(b.scope, `${b.id} on ${k}`).toBe("cards");
     // the chords with ⌘/Ctrl that act on the open Card: ⌘A (mark the column) and ⌘↵ (send the Feedback)
     for (const id of ["select-all", "send-feedback"]) expect(keys.BINDINGS.find((b) => b.id === id)?.scope, id).toBe("cards");

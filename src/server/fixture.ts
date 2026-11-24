@@ -67,7 +67,7 @@ export class FixtureSource implements Source {
     const number = Math.max(0, ...this.issues.filter((i) => i.repo === repo).map((i) => i.number)) + 1;
     const now = new Date().toISOString();
     const issue: RawIssue = {
-      repo, number, title, body, labels, parent: null, assignees: [], blockedBy: [],
+      repo, number, title, body, labels,
       url: `https://github.com/${repo}/issues/${number}`,
       state: "open", stateReason: null, createdAt: now, updatedAt: now, closedAt: null, comments: [], pullRequests: [],
     };

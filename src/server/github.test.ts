@@ -39,29 +39,11 @@ describe("sync query", () => {
   });
 });
 
-describe("wayfinder fields", () => {
-  const gql = (over: Record<string, unknown> = {}) =>
-    ({
-      number: 7, title: "t", body: "", url: "u", state: "OPEN", stateReason: null, createdAt: "a", updatedAt: "b", closedAt: null,
-      labels: { nodes: [{ name: "wayfinder:research" }] },
-      parent: { number: 3, repository: { nameWithOwner: "O/R" } },
-      assignees: { nodes: [{ login: "demo-user" }] },
-      blockedBy: { nodes: [{ number: 5, state: "OPEN", repository: { nameWithOwner: "o/r" } }, { number: 6, state: "CLOSED", repository: { nameWithOwner: "o/r" } }, { number: 1, state: "OPEN", repository: { nameWithOwner: "x/y" } }] },
-      comments: { nodes: [] }, closedByPullRequestsReferences: { nodes: [] },
-      ...over,
-    }) as unknown as Parameters<typeof toRawIssue>[1];
-
-  it("maps parent, assignees and same-repo blockers", () => {
-    expect(toRawIssue("o/r", gql())).toMatchObject({ parent: 3, assignees: ["demo-user"], blockedBy: [{ number: 5, state: "open" }, { number: 6, state: "closed" }] });
-  });
-  it("drops a parent in another repo and keeps null parents null", () => {
-    expect(toRawIssue("o/r", gql({ parent: { number: 3, repository: { nameWithOwner: "x/y" } } })).parent).toBeNull();
-    expect(toRawIssue("o/r", gql({ parent: null })).parent).toBeNull();
-  });
-  it("asks for the fields in the delta query", async () => {
+describe("the issue query", () => {
+  it("does not ask for the sub-issue and blocker fields the removed Wayfinder maps view needed (#15)", async () => {
     const fetchMock = stub({ data: { repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } } });
     await new GitHubSource("t").fetchIssues("o/r", null, 7);
     const q = String((JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)) as { query: string }).query);
-    for (const f of ["parent {", "assignees(first", "blockedBy(first"]) expect(q).toContain(f);
+    for (const f of ["parent {", "assignees(first", "blockedBy(first"]) expect(q).not.toContain(f);
   });
 });

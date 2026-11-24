@@ -34,7 +34,7 @@ export interface Binding {
   /** `KeyboardEvent.key` values that trigger it (the overview shows them; a chord shows `<chord> <key>`) */
   keys: string[];
   label: string;
-  /** "anywhere", or "cards": only on a view that lists Cards (Waiting on me, Board); Maps and Settings have none to act on */
+  /** "anywhere", or "cards": only on a view that lists Cards (Waiting on me, Board); Settings has none to act on */
   scope: "anywhere" | "cards";
   /** held ⌘ or Ctrl */
   mod?: boolean;
@@ -46,7 +46,7 @@ export interface Binding {
   run: (e: KeyboardEvent, ctx: KeyCtx) => boolean | void;
 }
 
-/** The Feedback panel of the open Card, when its number keys and ⌘↵ are live (the panel registers only while its tab is open; the bindings are scoped to Card views, so never on Maps or Settings). */
+/** The Feedback panel of the open Card, when its number keys and ⌘↵ are live (the panel registers only while its tab is open; the bindings are scoped to Card views, so never on Settings). */
 const livePanel = () => (panelKeys.current && panelKeys.current.cardKey === useStore.getState().selected ? panelKeys.current : null);
 
 const inFocus = () => useStore.getState().focus;
@@ -97,7 +97,6 @@ function move({ order }: KeyCtx, dir: 1 | -1) {
 const GO: [string, string, View][] = [
   ["w", "Waiting on me", "waiting"],
   ["b", "Board", "board"],
-  ["m", "Wayfinder maps", "maps"],
   ["s", "Settings", "settings"],
 ];
 

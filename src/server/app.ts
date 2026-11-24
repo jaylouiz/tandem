@@ -5,7 +5,7 @@ import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { answerComment, challengeComment, parseScreenshots, prVerdictComment, roundReactionComment, type PrVerdict } from "../core/contract.ts";
 import { alignImages } from "../core/images.ts";
-import { NO_COORDINATOR, type RawIssue } from "../core/types.ts";
+import type { RawIssue } from "../core/types.ts";
 import { issueLogPath } from "./activity.ts";
 import type { Board } from "./board.ts";
 import { guard, isIssueNumber, isRepo, isRepoPart, isStringArray, type Access } from "./guard.ts";
@@ -68,7 +68,6 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
 
   app.post("/api/refresh", async (c) => {
     await board.refreshAll(true);
-    await board.refreshCoordinators();
     // a repo that failed to sync is recorded, not thrown: say so instead of "ok"
     const failed = Object.entries(board.view().sync).filter(([, s]) => s.error);
     if (failed.length) return c.json({ error: failed.map(([repo, s]) => `${repo}: ${s.error}`).join("; ") }, 502);
@@ -123,10 +122,7 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
   async function maybePush(repo: string, n: number, event: PushEvent, text: string, push: boolean): Promise<PushResult | null> {
     if (!push) return null;
     try {
-      const res = await pusher.push(repo, n, event, text);
-      // the Push just asked Orca: when the Board's copy of the answer differs, bring it in line, so the Card pane says what the footer says
-      if ((res.delivered || res.reason === NO_COORDINATOR) && !!board.view().coordinators[repo] !== res.delivered) await board.refreshCoordinators();
-      return res;
+      return await pusher.push(repo, n, event, text);
     } catch (e) {
       return { delivered: false, runId: null, reason: e instanceof Error ? e.message : String(e) };
     }
@@ -225,7 +221,6 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
     const path = store.state.repoPaths[repo] ?? (await pusher.knownPaths())[repo];
     if (!path) return c.json({ error: `No local checkout known for ${repo}. Set its path in Settings.` }, 400);
     await pusher.startCoordinator(repo, path, numbers);
-    await board.refreshCoordinators();
     return c.json({ ok: true });
   });
 

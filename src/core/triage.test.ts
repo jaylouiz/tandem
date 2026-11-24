@@ -149,12 +149,12 @@ describe("hand to agent: notice and coordinator start", () => {
   const a = card(103);
   const b = { ...card(103), repo: "acme/other", number: 7, key: "acme/other#7" };
   const c = { ...card(103), number: 8, key: "acme/app#8" };
-  it("says what was handed over and where no coordinator runs", () => {
+  it("says what was handed over and where no Run was found to send to", () => {
     expect(handNotice([a], [])).toBe("Handed to the coordinator · specify");
     expect(handNotice([a, b], [])).toBe("Handed to the coordinator · 2 Cards");
-    expect(handNotice([], [a])).toBe("No coordinator running");
-    expect(handNotice([a], [b])).toBe("Handed 1 Card to the coordinator; no coordinator running for other");
-    expect(handNotice([], [a, b])).toBe("No coordinator running for app, other");
+    expect(handNotice([], [a])).toBe("Not handed: no Orca Run found for app");
+    expect(handNotice([a], [b])).toBe("Handed 1 Card to the coordinator; no Orca Run found for other");
+    expect(handNotice([], [a, b])).toBe("No Orca Run found for app, other");
   });
   it("starts one coordinator per repo with every undelivered Card of that repo", () => {
     expect(startRequests([a, b, c])).toEqual([
@@ -198,10 +198,10 @@ describe("handed to the coordinator", () => {
     expect(handNotice([], [], ["boom"])).toBe("Failed: boom");
     expect(handNotice([], [], ["boom", "x"])).toBe("2 failed: boom");
     expect(handNotice([a], [], ["boom"])).toBe("Handed to the coordinator · specify; 1 failed: boom");
-    expect(handNotice([a], [b], ["boom"])).toBe("Handed 1 Card to the coordinator; no coordinator running for other; 1 failed: boom");
-    expect(handNotice([], [b], ["boom"])).toBe("No coordinator running for other; 1 failed: boom");
+    expect(handNotice([a], [b], ["boom"])).toBe("Handed 1 Card to the coordinator; no Orca Run found for other; 1 failed: boom");
+    expect(handNotice([], [b], ["boom"])).toBe("No Orca Run found for other; 1 failed: boom");
   });
-  it("names an unreachable Orca instead of saying no coordinator runs, and does not count it for Start coordinator (#63)", () => {
+  it("names an unreachable Orca instead of saying no Run was found, and does not count it for Start coordinator (#63)", () => {
     const a = card(103);
     const b = { ...card(103), repo: "acme/other", number: 7, key: "acme/other#7" };
     const c = { ...card(103), number: 8, key: "acme/app#8" };
@@ -209,10 +209,10 @@ describe("handed to the coordinator", () => {
     expect(handNotice([], [], [], [{ card: a, reason: why }])).toBe(`Not handed over (${why})`);
     expect(handNotice([], [], [], [{ card: a, reason: why }, { card: b, reason: why }])).toBe(`2 Cards not handed over (${why})`);
     expect(handNotice([a], [], [], [{ card: b, reason: why }])).toBe(`Handed 1 Card to the coordinator; 1 Card not handed over (${why})`);
-    expect(handNotice([], [a], [], [{ card: b, reason: why }])).toBe(`No coordinator running for app; 1 Card not handed over (${why})`);
-    expect(handNotice([a], [b], [], [{ card: c, reason: why }])).toBe(`Handed 1 Card to the coordinator; no coordinator running for other; 1 Card not handed over (${why})`);
+    expect(handNotice([], [a], [], [{ card: b, reason: why }])).toBe(`No Orca Run found for app; 1 Card not handed over (${why})`);
+    expect(handNotice([a], [b], [], [{ card: c, reason: why }])).toBe(`Handed 1 Card to the coordinator; no Orca Run found for other; 1 Card not handed over (${why})`);
     expect(handNotice([], [], ["boom"], [{ card: a, reason: why }])).toBe(`Not handed over (${why}); 1 failed: boom`);
-    expect(handNotice([], [a], [], [])).toBe("No coordinator running");
+    expect(handNotice([], [a], [], [])).toBe("Not handed: no Orca Run found for app");
   });
   it("reports which repos started and which did not", () => {
     expect(startNotice(["a", "b"], [])).toBe("Coordinator starting for a, b");

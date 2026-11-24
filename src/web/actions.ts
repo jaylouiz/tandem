@@ -38,7 +38,7 @@ export interface ActionCtx {
   view: View;
   /** the open Card, if any */
   card: Card | null;
-  /** the Card awaits pickup and no coordinator runs for its Repo (Start coordinator) */
+  /** the Card awaits pickup: Start coordinator is offered as a plain action (whether one runs is not known, #14) */
   startable: boolean;
   /** its last Feedback was not sent (the Not sent message shows) */
   failed: boolean;
@@ -72,7 +72,6 @@ export function paletteActions(c: ActionCtx): PaletteAction[] {
   for (const [id, label, view] of [
     ["go-waiting", "Waiting on me", "waiting"],
     ["go-board", "Board", "board"],
-    ["go-maps", "Wayfinder maps", "maps"],
     ["go-settings", "Settings", "settings"],
   ] as const)
     add({ id, group: "Go to", label, binding: id, run: () => s().setView(view) });
@@ -107,7 +106,7 @@ export function paletteActions(c: ActionCtx): PaletteAction[] {
       add({ id: "next", group: "Card", label: "Next Card", binding: "next", run: run("next", "j") });
       add({ id: "previous", group: "Card", label: "Previous Card", binding: "previous", run: run("previous", "k") });
     }
-    // the keys below are Card-scoped: on Maps they do nothing, so Mark (its marks would be invisible there) is not offered and Open runs without a key
+    // the keys below are Card-scoped: on Settings they do nothing, so Mark (its marks would be invisible there) is not offered and Open runs without a key
     if (cards) add({ id: "mark", group: "Card", label: "Mark the open Card", binding: "mark", search: "select", run: run("mark") });
     add({ id: "open", group: "Card", label: "Open on GitHub", ...(cards ? { binding: "open" } : {}), run: () => void window.open(card.url, "_blank") });
     add({ id: "close-card", group: "Card", label: "Close the Card", binding: "escape", keys: "esc", run: () => s().select(null) });
