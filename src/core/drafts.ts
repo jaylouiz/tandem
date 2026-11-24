@@ -19,6 +19,8 @@ export function liveDraftIds(card: Card): string[] {
   if (w?.kind === "decision" && w.requestId) ids.push(w.requestId);
   const round = card.rounds.at(-1);
   if (w?.kind === "design-round" && round) ids.push(roundDraftId(round.round));
+  // a round in the question format is answered as its request (`questions.ts`): that draft lives under the request id
+  if (w?.kind === "design-round" && w.requestId) ids.push(w.requestId);
   if (w?.kind === "pr-approval") ids.push(prDraftId(w.requestId));
   if (card.decisionsToAccept.length) ids.push(AGENT_DRAFT_ID);
   return ids;

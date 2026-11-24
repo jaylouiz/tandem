@@ -4,7 +4,8 @@ import { serve } from "@hono/node-server";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { decisionFeedback, feedbackComment, prFeedback, roundFeedback, type Feedback } from "../core/answer.ts";
+import { decisionFeedback, feedbackComment, prFeedback, questionsFeedback, roundFeedback, type Feedback } from "../core/answer.ts";
+import { askQuestions } from "../core/questions.ts";
 import { parseMarker } from "../core/contract.ts";
 import { NO_RUN } from "../core/types.ts";
 import { createApp } from "./app.ts";
@@ -45,7 +46,7 @@ describe("feedback", () => {
     expect((await res.json()).push).toMatchObject({ delivered: true });
     const raw = (await source.fetchIssues("acme/app", null)).find((i) => i.number === 105)!;
     const last = raw.comments.at(-1)!.body;
-    expect(last).toBe("D1: B");
+    expect(last).toBe("Decision D1: B");
     expect(parseMarker(last)).toBeNull();
     const c = await card(105);
     expect(c.waiting).toBeNull();
@@ -65,6 +66,10 @@ describe("feedback", () => {
       roundFeedback(1, ["b"], [], ""),
       roundFeedback(1, ["a", "b"], ["c"], "header from a, list from b"),
     ];
+    // an ask with several questions (#13): every form of its one comment
+    const ask = askQuestions(await card(183))!;
+    all.push(questionsFeedback(ask, {}, {}), questionsFeedback(ask, { 1: "A" }, {}), questionsFeedback(ask, { 1: "C" }, { 1: "but calmer" }));
+    expect(all.slice(-3).map(feedbackComment)).toEqual(["Decision D1: ok", "Decision D1: ok. 1A", "Decision D1: 1 Shell: C (Top stepper) but calmer\n2 Heading: A (Hidden)\n3 Width: B (Content width)"]);
     for (const f of all) {
       const res = await post(`/api/cards/acme/app/105/${f.action}`, { ...f.body, push: false });
       expect(res.status).toBe(200);

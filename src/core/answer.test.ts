@@ -21,19 +21,19 @@ describe("a decision's answer text", () => {
   });
 });
 
-// The same text as before #8 for the same answer: these literals are what the panels wrote.
+// These literals are what lands on GitHub: every reply to a decision starts with `Decision D<k>: ` (#1).
 describe("the comment an option shows is the comment that is written", () => {
   it("a decision without and with a note", () => {
-    expect(feedbackComment(decisionFeedback("D3", "B: 5", ""))).toBe("D3: B");
-    expect(feedbackComment(decisionFeedback("D3", "B: 5", "and log each retry"))).toBe("D3: B. and log each retry");
-    expect(feedbackComment(decisionFeedback("D3", null, "7, it is a slow API"))).toBe("D3: 7, it is a slow API");
+    expect(feedbackComment(decisionFeedback("D3", "B: 5", ""))).toBe("Decision D3: B");
+    expect(feedbackComment(decisionFeedback("D3", "B: 5", "and log each retry"))).toBe("Decision D3: B. and log each retry");
+    expect(feedbackComment(decisionFeedback("D3", null, "7, it is a slow API"))).toBe("Decision D3: 7, it is a slow API");
   });
 
   it("each PR verdict", () => {
-    expect(feedbackComment(prFeedback("D1", "approve", ""))).toBe("D1: Approve: merge");
-    expect(feedbackComment(prFeedback("D1", "approve", "nice"))).toBe("D1: Approve: merge. nice");
-    expect(feedbackComment(prFeedback("D1", "hold", ""))).toBe("D1: Hold");
-    expect(feedbackComment(prFeedback("D1", "send-back", "the empty state is missing"))).toBe("D1: Send back. the empty state is missing");
+    expect(feedbackComment(prFeedback("D1", "approve", ""))).toBe("Decision D1: Approve: merge");
+    expect(feedbackComment(prFeedback("D1", "approve", "nice"))).toBe("Decision D1: Approve: merge. nice");
+    expect(feedbackComment(prFeedback("D1", "hold", ""))).toBe("Decision D1: Hold");
+    expect(feedbackComment(prFeedback("D1", "send-back", "the empty state is missing"))).toBe("Decision D1: Send back. the empty state is missing");
     expect(feedbackComment(prFeedback(null, "approve", ""))).toBe("Approve: merge");
   });
 
