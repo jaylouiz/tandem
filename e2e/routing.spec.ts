@@ -93,7 +93,7 @@ test("a Card that is not on the Board closes with a notice and does not add a Ba
   await page.goto("/waiting");
   await loaded(page);
   await page.goto(`/board/${K}/99999`);
-  await expect(page.getByTestId("toast").filter({ hasText: `${K}#99999 is not on the Board` })).toBeVisible();
+  await expect(toast(page, `${K}#99999 is not on the Board`)).toBeVisible();
   await expect(detail(page)).toHaveCount(0);
   expect(url(page)).toBe("/board");
   await page.goBack();
