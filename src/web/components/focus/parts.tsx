@@ -47,8 +47,8 @@ export function Meta({ card, kind }: { card: Card; kind: Kind }) {
 
 export interface TileProps {
   n: number;
-  /** the option's key (`B`) or the verdict's name */
-  head: ReactNode;
+  /** the option's key (`B`) or the verdict's name; none when the option has no short key (its digit is the head then) */
+  head?: ReactNode;
   text?: ReactNode;
   /** the comment a click writes, word for word; absent while the note is open (the Send bar shows the whole comment then) */
   writes?: ReactNode;
@@ -67,7 +67,7 @@ export function Tile({ n, head, text, writes, picks, picked, recommended, onClic
     <Btn className="tile" data-testid={`tile-${n}`} data-picked={picked || undefined} aria-pressed={picks ? picked : undefined} why={sending ? "Sending…" : null} onClick={onClick}>
       <span className="tile-top">
         <kbd>{n}</kbd>
-        <b>{head}</b>
+        {head && <b>{head}</b>}
         {recommended && (
           <span className="tile-rec">
             <Star /> Recommended

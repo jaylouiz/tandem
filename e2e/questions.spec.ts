@@ -408,6 +408,10 @@ test("Focus: a click on the ★ option of a one-question decision sends it", asy
   // an option's Markdown is rendered, not shown raw
   await expect(page.getByTestId("tile-2").locator(".tile-text code")).toHaveText("Jetzt");
   await expect(page.getByTestId("tile-2")).not.toContainText("`");
+  // an option without a short key is no heading: its digit heads the tile, the line reads at text size
+  await expect(page.getByTestId("tile-4").locator(".tile-top b")).toHaveCount(0);
+  await expect(page.getByTestId("tile-4").locator(".tile-text")).toContainText("Or a mix");
+  await expect(page.getByTestId("tile-1").locator(".tile-top b")).toHaveText("H1 Sunlit Outline");
   await page.getByTestId("tile-1").click();
   await expect.poll(async () => (await written(page, 185)).answer).toBe("Decision D1: H1 Sunlit Outline");
 });
