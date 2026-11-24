@@ -35,7 +35,6 @@ function PaletteBody() {
   const cfg = useStore((s) => s.board?.workflow);
   const moveStep = useStore((s) => s.moveStep);
   const view = useStore((s) => s.view);
-  const tab = useStore((s) => s.tab);
   const focus = useStore((s) => s.focus);
   const marked = useStore((s) => s.marked.length);
   const lanes = useStore((s) => s.lanes);
@@ -51,7 +50,6 @@ function PaletteBody() {
         card: selected,
         startable: !!selected?.awaitingPickup,
         failed,
-        tab,
         marked,
         shots: selected ? shotsTarget(selected) : null,
         canUndo: canUndo(),
@@ -72,7 +70,7 @@ function PaletteBody() {
             },
         setTheme,
       }),
-    [view, focus, selected, failed, tab, marked, repoCount, lanes, filter, live, targets, cfg, moveStep, handed],
+    [view, focus, selected, failed, marked, repoCount, lanes, filter, live, targets, cfg, moveStep, handed],
   );
   const groups = [...new Set(actions.map((a) => a.group))];
   const item = (a: PaletteAction) => {

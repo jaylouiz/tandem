@@ -13,13 +13,11 @@ afterEach(() => vi.unstubAllGlobals());
 const card = { key: "o/r#1", repo: "o/r", number: 1 } as Card;
 
 describe("giveFeedback", () => {
-  it("a failed answer brings the Card back on its Now tab, also when it was already the selected one", async () => {
+  it("a failed answer keeps (or brings back) the Card, with the reason on it", async () => {
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ error: "boom" }), { status: 500, headers: { "content-type": "application/json" } }));
-    // the last blocker was answered: the pane switched to Decided and still holds the Card
-    store.useStore.setState({ selected: card.key, tab: "decided" });
+    store.useStore.setState({ selected: null });
     await store.giveFeedback(card, "answer", {}, {});
     expect(store.useStore.getState().selected).toBe(card.key);
-    expect(store.useStore.getState().tab).toBe("now");
     expect(store.useStore.getState().failures[card.key]).toContain("boom");
   });
 
@@ -113,7 +111,7 @@ describe("giveFeedback in Waiting on me: only the developer's own answer advance
   const board = (cards: Card[]) => ({ cards }) as unknown as import("../core/types.ts").BoardView;
   const ok = () => vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ push: null }), { status: 200, headers: { "content-type": "application/json" } }));
   const sel = () => store.useStore.getState().selected;
-  const start = (view: "waiting" | "board" = "waiting") => store.useStore.setState({ board: board([a, b, c]), pending: {}, view, repoFilter: null, selected: b.key, tab: "now", failures: {} });
+  const start = (view: "waiting" | "board" = "waiting") => store.useStore.setState({ board: board([a, b, c]), pending: {}, view, repoFilter: null, selected: b.key, failures: {} });
 
   it("answering the open blocker opens the one now at its place", async () => {
     ok();
@@ -122,11 +120,11 @@ describe("giveFeedback in Waiting on me: only the developer's own answer advance
     expect(sel()).toBe(c.key);
   });
 
-  it("the last blocker answered: the pane keeps the Card on Decided", async () => {
+  it("the last blocker answered: the sheet keeps the Card (it now says the Feedback awaits pickup)", async () => {
     ok();
-    store.useStore.setState({ board: board([a]), pending: {}, view: "waiting", repoFilter: null, selected: a.key, tab: "now" });
+    store.useStore.setState({ board: board([a]), pending: {}, view: "waiting", repoFilter: null, selected: a.key });
     await store.giveFeedback(a, "answer", {}, { waiting: null });
-    expect(store.useStore.getState()).toMatchObject({ selected: a.key, tab: "decided" });
+    expect(store.useStore.getState()).toMatchObject({ selected: a.key });
   });
 
   it("an answer from elsewhere (a snapshot without the open blocker) opens nothing: the Card stays open", () => {
@@ -197,9 +195,9 @@ describe("answer drafts", () => {
 describe("changing the view", () => {
   beforeEach(() => vi.stubGlobal("localStorage", { setItem: (k: string, v: string) => void mem.set(k, v) }));
   it("starts the new page with nothing open, nothing marked and nothing lingering", () => {
-    store.useStore.setState({ view: "board", selected: "o/r#1", tab: "decided", marked: ["o/r#1", "o/r#2"], linger: "o/r#1" });
+    store.useStore.setState({ view: "board", selected: "o/r#1", marked: ["o/r#1", "o/r#2"], linger: "o/r#1" });
     store.useStore.getState().setView("waiting");
-    expect(store.useStore.getState()).toMatchObject({ view: "waiting", selected: null, tab: "now", marked: [], linger: null });
+    expect(store.useStore.getState()).toMatchObject({ view: "waiting", selected: null, marked: [], linger: null });
     expect(mem.get("tandem.view")).toBe("waiting");
   });
 
@@ -225,7 +223,7 @@ describe("the Repo filter", () => {
   beforeEach(() => vi.stubGlobal("localStorage", { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) })); // the file's afterEach unstubs it
   const start = (extra: object = {}) => {
     mem.clear();
-    store.useStore.setState({ board: { cards: [a1, a2, b1], repos: ["o/a", "o/b"] } as never, pending: {}, view: "board", repoFilter: null, selected: null, tab: "now", linger: null, marked: [], ...extra });
+    store.useStore.setState({ board: { cards: [a1, a2, b1], repos: ["o/a", "o/b"] } as never, pending: {}, view: "board", repoFilter: null, selected: null, linger: null, marked: [], ...extra });
   };
 
   it("is remembered across a reload and dropped again when cleared", () => {
@@ -237,12 +235,12 @@ describe("the Repo filter", () => {
   });
 
   it("closes an open Card the filter hides (no dangling selection) and keeps one it shows", () => {
-    start({ selected: b1.key, tab: "activity", linger: b1.key });
+    start({ selected: b1.key, linger: b1.key });
     state().setRepoFilter("o/a");
-    expect(state()).toMatchObject({ repoFilter: "o/a", selected: null, tab: "now", linger: null });
-    start({ selected: a1.key, tab: "activity" });
+    expect(state()).toMatchObject({ repoFilter: "o/a", selected: null, linger: null });
+    start({ selected: a1.key });
     state().setRepoFilter("o/a");
-    expect(state()).toMatchObject({ selected: a1.key, tab: "activity" });
+    expect(state()).toMatchObject({ selected: a1.key });
   });
 
   it("unmarks the Cards it hides", () => {

@@ -1,89 +1,21 @@
+// The Card sheet (#17): one page, no tabs. One head line (repo and number, the Phase as a track, what is exceptional, More), the title,
+// then what the Card asks (the one raised panel), then Issue, Decided and Activity as folds that open in place. Everything is said once.
+// The rare actions (Next step, hold, Needs wayfinder, GitHub) live in the More menu and keep their keys.
 import { useEffect, useRef, useState } from "react";
 import { STATE_DEFAULT_TEXT, STATE_LABEL, classifyActivity, parseLog, type Activity } from "../../core/activity.ts";
-import { KIND_LABEL, askOf, decisionState, kindOf, sinceOf } from "../../core/ask.ts";
-import type { Card, DesignRound } from "../../core/types.ts";
+import { askOf, decidedParts, decidedSummary, decisionState, foldStart, issueSummary, type FoldId } from "../../core/ask.ts";
 import type { ShotsTarget } from "../../core/gallery.ts";
-import { TABS, api, useActivity, useCard, useNow, useStore } from "../store.ts";
-import { useSigned } from "../signed.ts";
+import { askQuestions } from "../../core/questions.ts";
 import { handedValid, startNotice, startRequests } from "../../core/triage.ts";
+import type { Card, DesignRound } from "../../core/types.ts";
+import { useSigned } from "../signed.ts";
+import { api, useActivity, useCard, useNow, useStore } from "../store.ts";
 import { TRIAGE_ENTRIES, actionBlocked, runTriage } from "../triage.ts";
-import { BINDINGS, keyCaps, keyOf } from "../keys.ts";
 import { AgentDecisionPanel, DecisionPanel, EarlierRounds, LookPanel, PrPanel, RoundPanel } from "./Feedback.tsx";
-import { Tooltip } from "../ui/Tooltip.tsx";
-import { ActDot, Age, Btn, CardChips, Ext, KindGlyph, Markdown, RepoTag, Stepper, ago, clock } from "./bits.tsx";
-
-
-function Triage({ card }: { card: Card }) {
-  const handed = useStore((s) => s.handed);
-  const hold = useStore((s) => s.board?.workflow.holdLabel ?? "on-hold");
-  const entry = (id: string) => TRIAGE_ENTRIES.find((e) => e.id === id)!;
-  const heldByWorkflow = card.onHold && !card.labels.includes(hold);
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    void navigator.clipboard?.writeText(`/wayfinder ${card.number}`);
-    setCopied(true);
-  };
-  return (
-    <div data-testid="triage">
-      {card.fog ? (
-        <div className="actions" data-testid="fog-hint">
-          <span className="muted">
-            Needs wayfinder: run <code>/wayfinder {card.number}</code> in a terminal
-          </span>
-          <button className="btn" onClick={copy} aria-label={`Copy /wayfinder ${card.number}`}>
-            {copied ? "Copied" : "Copy"}
-          </button>
-        </div>
-      ) : (
-        <div className="actions">
-          <span className="muted">Next step</span>
-          {TRIAGE_ENTRIES.filter((e) => e.action.kind === "next").map((e) => (
-            <Btn
-              key={e.id}
-              className={`btn ${e.action.kind === "next" && card.nextStep === e.action.step ? "selected" : ""}`}
-              why={actionBlocked(e.action, [card], handed)}
-              title={`${e.label} (${e.key})`}
-              onClick={() => void runTriage(e, [card])}
-            >
-              {e.action.kind === "next" ? e.action.step : ""} <kbd>{e.key}</kbd>
-            </Btn>
-          ))}
-        </div>
-      )}
-      <div className="actions">
-        <span className="muted">Priority</span>
-        {TRIAGE_ENTRIES.filter((e) => e.action.kind === "priority" && e.action.level > 0).map((e) => (
-          <button
-            key={e.id}
-            className={`btn ${e.action.kind === "priority" && card.priority === e.action.level ? "selected" : ""}`}
-            title={`${e.label} (${e.key})`}
-            onClick={() => void runTriage(e, [card])}
-          >
-            P{e.action.kind === "priority" ? e.action.level : ""} <kbd>{e.key}</kbd>
-          </button>
-        ))}
-        {card.priority !== null && (
-          <button className="btn ghost" title="Priority: clear (0)" onClick={() => void runTriage(entry("priority-0"), [card])}>
-            Clear <kbd>0</kbd>
-          </button>
-        )}
-        <span className="spacer" />
-        {card.phase === "Inbox" && (
-          <button className={`btn ${card.fog ? "selected" : ""}`} onClick={() => void runTriage(entry("fog"), [card])}>
-            Needs wayfinder <kbd>w</kbd>
-          </button>
-        )}
-        <Btn
-          className="btn"
-          why={heldByWorkflow ? "On hold through a workflow label; remove that label on GitHub to release it" : actionBlocked({ kind: "hold" }, [card], handed)}
-          onClick={() => void runTriage(entry("hold"), [card])}
-        >
-          {heldByWorkflow ? "On hold" : card.labels.includes(hold) ? "Release hold" : "Hold Card"} <kbd>h</kbd>
-        </Btn>
-      </div>
-    </div>
-  );
-}
+import { AskPanel } from "./Questions.tsx";
+import { ActDot, Btn, Ext, Inline, Markdown, PhaseTrack, RepoTag, agoText, clock } from "./bits.tsx";
+import { Fold } from "./sheet/Fold.tsx";
+import { CloseKey, MoreMenu } from "./sheet/MoreMenu.tsx";
 
 /** The coordination log of one Card, fetched when `enabled` and again when the Card's last log line changes. */
 function useLog(card: Card, enabled: boolean): string | null | undefined {
@@ -110,58 +42,60 @@ function useActivityOf(card: Card | null): Activity | null {
   return card && cfg ? classifyActivity(card, activity[card.key], now, cfg) : null;
 }
 
-/** Where the Card is: state, when it last moved, and the coordination log on demand. */
-function Status({ card, act, expanded }: { card: Card; act: Activity | null; expanded: boolean }) {
-  const [shown, setShown] = useState(expanded);
-  const log = useLog(card, shown);
+/** Where the Card stands, in one line: the agent's state, what it last reported and when; without agent activity, when the Card last moved (#20: "just now", never "now ago"). */
+function ActivityLine({ card, act }: { card: Card; act: Activity | null }) {
+  if (!act) return <>Moved {agoText(card.updatedAt)}</>;
+  return (
+    <span className="act-line" data-state={act.state}>
+      <ActDot state={act.state} />
+      <b>{STATE_LABEL[act.state]}</b>
+      <span className="act-sep" aria-hidden>
+        ·
+      </span>
+      <span className="act-last">{act.last ?? STATE_DEFAULT_TEXT[act.state]}</span>
+      <span className="act-sep" aria-hidden>
+        ·
+      </span>
+      <span className="act-at">{agoText(act.at)}</span>
+    </span>
+  );
+}
+
+/** The coordination log, newest first. Fetched when the fold opens. */
+function Log({ card }: { card: Card }) {
+  const log = useLog(card, true);
   const lines = log ? parseLog(log) : [];
   return (
-    <div className="section tight" data-testid="status">
-      <div className="status-line" data-state={act?.state}>
-        {act && <ActDot state={act.state} />}
-        <b>{act ? STATE_LABEL[act.state] : "Status"}</b>
-        <span className="muted">last moved {ago(act?.at ?? card.updatedAt)} ago</span>
-      </div>
-      {act && <div className="status-last muted">{act.last ?? STATE_DEFAULT_TEXT[act.state]}</div>}
-      {expanded ? null : (
-        <button className="btn ghost" aria-expanded={shown} onClick={() => setShown(!shown)}>
-          {shown ? "Hide coordination log" : "Show coordination log"}
-        </button>
-      )}
-      {shown && (
-        <div data-testid="coordination-log">
-          {log === undefined ? (
-            <div className="muted">Loading…</div>
-          ) : log === null ? (
-            <div className="muted">No coordination log for this issue.</div>
-          ) : lines.length ? (
-            <ol className="timeline">
-              {[...lines].reverse().map((l, i) => (
-                <li key={`${l.at}${i}`}>
-                  <span className="tl-mark" aria-hidden>
-                    <i />
-                  </span>
-                  <span className="tl-text">{l.text}</span>
-                  <span className="faint tl-at">{clock(l.at)}</span>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <div className="log">{log}</div>
-          )}
-        </div>
+    <div data-testid="coordination-log">
+      {log === undefined ? (
+        <div className="muted">Loading…</div>
+      ) : log === null ? (
+        <div className="muted">No coordination log for this issue.</div>
+      ) : lines.length ? (
+        <ol className="timeline">
+          {[...lines].reverse().map((l, i) => (
+            <li key={`${l.at}${i}`}>
+              <span className="tl-mark" aria-hidden>
+                <i />
+              </span>
+              <span className="tl-text">{l.text}</span>
+              <span className="faint tl-at">{clock(l.at)}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <div className="log">{log}</div>
       )}
     </div>
   );
 }
 
-function Decided({ card, rounds, roundWaits, src, signal }: { card: Card; rounds: DesignRound[]; roundWaits: boolean; src: ReturnType<typeof useSigned>; signal: number | undefined }) {
+/** What was decided on this Card: the developer's answers, the agents' decisions (the new ones to accept or challenge), the rounds that are over. */
+function Decided({ card, rounds, roundWaits, src, signal, keys }: { card: Card; rounds: DesignRound[]; roundWaits: boolean; src: ReturnType<typeof useSigned>; signal: number | undefined; keys: boolean }) {
   const answered = card.requests.filter((r) => r.answer !== null || r.resolved);
   const earlier = roundWaits ? rounds.slice(0, -1) : rounds;
-  const nothing = !answered.length && !card.agentDecisions.length && !earlier.length;
   return (
     <div className="decided" data-testid="decided">
-      {nothing && <div className="empty tight">Nothing decided yet.</div>}
       {answered.length > 0 && (
         <>
           <div className="sec-h">Your answers</div>
@@ -169,7 +103,9 @@ function Decided({ card, rounds, roundWaits, src, signal }: { card: Card; rounds
             <div key={r.id} className="decided-row">
               <span className="did">{r.id}</span>
               <div className="decided-body">
-                <span>{r.question}</span>
+                <span>
+                  <Inline text={r.question} />
+                </span>
                 {r.answer && <p className="decided-answer">{r.answer}</p>}
               </div>
               <span className="chip ok">{r.answer ? "Answered" : "Resolved"}</span>
@@ -180,7 +116,7 @@ function Decided({ card, rounds, roundWaits, src, signal }: { card: Card; rounds
       {card.agentDecisions.length > 0 && (
         <>
           <div className="sec-h">Agent decisions</div>
-          {card.decisionsToAccept.length > 0 && <AgentDecisionPanel card={card} />}
+          {card.decisionsToAccept.length > 0 && <AgentDecisionPanel card={card} keys={keys} />}
           {card.agentDecisions
             .filter((d) => decisionState(card, d) !== "new")
             .map((d) => (
@@ -192,42 +128,110 @@ function Decided({ card, rounds, roundWaits, src, signal }: { card: Card; rounds
             ))}
         </>
       )}
-      {earlier.length > 0 && (
-        <>
-          <EarlierRounds key={`earlier-${card.key}`} rounds={earlier} label={roundWaits ? "Earlier rounds" : "Design rounds"} src={src} openSignal={signal} startOpen />
-        </>
+      {earlier.length > 0 && <EarlierRounds key={`earlier-${card.key}`} rounds={earlier} label={roundWaits ? "Earlier rounds" : "Design rounds"} src={src} openSignal={signal} startOpen />}
+    </div>
+  );
+}
+
+/** The one action of a Backlog Card nobody waits on: hand it to the coordinator with its Next step. Once handed, it says so in place. */
+function HandRow({ card }: { card: Card }) {
+  const handed = useStore((s) => s.handed);
+  const rec = handed[card.key];
+  const isHanded = handedValid(card, rec);
+  const handedRef = useRef<HTMLSpanElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  /** the Hand button (or the handed text) holds the keyboard */
+  const refocus = useRef(false);
+  // the Hand button and the handed text swap places: keep the keyboard where it was (also when a failed Push or a hold swaps them back)
+  useEffect(() => {
+    if (isHanded && refocus.current) handedRef.current?.focus();
+    else if (!isHanded && refocus.current && document.activeElement === document.body) btnRef.current?.focus();
+    refocus.current = isHanded && document.activeElement === handedRef.current;
+  }, [isHanded]);
+  return (
+    <div className="sheet-line" data-testid="hand-row">
+      <span>
+        Next step: <b>{card.nextStep ?? "not set"}</b>
+      </span>
+      <span className="spacer" />
+      {isHanded && rec ? (
+        <span className="handed" data-testid="handed" tabIndex={-1} ref={handedRef}>
+          <span>Handed to the coordinator · {clock(new Date(rec.at).toISOString())}</span>
+          <span className="muted">Hold and release to hand again</span>
+        </span>
+      ) : (
+        <Btn
+          ref={btnRef}
+          className="btn primary"
+          data-testid="hand"
+          onClick={() => {
+            refocus.current = true;
+            void runTriage(TRIAGE_ENTRIES.find((e) => e.id === "hand")!, [card]);
+          }}
+          why={actionBlocked({ kind: "hand" }, [card], handed)}
+        >
+          Hand to agent <kbd>a</kbd>
+        </Btn>
       )}
     </div>
   );
 }
 
-/** `drawer`: the Card behind an ask of Focus (`focus/Focus.tsx`): Decided, Activity and Issue, without the Now tab (the ask is on the cover), so no second Feedback panel is mounted. */
+/** A Card that needs wayfinder has no Next step: the one way out is the command, to run in a terminal. */
+function WayfinderLine({ card }: { card: Card }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="sheet-line" data-testid="fog-hint">
+      <span className="muted">
+        Needs wayfinder: run <code>/wayfinder {card.number}</code> in a terminal
+      </span>
+      <span className="spacer" />
+      <button
+        className="btn"
+        aria-label={`Copy /wayfinder ${card.number}`}
+        onClick={() => {
+          void navigator.clipboard?.writeText(`/wayfinder ${card.number}`);
+          setCopied(true);
+        }}
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * `split`: beside the Waiting on me list; `aside`: beside the Board (it has a close key); `drawer`: the Card behind an ask of Focus
+ * (`focus/Focus.tsx`): the same sheet without what the cover already shows (the ask) and without the actions that change the Card.
+ */
 export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "split" | "aside" | "drawer"; onClose?: () => void }) {
   const card = useCard(cardKey);
   const select = useStore((s) => s.select);
-  const storeTab = useStore((s) => s.tab);
   const drawer = mode === "drawer";
-  const tab = drawer && storeTab === "now" ? "issue" : storeTab;
-  const setTab = useStore((s) => s.setTab);
   const failure = useStore((s) => s.failures[cardKey]);
   const clearFailure = useStore((s) => s.clearFailure);
   const shotsRequest = useStore((s) => s.shotsRequest);
+  const foldRequest = useStore((s) => s.foldRequest);
   const act = useActivityOf(card);
   const signed = useSigned(card);
-  const handed = useStore((s) => s.handed);
-  const handedRec = handed[cardKey];
-  const handedRef = useRef<HTMLSpanElement>(null);
-  const handBtnRef = useRef<HTMLButtonElement>(null);
-  /** the Card whose Hand button (or handed text) holds the keyboard */
-  const refocus = useRef<string | null>(null);
-  const isHanded = !!card && handedValid(card, handedRec);
-  // the Hand button and the handed text swap places: keep the keyboard where it was (also when a failed Push or a hold swaps them back)
+  // Which folds are open belongs to this opening of the Card (the pane is keyed by the Card): it starts from what is new and is the
+  // developer's from then on. Nothing opens or closes by itself afterwards, also not when the Card's state changes under it.
+  const [open, setOpen] = useState<Record<FoldId, boolean> | null>(() => (card ? { ...foldStart(card), ...(drawer ? { issue: true } : {}) } : null));
+  const [reveal, setReveal] = useState<{ fold: FoldId; id: number } | null>(null);
   useEffect(() => {
-    const mine = refocus.current === cardKey;
-    if (isHanded && mine) handedRef.current?.focus();
-    else if (!isHanded && mine && document.activeElement === document.body) handBtnRef.current?.focus();
-    refocus.current = isHanded && document.activeElement === handedRef.current ? cardKey : null;
-  }, [isHanded, cardKey]);
+    if (card && !open) setOpen({ ...foldStart(card), ...(drawer ? { issue: true } : {}) }); // the Card arrived after the pane (a link opened before the first snapshot)
+  }, [card, open, drawer]);
+  // a fold asked for from outside (palette, Agent activity, the agent decisions line of Focus) opens and comes into view; the request is spent
+  useEffect(() => {
+    if (!foldRequest || foldRequest.key !== cardKey || !open) return;
+    setOpen({ ...open, [foldRequest.fold]: true });
+    setReveal({ fold: foldRequest.fold, id: foldRequest.id });
+    useStore.setState({ foldRequest: null });
+  }, [foldRequest, cardKey, open]);
+  // the palette's "Open screenshots" may name the rounds in Decided: that fold opens for it
+  useEffect(() => {
+    if (shotsRequest?.key === cardKey && shotsRequest.target === "earlier") setOpen((o) => (o && !o.decided ? { ...o, decided: true } : o));
+  }, [shotsRequest, cardKey]);
   // Closing the aside (its Close button, Esc, a click on empty space) hands focus back to the Card or row that opened it (#42). Only when focus
   // was lost with the pane (it sits on `body` now): another Card selected, a view or a dialog opened, or focus put elsewhere keep theirs.
   useEffect(
@@ -237,11 +241,7 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
     },
     [mode, cardKey],
   );
-  // the palette's "Open screenshots" names a panel: show the tab that holds it
-  useEffect(() => {
-    if (shotsRequest?.key === cardKey) setTab(shotsRequest.target === "earlier" ? "decided" : "now");
-  }, [shotsRequest, cardKey, setTab]);
-  if (!card) return null;
+  if (!card || !open) return null;
   // screenshots with their signed sources (private repos), see signed.ts
   const rounds = card.rounds.map((r) => ({ ...r, screenshots: signed.shots(r.commentId, r.screenshots) }));
   const look = card.look ? { ...card.look, screenshots: signed.shots(card.look.commentId, card.look.screenshots) } : null;
@@ -250,131 +250,93 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
   const lookShown = card.phase === "Done" && card.needsLook;
   // a Card that changes afterwards (Send moves the round to "earlier") never re-targets the panel
   const signalFor = (who: ShotsTarget) => (shotsRequest?.key === card.key && shotsRequest.target === who ? shotsRequest.id : undefined);
-  const kind = kindOf(card);
-  // the Feedback panels lead with their own question: only an ask without a panel (Awaiting pickup) is spelled out in the head
-  const headAsk = kind === "pickup";
+  const ask = drawer ? null : askQuestions(card);
+  const parts = decidedParts(card);
+  const toggle = (f: FoldId) => setOpen({ ...open, [f]: !open[f] });
+  const revealOf = (f: FoldId) => (reveal?.fold === f ? reveal.id : undefined);
+  const close = () => (onClose ? onClose() : select(null));
 
   return (
-    <aside className={`pane ${mode}`} data-testid="detail" aria-label={`Card ${card.key}`}>
-      <div className="pane-head">
-        <div className="pane-top">
-          <Stepper phase={card.phase} />
-          <span style={{ flex: 1 }} />
-          <a className="btn ghost" href={card.url} target="_blank" rel="noreferrer">
-            GitHub<Ext />
-          </a>
-          {(mode === "aside" || drawer) && (
-            <Tooltip label={drawer ? "Close the Card details" : "Close the Card"} keys={keyOf("escape")} side="bottom">
-              <button className="btn ghost" onClick={() => (onClose ? onClose() : select(null))} aria-label="Close">
-                <kbd>{keyOf("escape")}</kbd>
-              </button>
-            </Tooltip>
+    <aside className={`pane sheet ${mode}`} data-testid="detail" aria-label={`Card ${card.key}`}>
+      <div className="sheet-head">
+        <div className="sheet-top">
+          <RepoTag repo={card.repo} number={card.number} />
+          <PhaseTrack phase={card.phase} />
+          {card.onHold && <span className="chip danger">On hold</span>}
+          {card.fog && <span className="chip accent">Needs wayfinder</span>}
+          {card.pullRequest?.state === "open" && (
+            <a className="chip ok" href={card.pullRequest.url} target="_blank" rel="noreferrer" title="Open the pull request on GitHub">
+              PR #{card.pullRequest.number}
+            </a>
           )}
+          <span className="spacer" />
+          {/* the Card behind an ask of Focus is not changed from here: its drawer only leads to GitHub */}
+          {drawer ? (
+            <a className="btn ghost" href={card.url} target="_blank" rel="noreferrer">
+              GitHub
+              <Ext />
+            </a>
+          ) : (
+            <MoreMenu card={card} />
+          )}
+          {(mode === "aside" || drawer) && <CloseKey label={drawer ? "Close the Card details" : "Close the Card"} onClose={close} />}
         </div>
         <h2>{card.title}</h2>
-        <div className="actions">
-          <RepoTag repo={card.repo} number={card.number} />
-          <CardChips card={card} />
-        </div>
-        {kind && headAsk && !drawer && (
-          <div className="pane-ask" data-kind={kind}>
-            <KindGlyph kind={kind} box />
-            <div>
-              <div className="ask-kind">{KIND_LABEL[kind]}</div>
-              <div className="ask-text">{askOf(card)}</div>
-            </div>
-            <Age iso={sinceOf(card)} />
-          </div>
-        )}
-        <div className="tabs" role="tablist" aria-label="Card">
-          {TABS.filter((t) => !drawer || t.id !== "now").map((t) => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>
-              {t.label}
-            </button>
-          ))}
-          <span className="tabs-hint faint">
-            {keyCaps(BINDINGS.find((b) => b.id === "tab")!).map((c) => (
-              <kbd key={c}>{c}</kbd>
-            ))}
-          </span>
-        </div>
       </div>
-      <div className="pane-body">
+      <div className="pane-body sheet-body">
         {!drawer && (
-        <div className="tab-body" role="tabpanel" hidden={tab !== "now"} data-testid="tab-now">
-          {failure && (
-            <div className="section failed" role="alert" data-testid="not-sent">
-              <div>
-                <strong>Not sent:</strong> {failure}
-              </div>
-              <button className="btn ghost" onClick={() => clearFailure(card.key)}>
-                Dismiss
-              </button>
-            </div>
-          )}
-          {card.waiting?.kind === "decision" && <DecisionPanel key={card.waiting.requestId} card={card} />}
-          {card.decisionsToAccept.length > 0 && (
-            <button className="quiet-line" data-testid="decisions-line" onClick={() => setTab("decided")}>
-              {card.decisionsToAccept.length} agent decision{card.decisionsToAccept.length > 1 ? "s" : ""}, not blocking <kbd>{keyCaps(BINDINGS.find((b) => b.id === "tab")!)[1]}</kbd>
-            </button>
-          )}
-          {roundWaits && round && <RoundPanel key={`${card.key}-${round.round}`} card={card} round={round} src={signed} openSignal={signalFor("round")} />}
-          {card.waiting?.kind === "pr-approval" && card.pullRequest && <PrPanel card={card} />}
-          {lookShown && <LookPanel key={`look-${card.key}`} card={card} look={look} src={signed} openSignal={signalFor("look")} />}
-
-          {card.awaitingPickup && (
-            <div className="section" data-testid="awaiting-pickup">
-              <div className="section-title">Feedback given, awaiting pickup</div>
-              <div className="muted">Nothing waits on you. The agents pick it up from GitHub.</div>
-            </div>
-          )}
-
-          {card.phase !== "Done" && (
-            <div className="section">
-              <Triage key={card.key} card={card} />
-              {card.phase === "Backlog" && !card.waiting && (
-                <div className="actions">
-                  <span className="spacer" />
-                  {handedValid(card, handedRec) ? (
-                    <span className="handed" data-testid="handed" tabIndex={-1} ref={handedRef}>
-                      <span>
-                        Handed to the coordinator · {handedRec.nextStep} · {clock(new Date(handedRec.at).toISOString())}
-                      </span>
-                      <span className="muted">Hold and release to hand again</span>
-                    </span>
-                  ) : (
-                    <Btn
-                      ref={handBtnRef}
-                      className="btn primary"
-                      onClick={() => {
-                        refocus.current = card.key;
-                        void runTriage(TRIAGE_ENTRIES.find((e) => e.id === "hand")!, [card]);
-                      }}
-                      why={actionBlocked({ kind: "hand" }, [card], handed)}
-                    >
-                      Hand to agent ({card.nextStep ?? "set a Next step"}) <kbd>a</kbd>
-                    </Btn>
-                  )}
+          <div className="sheet-ask" data-testid="sheet-ask">
+            {failure && (
+              <div className="section failed" role="alert" data-testid="not-sent">
+                <div>
+                  <strong>Not sent:</strong> {failure}
                 </div>
-              )}
-            </div>
+                <button className="btn ghost" onClick={() => clearFailure(card.key)}>
+                  Dismiss
+                </button>
+              </div>
+            )}
+            {ask ? (
+              <AskPanel key={`${card.key}-${ask.id}`} card={card} ask={ask} signed={signed} openSignal={signalFor("round")} />
+            ) : (
+              <>
+                {card.waiting?.kind === "decision" && <DecisionPanel key={card.waiting.requestId} card={card} />}
+                {roundWaits && round && <RoundPanel key={`${card.key}-${round.round}`} card={card} round={round} src={signed} openSignal={signalFor("round")} />}
+              </>
+            )}
+            {card.waiting?.kind === "pr-approval" && card.pullRequest && <PrPanel card={card} />}
+            {lookShown && <LookPanel key={`look-${card.key}`} card={card} look={look} src={signed} openSignal={signalFor("look")} />}
+            {card.awaitingPickup && (
+              <div className="sheet-line" data-testid="awaiting-pickup">
+                <ActDot state="queued" />
+                <span>
+                  <b>Feedback given, awaiting pickup.</b> <span className="muted">{askOf(card, "pickup")}.</span>
+                </span>
+              </div>
+            )}
+            {card.phase === "Backlog" && !card.waiting && !card.awaitingPickup && !card.fog && <HandRow key={card.key} card={card} />}
+            {card.fog && card.phase !== "Done" && <WayfinderLine key={card.key} card={card} />}
+          </div>
+        )}
+        <div className="folds">
+          <Fold id="issue" title="Issue" summary={issueSummary(card.body)} open={open.issue} onToggle={() => toggle("issue")} reveal={revealOf("issue")}>
+            <div className="issue-text">{card.body.trim() ? <Markdown text={card.body} /> : <span className="muted">No description.</span>}</div>
+          </Fold>
+          {parts.answers + parts.decisions + parts.rounds > 0 && (
+            <Fold id="decided" title="Decided" summary={decidedSummary(card)} open={open.decided} onToggle={() => toggle("decided")} reveal={revealOf("decided")}>
+              {/* the ask panel owns the digits and ⌘↵ while it is there; else the agent decisions take them */}
+              <Decided card={card} rounds={rounds} roundWaits={roundWaits} src={signed} signal={signalFor("earlier")} keys={drawer || !card.waiting} />
+            </Fold>
           )}
-          <Status key={`status-${card.key}`} card={card} act={act} expanded={false} />
+          {card.phase !== "Done" && (
+            <Fold id="activity" title="Activity" summary={<ActivityLine card={card} act={act} />} open={open.activity} onToggle={() => toggle("activity")} reveal={revealOf("activity")}>
+              <div className="act-head" data-testid="status">
+                <ActivityLine card={card} act={act} />
+              </div>
+              <Log card={card} />
+            </Fold>
+          )}
         </div>
-        )}
-        <div className="tab-body" role="tabpanel" hidden={tab !== "decided"} data-testid="tab-decided">
-          <Decided card={card} rounds={rounds} roundWaits={roundWaits} src={signed} signal={signalFor("earlier")} />
-        </div>
-        {tab === "activity" && (
-          <div className="tab-body" role="tabpanel" data-testid="tab-activity">
-            <Status key={`activity-${card.key}`} card={card} act={act} expanded />
-          </div>
-        )}
-        {tab === "issue" && (
-          <div className="tab-body" role="tabpanel" data-testid="tab-issue">
-            <Markdown text={card.body || "_No description._"} />
-          </div>
-        )}
       </div>
     </aside>
   );

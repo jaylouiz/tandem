@@ -5,7 +5,7 @@ const at = (url: string) => {
   const u = new URL(url, "http://x");
   return parseRoute(u.pathname, u.search);
 };
-const state = { view: "waiting" as const, selected: null, tab: "now" as const, repoFilter: null };
+const state = { view: "waiting" as const, selected: null, repoFilter: null };
 
 describe("appPath (a demo mounted under a sub-path)", () => {
   it("strips the mount point and leaves other paths alone", async () => {
@@ -18,9 +18,9 @@ describe("appPath (a demo mounted under a sub-path)", () => {
 });
 
 describe("parseRoute", () => {
-  it("reads the view, the Card, the tab and the Repo filter", () => {
-    expect(at("/board/acme/tandem/48?tab=activity&repo=acme/tandem")).toEqual({ view: "board", selected: "acme/tandem#48", tab: "activity", repoFilter: "acme/tandem" });
-    expect(at("/waiting")).toEqual({ view: "waiting", selected: null, tab: "now", repoFilter: null });
+  it("reads the view, the Card and the Repo filter", () => {
+    expect(at("/board/acme/tandem/48?repo=acme/tandem")).toEqual({ view: "board", selected: "acme/tandem#48", repoFilter: "acme/tandem" });
+    expect(at("/waiting")).toEqual({ view: "waiting", selected: null, repoFilter: null });
   });
   it("names no view for / and for unknown paths, trailing slashes are fine", () => {
     expect(at("/").view).toBeNull();
@@ -36,9 +36,9 @@ describe("parseRoute", () => {
     expect(at("/board/o/r").selected).toBeNull();
     expect(at("/board/o/r/1/extra").selected).toBeNull();
   });
-  it("ignores an invalid tab, and a tab without a Card", () => {
-    expect(at("/board/o/r/1?tab=bogus").tab).toBe("now");
-    expect(at("/board?tab=issue").tab).toBe("now");
+  it("still opens the Card of an older link that carries `?tab=` (the sheet has no tabs, #17)", () => {
+    expect(at("/board/o/r/1?tab=activity")).toEqual({ view: "board", selected: "o/r#1", repoFilter: null });
+    expect(at("/board?tab=issue&repo=o/r")).toEqual({ view: "board", selected: null, repoFilter: "o/r" });
   });
   it("ignores a repo that is not owner/name", () => {
     expect(at("/board?repo=nope").repoFilter).toBeNull();
@@ -51,25 +51,24 @@ describe("parseRoute", () => {
 });
 
 describe("formatRoute", () => {
-  it("puts the view, the Card, a tab other than Now and the filter in the URL", () => {
+  it("puts the view, the Card and the filter in the URL", () => {
     expect(formatRoute(state)).toBe("/waiting");
     expect(formatRoute({ ...state, view: "board", selected: "o/r#4" })).toBe("/board/o/r/4");
-    expect(formatRoute({ ...state, view: "board", selected: "o/r#4", tab: "decided", repoFilter: "o/r" })).toBe("/board/o/r/4?tab=decided&repo=o/r");
+    expect(formatRoute({ ...state, view: "board", selected: "o/r#4", repoFilter: "o/r" })).toBe("/board/o/r/4?repo=o/r");
     expect(formatRoute({ ...state, view: "board", repoFilter: "o/r" })).toBe("/board?repo=o/r");
   });
-  it("has no Card segment on Settings and no tab without a Card", () => {
-    expect(formatRoute({ ...state, view: "settings", selected: "o/r#4", tab: "issue" })).toBe("/settings");
-    expect(formatRoute({ ...state, tab: "issue" })).toBe("/waiting");
+  it("has no Card segment on Settings", () => {
+    expect(formatRoute({ ...state, view: "settings", selected: "o/r#4" })).toBe("/settings");
   });
   it("round-trips", () => {
     for (const s of [
-      { view: "waiting", selected: "acme/tandem#48", tab: "activity", repoFilter: null },
-      { view: "board", selected: null, tab: "now", repoFilter: "a.b/c_d" },
-      { view: "board", selected: "o/r#1", tab: "issue", repoFilter: "o/r" },
+      { view: "waiting", selected: "acme/tandem#48", repoFilter: null },
+      { view: "board", selected: null, repoFilter: "a.b/c_d" },
+      { view: "board", selected: "o/r#1", repoFilter: "o/r" },
     ] as const) {
       const u = new URL(formatRoute(s), "http://x");
       const r = parseRoute(u.pathname, u.search);
-      expect({ view: r.view, selected: r.selected, tab: r.tab, repoFilter: r.repoFilter }).toEqual(s);
+      expect({ view: r.view, selected: r.selected, repoFilter: r.repoFilter }).toEqual(s);
     }
   });
 });

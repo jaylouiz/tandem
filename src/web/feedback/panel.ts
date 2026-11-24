@@ -13,6 +13,8 @@ export interface PanelSpec {
   extras?: PanelExtra[];
   push: boolean;
   setPush: (p: boolean) => void;
+  /** an ask with several questions: `[` `]` move between its steps */
+  step?: (dir: 1 | -1) => void;
 }
 
 /** Live while mounted and `on`. The functions may change on every render: the registration reads the latest ones. */
@@ -31,10 +33,11 @@ export function useRegisterPanel(cardKey: string, spec: PanelSpec, on: boolean) 
         { id: "push", label: latest.current.push ? "Push this Feedback: turn off" : "Push this Feedback: turn on", run: () => latest.current.setPush(!latest.current.push) },
       ],
       canSend: () => latest.current.canSend,
+      ...(latest.current.step ? { step: (dir: 1 | -1) => latest.current.step?.(dir) } : {}),
     };
     panelKeys.current = keys;
     return () => {
       if (panelKeys.current === keys) panelKeys.current = null;
     };
-  }, [cardKey, on]);
+  }, [cardKey, on, !!spec.step]);
 }

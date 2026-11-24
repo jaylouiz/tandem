@@ -5,7 +5,7 @@ import type { ShotsTarget } from "../core/gallery.ts";
 import type { Card } from "../core/types.ts";
 import { keyCaps, BINDINGS, runBinding } from "./keys.ts";
 import type { PanelKeys } from "./panelKeys.ts";
-import { TABS, refreshFromGitHub, useStore, type Tab, type View } from "./store.ts";
+import { FOLDS, refreshFromGitHub, useStore, type View } from "./store.ts";
 import { markSelectionSeen } from "./seen.ts";
 import { runMove, runTriage, type MoveEntry, type TriageEntry } from "./triage.ts";
 import { startCoordinator } from "./components/CardPane.tsx";
@@ -18,7 +18,7 @@ export interface PaletteAction {
   label: string;
   /** the id of the `BINDINGS` entry this runs (its key is shown) */
   binding?: string;
-  /** the key shown when the binding has several or this entry presses a specific one (`]` for the next tab) */
+  /** the key shown when the binding has several or this entry presses a specific one (`]` for the next question) */
   keys?: string;
   /** more words the search matches */
   search?: string;
@@ -42,7 +42,6 @@ export interface ActionCtx {
   startable: boolean;
   /** its last Feedback was not sent (the Not sent message shows) */
   failed: boolean;
-  tab: Tab;
   /** Waiting on me is in Focus (one Card at a time) */
   focus: boolean;
   /** how many Cards are marked */
@@ -52,7 +51,7 @@ export interface ActionCtx {
   repoCount: number;
   lanes: boolean;
   repoFilter: string | null;
-  /** the Feedback panel of the open Card, when its tab is open */
+  /** the Feedback panel of the open Card (the sheet's ask panel, or the cover of Focus) */
   panel: PanelKeys | null;
   /** Focus: its keys that do something on what is on screen (`focus/keys.ts`); empty outside Focus */
   focusKeys: { id: string; label: string; key?: string }[];
@@ -84,24 +83,14 @@ export function paletteActions(c: ActionCtx): PaletteAction[] {
 
   const card = c.card;
   if (card && c.focus) {
-    // the ask is on the cover: the Card behind it is reached through its details (`e`), not through tabs, marks or triage
+    // the ask is on the cover: the Card behind it is reached through its details (`e`), not through marks or triage
     add({ id: "next", group: "Card", label: "Skip to the next Card", binding: "next", run: run("next", "j") });
     add({ id: "previous", group: "Card", label: "Back to the previous Card", binding: "previous", run: run("previous", "k") });
     add({ id: "open", group: "Card", label: "Open on GitHub", binding: "open", run: () => void window.open(card.url, "_blank") });
   } else if (card) {
-    const at = TABS.findIndex((t) => t.id === c.tab);
-    const next = TABS[(at + 1) % TABS.length]!.id;
-    const previous = TABS[(at + TABS.length - 1) % TABS.length]!.id;
-    for (const t of TABS)
-      add({
-        id: `tab-${t.id}`,
-        group: "Card",
-        label: `Tab: ${t.label}`,
-        search: "card tab",
-        ...(!cards ? {} : t.id === next ? { binding: "tab", keys: "]" } : t.id === previous ? { binding: "tab", keys: "[" } : {}),
-        run: () => s().setTab(t.id),
-      });
-    add({ id: "show-log", group: "Card", label: "Show coordination log", search: "activity", run: () => s().setTab("activity") });
+    // the folds of the sheet: a command opens one and brings it into view (they have no key: a click or Enter on the fold's head opens it)
+    for (const f of FOLDS)
+      add({ id: f.id === "activity" ? "show-log" : `show-${f.id}`, group: "Card", label: f.id === "activity" ? "Show coordination log" : `Show ${f.label}`, search: `card fold ${f.label.toLowerCase()}`, run: () => s().requestFold(card.key, f.id) });
     if (cards) {
       add({ id: "next", group: "Card", label: "Next Card", binding: "next", run: run("next", "j") });
       add({ id: "previous", group: "Card", label: "Previous Card", binding: "previous", run: run("previous", "k") });
@@ -122,6 +111,10 @@ export function paletteActions(c: ActionCtx): PaletteAction[] {
   if (panel) {
     for (const ch of panel.choices())
       add({ id: `choice-${ch.n}`, group: "Feedback", label: ch.label, binding: "pick-choice", keys: String(ch.n), search: ch.on ? "chosen" : "", run: () => panel.pick(ch.n) });
+    if (panel.step) {
+      add({ id: "question-next", group: "Feedback", label: "Next question", binding: "question", keys: "]", run: () => panel.step?.(1) });
+      add({ id: "question-previous", group: "Feedback", label: "Previous question", binding: "question", keys: "[", run: () => panel.step?.(-1) });
+    }
     if (panel.canSend()) add({ id: "send-feedback", group: "Feedback", label: "Send the chosen Feedback", binding: "send-feedback", run: () => panel.send() });
     for (const x of panel.extras()) add({ id: `panel-${x.id}`, group: "Feedback", label: x.label, run: x.run });
   }

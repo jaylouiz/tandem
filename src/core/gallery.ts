@@ -45,7 +45,8 @@ export function buildNav(shots: Screenshot[], variants: Variant[] = [], by: "var
     const members = shots.map((s, i) => ({ s, i })).filter(({ s }) => keyOf(s) === key).sort((a, b) => viewRank(a.s) - viewRank(b.s) || a.i - b.i);
     if (!members.length) continue;
     const v = key === null ? undefined : declared.get(key.toLowerCase());
-    const label = key === null || by === "state" ? key ?? "" : key.includes("=") ? keyLabel(key) : `Variant ${key}`;
+    // a question round groups by question (`1. Shell`): that is the label as it stands
+    const label = key === null || by === "state" ? key ?? "" : key.includes("=") ? keyLabel(key) : /^\d+\.\s/.test(key) ? key : `Variant ${key}`;
     const title = by === "variant" && v && v.name && v.name !== splitKey(v.key).option ? `${label} · ${v.name}` : label;
     const indices = members.map(({ s }) => {
       flat.push(s);
@@ -56,6 +57,13 @@ export function buildNav(shots: Screenshot[], variants: Variant[] = [], by: "var
   }
   return { flat, groups, groupOf };
 }
+
+/**
+ * What a round's screenshots group by: its variants, or, for a round in the question format, its questions (the alt names the question,
+ * `R1 · 1. Shell · …`, and one image shows that question's options side by side).
+ */
+export const shotGroups = (round: Pick<DesignRound, "variants" | "questions">): DesignRound["variants"] =>
+  round.questions.length ? round.questions.map((q) => ({ key: `${q.n}. ${q.label}`, name: q.about, summary: "", axis: null })) : round.variants;
 
 export const stepIndex = (nav: ShotNav, i: number, dir: 1 | -1) => Math.max(0, Math.min(nav.flat.length - 1, i + dir));
 

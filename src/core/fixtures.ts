@@ -188,10 +188,10 @@ export const choicesRequestBody = (id: string, question: string, lines: string[]
     "---",
     "Copy, change only the letters you disagree with, post as a comment:",
     "```",
-    id,
+    `Decision ${id}:`,
     ...parsed.map((q) => `${q.n} ${q.label}: ${q.rec.key} (${q.rec.text})`),
     "```",
-    `Or reply \`ok\` to take every recommendation. Text after a letter is read as a note. Short form: \`${id}: ${short}\`. The run picks it up at its next checkpoint.`,
+    `Or reply \`ok\` to take every recommendation. Text after a letter is read as a note. Short form: \`Decision ${id}: ${short}\`. The run picks it up at its next checkpoint.`,
     "",
   ].join("\n");
 };

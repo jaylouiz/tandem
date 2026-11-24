@@ -26,6 +26,8 @@ export interface PanelKeys {
   extras: () => PanelExtra[];
   /** whether Send would write now */
   canSend: () => boolean;
+  /** `[` `]`: the previous or next question of an ask with several (absent: the panel has no steps) */
+  step?: (dir: 1 | -1) => void;
 }
 
 export const panelKeys: { current: PanelKeys | null } = { current: null };

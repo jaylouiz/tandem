@@ -13,16 +13,16 @@ import { NO_RUN, type ActivityEntry, type BoardView, type Card, type NextStep, t
 export type View = "waiting" | "board" | "settings";
 /** The views that list Cards: only there the Card keys and the Selection bar are live (Settings has none to act on). */
 export const showsCards = (v: View) => v === "waiting" || v === "board";
-export type Tab = "now" | "decided" | "activity" | "issue";
+/** The folds of the Card sheet under the ask: what the issue says, what was decided, what the agents did. */
+export type Fold = "issue" | "decided" | "activity";
 export type Modal = "palette" | "capture" | "agents" | "shortcuts";
 
 /** Opening a modal replaces the open one; closing one that is no longer the open one (the Palette's command opened another) leaves it alone. */
 const modalPatch = (s: { modal: Modal | null }, name: Modal, open: boolean): { modal: Modal | null } | {} => (open ? (s.modal === name ? {} : { modal: name }) : s.modal === name ? { modal: null } : {});
-export const TABS: { id: Tab; label: string }[] = [
-  { id: "now", label: "Now" },
+export const FOLDS: { id: Fold; label: string }[] = [
+  { id: "issue", label: "Issue" },
   { id: "decided", label: "Decided" },
   { id: "activity", label: "Activity" },
-  { id: "issue", label: "Issue" },
 ];
 
 // zustand selectors must never return a fresh []/{} literal (it re-renders forever): empty values live here
@@ -63,6 +63,13 @@ export interface DragState {
   lane: string | null;
 }
 
+/** A fold of the open Card to open and bring into view (palette, Agent activity, a notification): one-shot, `id` changes on every request. */
+export interface FoldRequest {
+  id: number;
+  key: string;
+  fold: Fold;
+}
+
 export interface ShotsRequest {
   id: number;
   key: string;
@@ -75,9 +82,9 @@ interface State {
   view: View;
   repoFilter: string | null;
   selected: string | null;
-  /** the Card pane's tab; resets to Now whenever another Card is selected (unless `select` names one) */
-  tab: Tab;
-  setTab: (t: Tab) => void;
+  /** set by whoever wants a fold of the Card sheet open (which folds are open is the sheet's own state, per opened Card) */
+  foldRequest: FoldRequest | null;
+  requestFold: (key: string, fold: Fold) => void;
   /** the one modal dialog that is open (Palette, Capture, Agent activity, Shortcuts): one at a time, opening another replaces it. The Gallery is local to the Card pane and blocks these keys through `ui/Dialog` */
   modal: Modal | null;
   setAgentsOpen: (o: boolean) => void;
@@ -127,7 +134,7 @@ interface State {
   /** switching view starts the page with nothing open and nothing marked (#30); a new history entry unless `nav` says "replace" (#48) */
   setView: (v: View, nav?: Nav) => void;
   /** Open (or close, null) a Card. `opts.nav`: the history entry a deliberate open pushes ("push"), anything automatic replaces (default); `opts.view` opens it in another view in the same step (#48) */
-  select: (key: string | null, tab?: Tab, opts?: SelectOpts) => void;
+  select: (key: string | null, fold?: Fold, opts?: SelectOpts) => void;
   setRepoFilter: (r: string | null) => void;
   setPalette: (o: boolean) => void;
   setCapture: (o: boolean) => void;
@@ -142,6 +149,20 @@ export interface SelectOpts {
 }
 
 const FILTER_KEY = "tandem.repoFilter";
+const DRAFTS_KEY = "tandem.drafts";
+/** drafts older than this are not restored: the ask they belong to has most likely gone, and its Card may have left the Board (nothing prunes it then) */
+const DRAFTS_MAX_AGE = 14 * 86_400_000;
+
+/** The Feedback drafts as the page last left them (#13: picks, notes and the step survive a reload). */
+function storedDrafts(): Record<string, Draft> {
+  try {
+    const v = JSON.parse(localStorage.getItem(DRAFTS_KEY) ?? "null") as { at?: number; drafts?: Record<string, Draft> } | null;
+    if (!v?.drafts || typeof v.drafts !== "object" || !v.at || Date.now() - v.at > DRAFTS_MAX_AGE) return NO_DRAFTS;
+    return Object.keys(v.drafts).length ? v.drafts : NO_DRAFTS;
+  } catch {
+    return NO_DRAFTS;
+  }
+}
 const VIEW_KEY = "tandem.view";
 
 /** The view the page was last on (`/` opens it). */
@@ -166,11 +187,11 @@ export function storeFilter(repo: string | null) {
  * Where the page starts: what the URL says (a Card link, a reload, a notification), else the remembered view and Repo filter.
  * The URL's own filter wins even when empty: `/board` shows every repo (#48).
  */
-function startingPlace(): { view: View; selected: string | null; tab: Tab; repoFilter: string | null } {
+function startingPlace(): { view: View; selected: string | null; repoFilter: string | null } {
   const r = typeof location === "undefined" ? null : parseRoute(appPath(location.pathname), location.search);
   const remembered = localStorage.getItem(FILTER_KEY);
-  if (!r?.view) return { view: storedView(), selected: null, tab: "now", repoFilter: r?.repoFilter ?? remembered };
-  return { view: r.view, selected: r.selected, tab: r.tab, repoFilter: r.repoFilter };
+  if (!r?.view) return { view: storedView(), selected: null, repoFilter: r?.repoFilter ?? remembered };
+  return { view: r.view, selected: r.selected, repoFilter: r.repoFilter };
 }
 const start = startingPlace();
 try {
@@ -192,10 +213,10 @@ export const useStore = create<State>((set) => ({
     navigation.hint = focus ? "push" : "replace";
     // Focus lives in Waiting on me: from another view it goes there first. It starts on its own start screen with nothing open and nothing
     // marked (like any view change); leaving it keeps the Card it was on open in the list.
-    set((s) => (focus === s.focus ? {} : focus ? { focus, view: "waiting", selected: null, tab: "now", linger: null, marked: s.marked.length ? [] : s.marked } : { focus, linger: null, marked: s.marked.length ? [] : s.marked }));
+    set((s) => (focus === s.focus ? {} : focus ? { focus, view: "waiting", selected: null, linger: null, marked: s.marked.length ? [] : s.marked } : { focus, linger: null, marked: s.marked.length ? [] : s.marked }));
   },
-  tab: start.tab,
-  setTab: (tab) => set({ tab }),
+  foldRequest: null,
+  requestFold: (key, fold) => set((s) => ({ foldRequest: { id: (s.foldRequest?.id ?? 0) + 1, key, fold } })),
   modal: null,
   setAgentsOpen: (o) => set((s) => modalPatch(s, "agents", o)),
   failures: NO_FAILURES,
@@ -206,7 +227,7 @@ export const useStore = create<State>((set) => ({
       const { [key]: _, ...rest } = s.failures;
       return { failures: Object.keys(rest).length ? rest : NO_FAILURES };
     }),
-  drafts: NO_DRAFTS,
+  drafts: storedDrafts(),
   setDraft: (id, patch) => set((s) => ({ drafts: { ...s.drafts, [id]: { ...s.drafts[id], ...patch } } })),
   clearDraft: (id) =>
     set((s) => {
@@ -253,20 +274,21 @@ export const useStore = create<State>((set) => ({
     localStorage.setItem(VIEW_KEY, view);
     navigation.hint = nav;
     // every page starts with the Card pane closed; the same view again keeps what is open
-    set((s) => (view === s.view ? {} : { view, focus: false, selected: null, tab: "now", linger: null, marked: s.marked.length ? [] : s.marked }));
+    set((s) => (view === s.view ? {} : { view, focus: false, selected: null, linger: null, marked: s.marked.length ? [] : s.marked }));
   },
-  select: (selected, tab, opts = {}) => {
+  select: (selected, fold, opts = {}) => {
     navigation.hint = opts.nav ?? "replace";
     if (opts.view) localStorage.setItem(VIEW_KEY, opts.view);
     set((s) => {
       const view = opts.view && opts.view !== s.view ? opts.view : null;
-      if (tab === undefined && selected === s.selected && !view) return {};
+      const ask = selected && fold ? { foldRequest: { id: (s.foldRequest?.id ?? 0) + 1, key: selected, fold } } : {};
+      if (selected === s.selected && !view) return ask;
       // a Card picked from elsewhere (palette, notification, activity) in a collapsed lane opens its lane, like Done opens its day (#36)
       const repo = selected ? s.board?.cards.find((c) => c.key === selected)?.repo : undefined;
       const lane = repo && s.collapsedLanes[repo] ? { collapsedLanes: { ...s.collapsedLanes, [repo]: false } } : {};
       // another view starts without marks and lingering Cards, as in setView
       const fresh = view ? { view, focus: false, linger: null, marked: s.marked.length ? [] : s.marked } : { linger: s.linger === selected ? s.linger : null };
-      return { ...lane, ...fresh, selected, tab: tab ?? "now" };
+      return { ...lane, ...fresh, ...ask, selected };
     });
   },
   setRepoFilter: (repoFilter) => {
@@ -278,7 +300,7 @@ export const useStore = create<State>((set) => ({
       const closes = s.selected !== null && hidden(s.selected);
       return {
         repoFilter,
-        ...(closes ? { selected: null, tab: "now" as Tab, linger: null } : {}),
+        ...(closes ? { selected: null, linger: null } : {}),
         ...(s.marked.some(hidden) ? { marked: s.marked.filter((k) => !hidden(k)) } : {}),
       };
     });
@@ -289,6 +311,15 @@ export const useStore = create<State>((set) => ({
   setNotice: (notice) => set({ notice }),
   optimistic: (key, patch) => set((s) => ({ pending: { ...s.pending, [key]: { ...s.pending[key], ...patch } } })),
 }));
+
+// Drafts are kept in the browser as they change, so a reload (or a rebuilt page) does not lose what was picked and typed.
+useStore.subscribe((s, was) => {
+  if (s.drafts === was.drafts) return;
+  try {
+    if (Object.keys(s.drafts).length) localStorage.setItem(DRAFTS_KEY, JSON.stringify({ at: Date.now(), drafts: s.drafts }));
+    else localStorage.removeItem(DRAFTS_KEY);
+  } catch {}
+});
 
 /** card key -> writes in flight; their optimistic patches survive snapshots */
 const inflight = new Map<string, number>();
@@ -514,16 +545,14 @@ const waitingNow = (s: Open) => ({ keys: groupsOf(currentCards(s)).waiting.map((
 
 /**
  * Waiting on me: the developer's own answer took the open blocker out of the list, so the next blocker takes its place
- * (the last one: the pane keeps the Card on Decided). Only this path advances; a Card that leaves the list because an answer came
+ * (the last one: the sheet keeps the Card, which now says that the Feedback awaits pickup). Only this path advances; a Card that leaves the list because an answer came
  * from elsewhere (GitHub, a terminal) or a snapshot arrived stays open and shows its new state.
  */
 function advanceAfterAnswer(was: ReturnType<typeof waitingNow>) {
   const s = useStore.getState();
   if (was.view !== "waiting" || s.view !== "waiting") return;
   const next = nextAfterAnswer(was, { keys: waitingNow(s).keys, selected: s.selected, filter: s.repoFilter });
-  if (!next) return;
-  if (next.open) s.select(next.open);
-  else s.setTab("decided");
+  if (next?.open) s.select(next.open);
 }
 
 /** Run a Feedback action: patch the Card at once, write, then report the Push outcome. Resolves to whether the write went through. `opts.cover`: sent from the ask's cover in Focus. */
@@ -542,7 +571,7 @@ export async function giveFeedback(card: Card, action: string, body: Record<stri
     // again) and no toast is raised beside it; once they have moved on (another ask, the overview) the toast is the only place that can.
     const now = useStore.getState();
     if (opts.cover && now.focus && now.selected === card.key) return false;
-    if (!now.focus) now.select(card.key, "now"); // "now" also when it is still the open Card on Decided (the last blocker)
+    if (!now.focus) now.select(card.key);
     setNotice({ key: card.key, text: `Failed: ${res.error}`, canStart: false, failed: true });
     return false;
   }
@@ -566,11 +595,11 @@ export async function giveFeedback(card: Card, action: string, body: Record<stri
  * Open a Card on purpose from outside the lists (palette, notification, Agent activity): one new history entry (#48).
  * Settings has no Card pane, so it goes to the Board first (`opts.view` names another view).
  */
-export function openCard(key: string, opts: { view?: View; tab?: Tab } = {}) {
+export function openCard(key: string, opts: { view?: View; fold?: Fold } = {}) {
   const s = useStore.getState();
   const view = opts.view ?? (s.view === "settings" ? "board" : undefined);
   // a Card the Repo filter hides (a notification names any repo) lifts the filter: it opens where the developer can see it
   const card = s.board?.cards.find((c) => c.key === key);
   if (s.repoFilter && card && card.repo !== s.repoFilter) s.setRepoFilter(null);
-  s.select(key, opts.tab, { nav: "push", view });
+  s.select(key, opts.fold, { nav: "push", view });
 }

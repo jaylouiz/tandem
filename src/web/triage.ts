@@ -21,10 +21,6 @@ export const TRIAGE_ENTRIES: TriageEntry[] = [
   { id: "next-build", short: "build", label: "Next step: build", key: "b", action: { kind: "next", step: "build" } },
   { id: "hold", short: "hold", label: "Hold Card / Release hold", key: "h", action: { kind: "hold" } },
   { id: "hand", short: "hand to agent", label: "Hand to agent", key: "a", action: { kind: "hand" } },
-  { id: "priority-1", short: "P1", label: "Priority: 1 (highest)", key: "1", action: { kind: "priority", level: 1 } },
-  { id: "priority-2", short: "P2", label: "Priority: 2", key: "2", action: { kind: "priority", level: 2 } },
-  { id: "priority-3", short: "P3", label: "Priority: 3", key: "3", action: { kind: "priority", level: 3 } },
-  { id: "priority-0", short: "no priority", label: "Priority: clear", key: "0", action: { kind: "priority", level: 0 } },
   { id: "fog", short: "wayfinder", label: "Needs wayfinder / Clear", key: "w", action: { kind: "fog" } },
 ];
 

@@ -1,5 +1,5 @@
 // The store and the URL, kept equal both ways (#48). The store stays the source of truth: the page's initial state comes from the URL
-// (`startingPlace` in store.ts), a change of view, open Card, tab or Repo filter writes the URL, and Back/Forward apply a URL to the store.
+// (`startingPlace` in store.ts), a change of view, open Card or Repo filter writes the URL, and Back/Forward apply a URL to the store.
 // Whether a change adds a history entry is decided where it happens (`navigation.hint`, see `Nav`): deliberate opens push, the rest replaces.
 import { BASE, appPath, formatRoute, navigation, parseRoute, type Nav } from "./route.ts";
 import { storeFilter, storedView, useStore, validFilter } from "./store.ts";
@@ -60,7 +60,7 @@ function applyUrl() {
   storeFilter(repoFilter);
   unverified = r.selected;
   // the reset #30's setView gives a page, without its "close the Card": the URL names the Card
-  useStore.setState({ view, selected: r.selected, tab: r.tab, repoFilter, linger: null, marked: [], ...(view === "waiting" ? {} : { focus: false }) });
+  useStore.setState({ view, selected: r.selected, repoFilter, linger: null, marked: [], ...(view === "waiting" ? {} : { focus: false }) });
 }
 
 /** Call once before the first render. */
@@ -71,7 +71,7 @@ export function startRouting() {
   useStore.subscribe((s, prev) => {
     const hint = navigation.hint;
     navigation.hint = "replace";
-    if (s.view !== prev.view || s.selected !== prev.selected || s.tab !== prev.tab || s.repoFilter !== prev.repoFilter) schedule(hint);
+    if (s.view !== prev.view || s.selected !== prev.selected || s.repoFilter !== prev.repoFilter) schedule(hint);
     if (s.board !== prev.board || s.selected !== prev.selected) verifyCard();
   });
   window.addEventListener("popstate", applyUrl);

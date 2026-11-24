@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { askOf, decisionState, kindOf, sinceOf } from "./ask.ts";
+import { askOf, decidedSummary, decisionState, foldStart, issueSummary, kindOf, sinceOf } from "./ask.ts";
 import { buildCard } from "./card.ts";
 import { DEFAULT_WORKFLOW as cfg } from "./config.ts";
 import { demoIssues } from "./fixtures.ts";
@@ -64,5 +64,39 @@ describe("tally (the end of Focus)", () => {
     expect(tally(["look", "look"])).toBe("2 marked Seen");
     expect(tally(["design-round"])).toBe("1 answered");
     expect(tally([])).toBe("");
+  });
+});
+
+describe("the Card sheet's folds (#17)", () => {
+  const base = { waiting: null, phase: "Build" as const, needsLook: false, decisionsToAccept: [] as string[] };
+  const waiting = { kind: "decision" as const, since: "", requestId: "D1" };
+  it("start open: the issue when nothing is asked, Decided when it holds a new agent decision, Activity never", () => {
+    expect(foldStart(base)).toEqual({ issue: true, decided: false, activity: false });
+    expect(foldStart({ ...base, waiting })).toEqual({ issue: false, decided: false, activity: false });
+    expect(foldStart({ ...base, waiting, decisionsToAccept: ["D2"] })).toEqual({ issue: false, decided: true, activity: false });
+    expect(foldStart({ ...base, decisionsToAccept: ["D2"] })).toEqual({ issue: true, decided: true, activity: false });
+    // a Done Card with a Look shows the Look panel in place of the ask, Seen or not
+    expect(foldStart({ ...base, phase: "Done", needsLook: true }).issue).toBe(false);
+    expect(foldStart({ ...base, phase: "Done" }).issue).toBe(true);
+  });
+
+  it("says what Decided holds, only the parts that exist", () => {
+    const req = (answer: string | null, resolved = false) => ({ answer, resolved }) as never;
+    const none = { requests: [], agentDecisions: [], decisionsToAccept: [], rounds: [], waiting: null };
+    expect(decidedSummary(none)).toBe("");
+    expect(decidedSummary({ ...none, requests: [req("B"), req(null, true), req(null)] })).toBe("2 answers");
+    expect(decidedSummary({ ...none, requests: [req("B")], agentDecisions: [{}, {}] as never, decisionsToAccept: ["D2"], rounds: [{}] as never })).toBe("1 answer · 2 agent decisions, 1 new · 1 design round");
+    // the round that waits is the ask, not history
+    expect(decidedSummary({ ...none, rounds: [{}, {}] as never, waiting: { kind: "design-round", since: "", requestId: "D1" } })).toBe("1 earlier round");
+    expect(decidedSummary({ ...none, rounds: [{}] as never, waiting: { kind: "design-round", since: "", requestId: "D1" } })).toBe("");
+  });
+
+  it("says what the issue is about in one line, without its Markdown", () => {
+    expect(issueSummary("")).toBe("No description");
+    expect(issueSummary("## Problem\n\nConnecting **Notion** and `Reminders` are [two flows](https://x) today.\n\n- back")).toBe("Problem Connecting Notion and Reminders are two flows today. back");
+    expect(issueSummary("<!-- note -->\n![shot](a.png)\n<img src=\"b.png\">")).toBe("No description");
+    const long = issueSummary("word ".repeat(40));
+    expect(long.length).toBeLessThanOrEqual(90);
+    expect(long.endsWith("…")).toBe(true);
   });
 });

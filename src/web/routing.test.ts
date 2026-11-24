@@ -33,10 +33,10 @@ const card = (n: number, repo = "o/r") => ({ key: `${repo}#${n}`, repo, number: 
 const board = (cards: Card[], sync: Record<string, { at: string | null; syncing: boolean }> = { "o/r": { at: "t", syncing: false } }, repos = ["o/r"]) => ({ cards, repos, sync, activity: {} }) as unknown as BoardView;
 
 describe("the first page", () => {
-  it("takes view, Card, tab and filter from the URL, and keeps them while the board loads", async () => {
-    expect({ view: get().view, selected: get().selected, tab: get().tab, repoFilter: get().repoFilter }).toEqual({ view: "board", selected: "o/r#2", tab: "decided", repoFilter: "o/r" });
+  it("takes view, Card and filter from the URL, and keeps them while the board loads; a `?tab=` of an older link is ignored (#17)", async () => {
+    expect({ view: get().view, selected: get().selected, repoFilter: get().repoFilter }).toEqual({ view: "board", selected: "o/r#2", repoFilter: "o/r" });
     await tick();
-    expect(entries).toEqual(["/board/o/r/2?tab=decided&repo=o/r"]);
+    expect(entries).toEqual(["/board/o/r/2?repo=o/r"]); // the same entry, rewritten without the parameter
   });
   it("a Card that is on the Board stays; a restore never touches Seen", async () => {
     const fetch = vi.fn();
@@ -51,13 +51,13 @@ describe("the first page", () => {
 
 describe("history entries", () => {
   beforeEach(async () => {
-    store.useStore.setState({ board: board([card(1), card(2), card(3)]), view: "waiting", selected: null, tab: "now", repoFilter: null, marked: [], linger: null });
+    store.useStore.setState({ board: board([card(1), card(2), card(3)]), view: "waiting", selected: null, repoFilter: null, marked: [], linger: null });
     await tick();
     entries.splice(0, entries.length, "/waiting");
     at = 0;
   });
 
-  it("a view change and a deliberate open push; j/k, tabs, the filter and closing replace", async () => {
+  it("a view change and a deliberate open push; j/k, a fold, the filter and closing replace", async () => {
     get().setView("board");
     await tick();
     expect(entries).toEqual(["/waiting", "/board"]);
@@ -65,12 +65,12 @@ describe("history entries", () => {
     await tick();
     expect(entries).toEqual(["/waiting", "/board", "/board/o/r/1"]);
     get().select("o/r#2"); // j
-    get().setTab("activity");
+    get().requestFold("o/r#2", "activity"); // a fold is not part of the address
     await tick();
-    expect(entries).toEqual(["/waiting", "/board", "/board/o/r/2?tab=activity"]);
+    expect(entries).toEqual(["/waiting", "/board", "/board/o/r/2"]);
     get().setRepoFilter("o/r");
     await tick();
-    expect(entries.at(-1)).toBe("/board/o/r/2?tab=activity&repo=o/r");
+    expect(entries.at(-1)).toBe("/board/o/r/2?repo=o/r");
     get().select(null); // Esc
     await tick();
     expect(entries).toEqual(["/waiting", "/board", "/board?repo=o/r"]);
@@ -85,15 +85,16 @@ describe("history entries", () => {
     expect(entries).toEqual(["/settings?repo=o/r", "/board/p/q/5"]);
   });
 
-  it("the overlay opens the Card in the current view on Activity", async () => {
+  it("the overlay opens the Card in the current view and asks for its Activity fold", async () => {
     get().setView("board");
-    store.openCard("o/r#3", { tab: "activity" });
+    store.openCard("o/r#3", { fold: "activity" });
     await tick();
-    expect(entries.at(-1)).toBe("/board/o/r/3?tab=activity");
+    expect(entries.at(-1)).toBe("/board/o/r/3");
+    expect(get().foldRequest).toMatchObject({ key: "o/r#3", fold: "activity" });
     expect(get().view).toBe("board");
   });
 
-  it("Back applies the entry before: view, Card, tab and filter; linger and marks reset; nothing is written", async () => {
+  it("Back applies the entry before: view, Card and filter; linger and marks reset; nothing is written", async () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     get().setView("board");
@@ -104,14 +105,13 @@ describe("history entries", () => {
     back();
     expect(get().view).toBe("board");
     expect(get().selected).toBeNull();
-    expect(get().tab).toBe("now");
     expect(get().marked).toEqual([]);
     expect(get().linger).toBeNull();
     back();
     expect(get().view).toBe("waiting");
     expect(fetch).not.toHaveBeenCalled();
     await tick();
-    expect(entries).toEqual(["/waiting", "/board", "/board/o/r/1?tab=issue"]); // Back moves along; it writes no entry
+    expect(entries).toEqual(["/waiting", "/board", "/board/o/r/1"]); // Back moves along; it writes no entry
   });
 
   it("a URL the app would not write ends on a valid one by replace", async () => {

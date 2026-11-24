@@ -24,7 +24,6 @@ const fullest = (): import("./actions.ts").ActionCtx => ({
   card: { key: "o/r#1", url: "https://github.com/o/r/issues/1", number: 1, fog: true } as Card,
   startable: true,
   failed: true,
-  tab: "now",
   marked: 2,
   shots: "round",
   canUndo: true,
@@ -41,6 +40,7 @@ const fullest = (): import("./actions.ts").ActionCtx => ({
     ],
     extras: () => [{ id: "push", label: "Push this Feedback: turn off", run: () => {} }],
     canSend: () => true,
+    step: () => {}, // an ask with several questions
   },
   // what Focus registers at its fullest (`focus/keys.ts`): the start, an ask with a note, a design round's stage
   focusKeys: [
@@ -139,13 +139,14 @@ describe("the palette lists every key binding", () => {
     // Settings has no Cards to walk or select
     const off = actions.paletteActions({ ...fullest(), view: "settings" }).map((a) => a.id);
     for (const id of ["next", "previous", "select-all", "extend-down"]) expect(off, id).not.toContain(id);
-    // a Card-scoped key does nothing there, so the palette neither offers Mark nor prints `o`, `[` or `]` for what it runs by hand
+    // a Card-scoped key does nothing there, so the palette neither offers Mark nor prints `o` for what it runs by hand
     expect(off).not.toContain("mark");
     const onSettings = actions.paletteActions({ ...fullest(), view: "settings" });
     expect(onSettings.find((a) => a.id === "open")?.binding).toBeUndefined();
-    const tabs = onSettings.filter((a) => a.id.startsWith("tab-"));
-    expect(tabs.length).toBeGreaterThan(0);
-    for (const a of tabs) expect(a.keys, a.id).toBeUndefined();
+    // the folds of the sheet are commands without a key
+    const folds = onSettings.filter((a) => ["show-issue", "show-decided", "show-log"].includes(a.id));
+    expect(folds.map((a) => a.label)).toEqual(["Show Issue", "Show Decided", "Show coordination log"]);
+    for (const a of folds) expect(actions.keyShown(a), a.id).toBeNull();
   });
 
   it("in Focus offers the Focus keys and the ask's choices, and nothing that acts on the Card behind the ask", () => {
@@ -161,7 +162,7 @@ describe("the palette lists every key binding", () => {
       ["Previous variant", "["],
       ["Reject variant b", "x"],
     ]);
-    for (const id of ["tab-now", "tab-decided", "show-log", "mark", "close-card", "shots", "select-all", "next-design", "move-inbox", "seen"]) expect(ids, id).not.toContain(id);
+    for (const id of ["show-issue", "show-decided", "show-log", "mark", "close-card", "shots", "select-all", "next-design", "move-inbox", "seen"]) expect(ids, id).not.toContain(id);
     for (const id of ["focus", "next", "previous", "open", "choice-1", "send-feedback", "panel-push", "capture", "shortcuts", "go-board"]) expect(ids, id).toContain(id);
     expect(entries.find((a) => a.id === "focus")?.label).toBe("Leave Focus: back to the list");
   });
@@ -186,6 +187,8 @@ describe("the palette lists every key binding", () => {
     expect(entries.filter((a) => a.group === "Feedback").map((a) => [a.label, a.keys ?? null])).toEqual([
       ["Approve the PR", "1"],
       ["Hold the merge", "2"],
+      ["Next question", "]"],
+      ["Previous question", "["],
       ["Send the chosen Feedback", null],
       ["Push this Feedback: turn off", null],
     ]);

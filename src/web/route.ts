@@ -1,9 +1,9 @@
-// The URL as the page's address (#48): which view, which Card, which tab and which Repo filter. Pure: the store sync is `routing.ts`.
+// The URL as the page's address (#48): which view, which Card and which Repo filter. Pure: the store sync is `routing.ts`.
 //   /waiting  /board  /settings                        the view
 //   /<view>/<owner>/<repo>/<n>                          with the open Card (key `owner/repo#n`)
-//   ?tab=decided|activity|issue                         the Card pane's tab (Now = no parameter)
+//   (`?tab=` of older links is ignored: the Card sheet has no tabs, #17)
 //   ?repo=<owner/repo>                                  the Repo filter (All repos = no parameter)
-import type { Tab, View } from "./store.ts";
+import type { View } from "./store.ts";
 
 /** Where the app is mounted: "" at the root (the local app), `/tandem/pr-4` for a demo served from a sub-path (Vite's `base`). */
 export const BASE = ((import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/").replace(/\/$/, "");
@@ -12,13 +12,11 @@ export const BASE = ((import.meta as { env?: { BASE_URL?: string } }).env?.BASE_
 export const appPath = (pathname: string, base = BASE): string => (base && (pathname === base || pathname.startsWith(`${base}/`)) ? pathname.slice(base.length) || "/" : pathname);
 
 export const VIEWS: readonly View[] = ["waiting", "board", "settings"];
-const TAB_PARAMS: readonly Tab[] = ["decided", "activity", "issue"];
 
 /** What a URL says. `view` is null for `/` and for a path that names no view: the caller picks the remembered one. */
 export interface Route {
   view: View | null;
   selected: string | null;
-  tab: Tab;
   repoFilter: string | null;
 }
 
@@ -52,22 +50,19 @@ export function parseRoute(pathname: string, search: string): Route {
     if (owner && repo && /^[1-9]\d*$/.test(n)) selected = `${owner}/${repo}#${n}`;
   }
   const q = new URLSearchParams(search);
-  const tab = q.get("tab") as Tab | null;
   const repo = q.get("repo");
   return {
     view,
     selected,
-    tab: selected && tab && TAB_PARAMS.includes(tab) ? tab : "now",
     repoFilter: repo && /^[^/\s]+\/[^/\s]+$/.test(repo) ? repo : null,
   };
 }
 
 /** The canonical URL (path + query) of a state; `parseRoute` of it gives the state back. */
-export function formatRoute(s: { view: View; selected: string | null; tab: Tab; repoFilter: string | null }): string {
+export function formatRoute(s: { view: View; selected: string | null; repoFilter: string | null }): string {
   const seg = s.view !== "settings" && s.selected ? keySegments(s.selected) : null;
   const path = `/${s.view}${seg ? `/${seg.map((p) => encodeURIComponent(p)).join("/")}` : ""}`;
   const q: string[] = [];
-  if (seg && s.tab !== "now") q.push(`tab=${s.tab}`);
   if (s.repoFilter) q.push(`repo=${encodeURIComponent(s.repoFilter).replace(/%2F/gi, "/")}`);
   return q.length ? `${path}?${q.join("&")}` : path;
 }

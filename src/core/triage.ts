@@ -8,7 +8,6 @@ export type TriageAction =
   | { kind: "next"; step: NextStep }
   | { kind: "hold" }
   | { kind: "hand" }
-  | { kind: "priority"; level: 0 | 1 | 2 | 3 } // 0 clears
   | { kind: "fog" };
 
 export interface LabelChange {
@@ -42,7 +41,7 @@ export function pruneHanded(handed: Record<string, HandedRecord>, cards: Card[])
 /** Why an action does not apply to a Card, or null when it does. `handed` is the Card's record, if any. */
 export function skipReason(action: TriageAction, card: Card, handed?: HandedRecord): string | null {
   if (card.state === "closed" || card.phase === "Done") return "Done";
-  if (action.kind === "hold" || action.kind === "priority") return null;
+  if (action.kind === "hold") return null;
   if (action.kind === "fog") return card.phase === "Inbox" ? null : card.phase;
   if (card.phase !== "Inbox" && card.phase !== "Backlog") return card.phase;
   if (action.kind === "hand") {
@@ -68,11 +67,6 @@ export function triageLabels(action: TriageAction, card: Card, cfg: WorkflowConf
       return release ? { add: [], remove: [cfg.holdLabel].filter(has) } : { add: has(cfg.holdLabel) ? [] : [cfg.holdLabel], remove: [] };
     case "hand":
       return { add: [], remove: [] };
-    case "priority": {
-      const mine = action.level ? `${cfg.priorityLabelPrefix}${action.level}` : null;
-      const others = card.labels.filter((l) => l.startsWith(cfg.priorityLabelPrefix) && l !== mine);
-      return { add: mine && !has(mine) ? [mine] : [], remove: others };
-    }
     case "fog":
       return release ? { add: [], remove: [cfg.fogLabel].filter(has) } : { add: has(cfg.fogLabel) ? [] : [cfg.fogLabel], remove: [] };
   }
