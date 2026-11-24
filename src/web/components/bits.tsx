@@ -75,7 +75,13 @@ export function CardChips({ card }: { card: Card }) {
   );
 }
 
-const loadMarkdown = () => import("./MarkdownBody.tsx");
+const plain = ({ text }: { text: string; breaks: boolean }) => (
+  <div className="markdown" style={{ whiteSpace: "pre-wrap" }}>
+    {text}
+  </div>
+);
+/** A chunk that cannot be fetched (the page outlived a rebuild: its hashed file is gone, or the server is down) leaves the text as it is instead of throwing through React. */
+const loadMarkdown = () => import("./MarkdownBody.tsx").catch(() => ({ default: plain }));
 const MarkdownBody = lazy(loadMarkdown);
 /** Fetches the Markdown chunk (marked, DOMPurify) once the page is idle, so a Card's text is rendered at once when it opens (#7). */
 export const preloadMarkdown = () => void loadMarkdown();
@@ -83,7 +89,7 @@ export const preloadMarkdown = () => void loadMarkdown();
 /** `breaks`: a single newline is a line break (agent records list their fields one per line). Until the renderer is there the text shows as it is. */
 export function Markdown({ text, breaks = false }: { text: string; breaks?: boolean }) {
   return (
-    <Suspense fallback={<div className="markdown" style={{ whiteSpace: "pre-wrap" }}>{text}</div>}>
+    <Suspense fallback={plain({ text, breaks })}>
       <MarkdownBody text={text} breaks={breaks} />
     </Suspense>
   );

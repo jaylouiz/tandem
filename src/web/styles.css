@@ -1349,7 +1349,7 @@ body[data-dragging], body[data-dragging] .card { cursor: grabbing; user-select: 
 .pane-empty { flex: 1; display: flex; flex-direction: column; gap: var(--s-2); align-items: center; justify-content: center; }
 .empty.tight { padding: var(--s-5) 20px; }
 
-.qrow { display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; padding: 6px 14px; border: 0; background: none; font: inherit; color: inherit; text-align: left; min-height: 52px; box-sizing: border-box; }
+.qrow { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; padding: 6px 14px; border: 0; background: none; font: inherit; color: inherit; text-align: left; min-height: 52px; box-sizing: border-box; }
 .qrow:hover { background: var(--bg-hover); }
 .qrow[aria-selected="true"] { background: var(--bg-active); }
 .qrow:focus-visible { outline-offset: -2px; }
