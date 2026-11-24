@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
-import { serveStatic } from "@hono/node-server/serve-static";
 import { Board } from "./board.ts";
 import { createApp } from "./app.ts";
 import { localAccess } from "./guard.ts";
@@ -14,6 +13,7 @@ import { macSend, Notifier, PageClients } from "./notifier.ts";
 import { FakePusher, OrcaPusher } from "./push.ts";
 import { Store } from "./store.ts";
 import { VersionCheck } from "./version.ts";
+import { serveWeb } from "./web.ts";
 
 const fixture = process.env.TANDEM_SOURCE === "fixture";
 const port = Number(process.env.TANDEM_PORT ?? 4317);
@@ -42,10 +42,7 @@ if (!fixture && process.env.TANDEM_NOTIFY !== "0" && process.platform === "darwi
 
 // Built web app (npm run build), served from the same origin.
 const webDir = join(dirname(fileURLToPath(import.meta.url)), "../../web");
-if (existsSync(webDir)) {
-  app.use("/*", serveStatic({ root: webDir }));
-  app.get("*", serveStatic({ path: join(webDir, "index.html") }));
-}
+if (existsSync(webDir)) serveWeb(app, webDir);
 
 serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, () => {
   console.log(`Tandem on http://127.0.0.1:${port} (${source.kind})`);
