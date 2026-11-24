@@ -1,6 +1,4 @@
-import DOMPurify from "dompurify";
-import { marked } from "marked";
-import { useId, type ComponentProps, type ReactNode } from "react";
+import { lazy, Suspense, useId, type ComponentProps, type ReactNode } from "react";
 import { KIND_LABEL, type Kind } from "../../core/ask.ts";
 import { STATE_LABEL, type AgentState } from "../../core/activity.ts";
 import { NO_REPOS, useStore, type View } from "../store.ts";
@@ -77,10 +75,18 @@ export function CardChips({ card }: { card: Card }) {
   );
 }
 
-/** `breaks`: a single newline is a line break (agent records list their fields one per line). */
+const loadMarkdown = () => import("./MarkdownBody.tsx");
+const MarkdownBody = lazy(loadMarkdown);
+/** Fetches the Markdown chunk (marked, DOMPurify) once the page is idle, so a Card's text is rendered at once when it opens (#7). */
+export const preloadMarkdown = () => void loadMarkdown();
+
+/** `breaks`: a single newline is a line break (agent records list their fields one per line). Until the renderer is there the text shows as it is. */
 export function Markdown({ text, breaks = false }: { text: string; breaks?: boolean }) {
-  const html = DOMPurify.sanitize(marked.parse(text, { async: false, gfm: true, breaks }) as string);
-  return <div className="markdown" dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <Suspense fallback={<div className="markdown" style={{ whiteSpace: "pre-wrap" }}>{text}</div>}>
+      <MarkdownBody text={text} breaks={breaks} />
+    </Suspense>
+  );
 }
 
 const ICON: Record<Kind, ReactNode> = {
@@ -163,7 +169,7 @@ export function NavIcon({ view }: { view: View }) {
 
 export function KindChip({ kind }: { kind: Kind }) {
   return (
-    <span className="kind-chip sr-only" data-kind={kind}>
+    <span className="kind-chip" data-kind={kind}>
       {KIND_LABEL[kind]}
     </span>
   );
