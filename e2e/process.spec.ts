@@ -161,7 +161,7 @@ test("Agent activity: Tab cycles inside the overlay and never reaches the Board 
 test("Agent activity: status line, g a overlay by state, a row opens the Card with its Activity fold open", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("agents-line")).toContainText(/\d+ working, [1-9]\d* stuck/);
-  await expect(page.getByTestId("stuck-count")).toHaveClass(/bad/);
+  await expect(page.getByTestId("stuck-count").locator(".act-dot")).toHaveCount(1); // the signal is the dot, the text stays neutral
   await page.keyboard.press("g");
   await page.keyboard.press("a");
   const agents = page.getByRole("dialog", { name: "Agent activity" });
@@ -171,6 +171,8 @@ test("Agent activity: status line, g a overlay by state, a row opens the Card wi
   expect(headings.map((h) => h.replace(/\s*\d+$/, "").trim())).toEqual(order);
   await expect(page.getByTestId("agents-stuck")).toContainText("worker session ended without worker_done");
   await expect(page.getByTestId("agents-hold")).toContainText("Bulk edit tags");
+  await expect(agents.locator(".group-head .act-dot")).toHaveCount(headings.length); // the dot is the group's
+  await expect(agents.locator(".arow .act-dot")).toHaveCount(0); // not every row's
   await page.keyboard.press("Escape");
   await expect(agents).toBeHidden();
   await page.getByTestId("agents-line").click();

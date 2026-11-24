@@ -1315,7 +1315,6 @@ body[data-dragging], body[data-dragging] .card { cursor: grabbing; user-select: 
 .act-dot[data-state="parked"] { background: var(--waiting); }
 .act-dot[data-state="queued"] { background: var(--accent); }
 .act-dot[data-state="hold"] { background: none; box-shadow: inset 0 0 0 1.5px var(--text-faint); }
-.act-box { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; }
 
 .split { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .split-list { width: clamp(320px, 30vw, 380px); flex-shrink: 0; overflow: auto; border-right: 1px solid var(--border); padding-bottom: var(--s-5); outline: none; }
@@ -1345,13 +1344,12 @@ body[data-dragging], body[data-dragging] .card { cursor: grabbing; user-select: 
 .qrow[aria-selected="true"] { background: var(--bg-active); }
 .qrow:focus-visible { outline-offset: -2px; }
 .qrow[data-failed] .ask { color: var(--danger); }
-.arow { grid-template-columns: 26px minmax(0, 1fr) auto; }
+.arow { grid-template-columns: minmax(0, 1fr) auto; }
 .q-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .q-title { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; }
 .q-title .title { flex: 1; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .q-sub { display: flex; align-items: center; gap: var(--s-2); min-width: 0; font-size: var(--fs-sm); color: var(--text-muted); }
 .q-sub .ask { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; color: var(--text-muted); }
-.arow[data-state="stuck"] .ask { color: var(--danger); }
 
 .pane { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg-panel); overflow: hidden; }
 .pane.aside { flex: 0 0 min(560px, 46vw); box-shadow: -1px 0 0 var(--border), -12px 0 28px -16px color-mix(in oklch, var(--ink) 18%, transparent); position: relative; }
@@ -1383,7 +1381,7 @@ body[data-dragging], body[data-dragging] .card { cursor: grabbing; user-select: 
 .repo-list .nav-item[aria-pressed="true"] { background: var(--bg-active); color: var(--text); }
 .rdot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
 .agents-line { margin-top: var(--s-2); }
-.agents-line .bad { color: var(--danger); font-weight: 600; }
+.agents-line .stuck-count { display: inline-flex; align-items: center; gap: 5px; }
 .agents-dialog { width: min(860px, 92vw); }
 .dialog:focus { outline: none; }
 .agents-head { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--border); font-weight: 600; }
