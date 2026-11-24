@@ -1476,6 +1476,9 @@ button.done-head:hover { background: var(--bg-hover); color: var(--text); }
   flex-direction: column;
   gap: var(--s-2);
   max-width: 420px;
+  /* many failing repos at once (offline): the list scrolls inside the window (Base UI sets the variable on the positioner) */
+  max-height: var(--available-height);
+  overflow: auto;
   padding: var(--s-3);
   border-radius: var(--radius-lg);
   background: var(--bg-raised);

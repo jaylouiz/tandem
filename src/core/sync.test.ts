@@ -3,8 +3,8 @@ import { syncFailure, syncFailureStatus } from "./sync.ts";
 
 describe("a failed sync in plain words (#2)", () => {
   it("names a network failure, a refused login, a rate limit and any other status", () => {
-    expect(syncFailure("GitHub could not be reached: fetch failed (ENOTFOUND)")).toEqual({ what: "GitHub could not be reached", detail: "GitHub could not be reached: fetch failed (ENOTFOUND)" });
-    expect(syncFailure('GitHub GET /repos/o/r/issues: 401 {"message":"Bad credentials"}').what).toBe("GitHub refused the login (401): run `gh auth login`");
+    expect(syncFailure("GitHub could not be reached: fetch failed (ENOTFOUND)")).toEqual({ what: "GitHub could not be reached", detail: "fetch failed (ENOTFOUND)" });
+    expect(syncFailure('GitHub GET /repos/o/r/issues: 401 {"message":"Bad credentials"}').what).toBe("GitHub refused the login (401). Log in again with gh auth login");
     expect(syncFailure("GitHub POST /graphql: 403 rate limit").what).toBe("GitHub refused the request (403), possibly a rate limit");
     expect(syncFailure("GitHub POST /graphql: 502 Bad Gateway").what).toBe("GitHub answered 502");
     expect(syncFailure("GitHub GraphQL: Something went wrong").what).toBe("Sync failed");

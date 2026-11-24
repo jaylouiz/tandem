@@ -64,6 +64,10 @@ _Avoid_: read, acknowledged
 Tandem telling an agent that feedback has arrived, so that work resumes without the developer starting or pinging the agent themselves.
 _Avoid_: trigger, dispatch, run
 
+**Orca Run**:
+An orchestration run in Orca: where a Push is sent (`run:<id>`). Tandem looks one up only when it sends a Push; "no Orca Run found" is a fact about that Push, never a statement about whether a coordinator is running (#14).
+_Avoid_: coordinator state, session
+
 **On hold**:
 A Card the developer parked with the hold label (Hold Card on the Card pane, key `h`; Release hold takes it back). An agent does not pick it up. Not the same as **Hold merge**, the verdict on a PR approval that keeps the PR open. The toast says "Held" or "Released".
 _Avoid_: pause, freeze, a bare "Hold" on a control (it names both)
