@@ -3,7 +3,7 @@
 // The rare actions (Next step, hold, Needs wayfinder, GitHub) live in the More menu and keep their keys.
 import { useEffect, useRef, useState } from "react";
 import { STATE_DEFAULT_TEXT, STATE_LABEL, classifyActivity, parseLog, type Activity } from "../../core/activity.ts";
-import { askOf, decidedParts, decidedSummary, decisionState, foldStart, issueSummary, type FoldId } from "../../core/ask.ts";
+import { askOf, hasAskPanel, decidedParts, decidedSummary, decisionState, foldStart, issueSummary, type FoldId } from "../../core/ask.ts";
 import type { ShotsTarget } from "../../core/gallery.ts";
 import { askQuestions } from "../../core/questions.ts";
 import { startNotice, startRequests } from "../../core/triage.ts";
@@ -322,7 +322,7 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
           {parts.answers + parts.decisions + parts.rounds > 0 && (
             <Fold id="decided" title="Decided" summary={decidedSummary(card)} open={open.decided} onToggle={() => toggle("decided")} reveal={revealOf("decided")}>
               {/* the ask panel owns the digits and ⌘↵ while it is there; else the agent decisions take them */}
-              <Decided card={card} rounds={rounds} roundWaits={roundWaits} src={signed} signal={signalFor("earlier")} keys={drawer || !card.waiting} />
+              <Decided card={card} rounds={rounds} roundWaits={roundWaits} src={signed} signal={signalFor("earlier")} keys={drawer || !hasAskPanel(card)} />
             </Fold>
           )}
           {card.phase !== "Done" && (

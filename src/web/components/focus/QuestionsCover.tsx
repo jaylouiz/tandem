@@ -53,7 +53,7 @@ export function QuestionsCover({ card, ask, signed }: { card: Card; ask: Ask; si
           {a.multi && <Steps ask={ask} a={a} />}
           <div className="qcover-step" onFocusCapture={(e) => e.target instanceof HTMLInputElement && setNoted(true)}>
             <StepPanel ask={ask} a={a} className="qcover-panel">
-              {q ? <QuestionView key={q.n} ask={ask} q={q} a={a} keys onPick={onPick} shots={g.forQuestion} big /> : <Review ask={ask} a={a} big />}
+              {q ? <QuestionView key={q.n} ask={ask} q={q} a={a} keys onPick={onPick} shots={g.forQuestion} big toggle={!sendsOnPick} /> : <Review ask={ask} a={a} big />}
             </StepPanel>
           </div>
         </div>

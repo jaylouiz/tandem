@@ -377,3 +377,24 @@ test("Focus: a one-question decision keeps sending on a click", async ({ page })
   await page.getByTestId("tile-2").click();
   await expect.poll(async () => (await written(page, 105)).answer).toBe("Decision D1: B");
 });
+
+test("Focus: one question with a ★ option: a click on the ★ tile sends it, a typed answer is written as the sheet writes it", async ({ page }) => {
+  // the sheet: ★ counts as picked, the note follows it
+  await open(page, 185);
+  await page.getByTestId("note-add").click();
+  await page.getByTestId("note").fill("with H1's outlines");
+  await expect(writes(page)).toHaveText("Decision D1: H1 Sunlit Outline. with H1's outlines");
+  // Focus reads the same draft and writes the same comment
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("f");
+  await page.getByTestId("focus-overview").locator('button[data-card="acme/app#185"]').click();
+  await expect(page.getByTestId("cover-decision")).toBeVisible();
+  await expect(page.getByTestId("sendbar").getByTestId("writes")).toHaveText("Decision D1: H1 Sunlit Outline. with H1's outlines");
+});
+
+test("Focus: a click on the ★ option of a one-question decision sends it", async ({ page }) => {
+  await startFocusOn(page, 185);
+  await expect(page.getByTestId("tile-1")).toBeVisible();
+  await page.getByTestId("tile-1").click();
+  await expect.poll(async () => (await written(page, 185)).answer).toBe("Decision D1: H1 Sunlit Outline");
+});

@@ -91,3 +91,18 @@ test("challenge from Decided on a Card that also waits: the digits stay the ask'
   await expect(row(page, 127)).toContainText("Decision"); // still the blocker D3
   await expect(row(page, 127)).not.toContainText("Awaiting pickup");
 });
+
+test("a Done Card with a Look and agent decisions: the Look has the keys, the agent decisions show none", async ({ page }) => {
+  // #160 is a Done Card with a Look; give it the new agent decision of #107 (no fixture has both)
+  await page.route("**/api/events*", async (route) => {
+    const board = (await (await page.request.get("/api/board")).json()) as { cards: Record<string, unknown>[] };
+    const from = board.cards.find((c) => c.key === "acme/app#107")!;
+    const to = board.cards.find((c) => c.key === "acme/app#160")!;
+    Object.assign(to, { agentDecisions: from.agentDecisions, decisionsToAccept: from.decisionsToAccept });
+    await route.fulfill({ status: 200, contentType: "text/event-stream", body: `event: board\ndata: ${JSON.stringify(board)}\n\n` });
+  });
+  await page.goto("/board/acme/app/160");
+  await expect(page.getByTestId("detail")).toHaveAttribute("aria-label", "Card acme/app#160");
+  await expect(page.getByTestId("fold-decided").getByTestId("panel-agent-decision")).toBeVisible();
+  await expect(page.getByTestId("panel-agent-decision").locator("kbd")).toHaveCount(0);
+});

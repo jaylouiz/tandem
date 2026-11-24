@@ -3,7 +3,7 @@
 // (`components/focus/`) both stand on these, so there is one rule for what gets written. How an answer is given (pick then Send in
 // the panels, a click that sends in Focus) is the caller's.
 import { canSend, decisionFeedback, optionKey, prFeedback, questionsFeedback, roundFeedback, type Feedback } from "../../core/answer.ts";
-import { answerSummary, effectivePicks, unanswered, type Ask, type Notes, type Picks } from "../../core/questions.ts";
+import { answerSummary, askQuestions, effectivePicks, unanswered, type Ask, type Notes, type Picks } from "../../core/questions.ts";
 import type { PrVerdict } from "../../core/contract.ts";
 import { draftKey, prDraftId, roundDraftId } from "../../core/drafts.ts";
 import type { Card, DesignRound } from "../../core/types.ts";
@@ -38,16 +38,21 @@ export function useDecisionAnswer(card: Card, via: SendVia = direct) {
   const req = card.requests.find((r) => r.id === card.waiting?.requestId);
   const dKey = draftKey(card.key, req?.id ?? "");
   const [draft, editDraft] = useDraft(dKey, ANSWER_DRAFT);
-  const choice = req?.options.find((o) => optionKey(o) === draft.picks[1]) ?? null;
+  // one question with a ★ option: the ★ counts as picked until it is taken back, as in the sheet's ask panel (`questionsAnswer`)
+  const ask = askQuestions(card);
+  const pick = ask && ask.questions.length === 1 ? effectivePicks(ask, draft.picks)[1] : draft.picks[1];
+  const choice = req?.options.find((o) => optionKey(o) === pick) ?? null;
+  /** the option the developer picked themselves (not the ★ that counts until then): a second pick of it takes it back */
+  const own = req?.options.find((o) => optionKey(o) === draft.picks[1]) ?? null;
   const text = draft.notes[1] ?? "";
   const push = draft.push;
   const edit = (p: { choice?: string | null; text?: string; push?: boolean }) =>
-    editDraft({ ...("choice" in p ? { picks: p.choice ? { 1: optionKey(p.choice) } : {} } : {}), ...("text" in p ? { notes: p.text ? { 1: p.text } : {} } : {}), ...(p.push === undefined ? {} : { push: p.push }) });
+    editDraft({ ...("choice" in p ? { picks: { 1: p.choice ? optionKey(p.choice) : "" } } : {}), ...("text" in p ? { notes: p.text ? { 1: p.text } : {} } : {}), ...(p.push === undefined ? {} : { push: p.push }) });
   /** the Feedback for this choice and note, sendable or not; null without a request */
   const feedbackOf = (c: string | null, note: string) => (req ? decisionFeedback(req.id, c, note) : null);
   const feedback = feedbackOf(choice, text);
   const sendWith = (c: string | null, note: string) => sendFeedback(card, feedbackOf(c, note), push, dKey, via);
-  return { req, choice, text, push, edit, feedback, feedbackOf, canSend: !!feedback && canSend(feedback), send: () => sendWith(choice, text), sendWith, clear: () => useStore.getState().clearDraft(dKey) };
+  return { req, choice, own, text, push, edit, feedback, feedbackOf, canSend: !!feedback && canSend(feedback), send: () => sendWith(choice, text), sendWith, clear: () => useStore.getState().clearDraft(dKey) };
 }
 
 /** The three verdicts in key order, each with what it sets off (`prVerdictComment`; Hold also labels the issue do-not-merge). */

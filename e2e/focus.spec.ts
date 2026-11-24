@@ -144,7 +144,7 @@ test("Answer with a note: options only pick, the Send bar shows the whole commen
   await page.keyboard.press("n");
   await expect(page.getByTestId("note")).toBeFocused();
   await page.getByTestId("note").fill("keep the undo toast");
-  await expect(page.getByTestId("writes")).toHaveText("Decision D1: keep the undo toast"); // a note alone is an answer
+  await expect(page.getByTestId("writes")).toHaveText("Decision D1: B. keep the undo toast"); // the ★ option counts as picked, as in the sheet (#17)
   await page.keyboard.press("Escape"); // leaves the field, keeps the text
   await page.keyboard.press("2"); // picks, does not send
   await on(page, 170);

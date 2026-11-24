@@ -166,7 +166,7 @@ export interface QuestionShots {
  * One question: what it decides, its options as rows (digit, letter, name, "today", in short, ★ Recommended), the agent's reason once,
  * a note, its screenshot. `onPick` is the caller's (the sheet picks and moves on; Focus with one question sends).
  */
-export function QuestionView({ ask, q, a, keys, onPick, shots, big }: { ask: Ask; q: Question; a: AskAnswer; keys: boolean; onPick: (q: Question, letter: string) => void; shots?: QuestionShots; big?: boolean }) {
+export function QuestionView({ ask, q, a, keys, onPick, shots, big, toggle = true }: { ask: Ask; q: Question; a: AskAnswer; keys: boolean; onPick: (q: Question, letter: string) => void; shots?: QuestionShots; big?: boolean; toggle?: boolean }) {
   const note = a.notes[q.n] ?? "";
   const [noting, setNoting] = useState(false);
   const rec = recommendedOf(q);
@@ -201,8 +201,8 @@ export function QuestionView({ ask, q, a, keys, onPick, shots, big }: { ask: Ask
             tabIndex={picked === o.letter || (i === 0 && !q.options.some((x) => x.letter === picked)) ? 0 : -1}
             data-plain={!o.name || undefined}
             data-testid={`option-${o.letter}`}
-            // one question may be answered in words alone: its pick can be taken back. Several questions each keep one pick.
-            onClick={() => (!a.multi && picked === o.letter ? a.pick(q.n, "", true) : onPick(q, o.letter))}
+            // one question may be answered in words alone: its pick can be taken back (not where a click sends, Focus). Several questions each keep one pick.
+            onClick={() => (toggle && !a.multi && picked === o.letter ? a.pick(q.n, "", true) : onPick(q, o.letter))}
           >
             {keys && i < 9 ? <kbd>{i + 1}</kbd> : <span className="qopt-nokey" aria-hidden />}
             <span className="qopt-main">
