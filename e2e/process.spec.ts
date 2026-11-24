@@ -54,9 +54,10 @@ test("a digit picks a decision option, ⌘↵ sends, the next blocker opens; a f
   await panel.getByTestId("note").fill("with a note"); // last, so the focus is in the field for ⌘↵
   await page.route("**/api/cards/acme/app/117/answer", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await page.keyboard.press("ControlOrMeta+Enter");
-  await expect(toast(page, "Failed: boom")).toBeVisible();
+  // said once, on the Card that comes back: its sheet, no toast beside it
   await open(page, 117);
   await expect(page.getByTestId("not-sent")).toContainText("boom");
+  await expect(page.getByTestId("toast")).toHaveCount(0);
   await expect(panel.getByTestId("note")).toHaveValue("with a note");
   await expect(panel.getByTestId("push-toggle")).not.toBeChecked(); // the Push choice is part of the draft
   await expect(row(page, 117)).toBeVisible();

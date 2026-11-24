@@ -395,6 +395,12 @@ test("Focus: one question with a ★ option: a click on the ★ tile sends it, a
 test("Focus: a click on the ★ option of a one-question decision sends it", async ({ page }) => {
   await startFocusOn(page, 185);
   await expect(page.getByTestId("tile-1")).toBeVisible();
+  // the ★ of a key of several words is read as the sheet reads it; the only tile with the agent's line
+  await expect(page.getByTestId("tile-1")).toContainText("The agent recommends this");
+  await expect(page.locator(".tile-rec")).toHaveCount(1);
+  // an option's Markdown is rendered, not shown raw
+  await expect(page.getByTestId("tile-2").locator(".tile-text code")).toHaveText("Jetzt");
+  await expect(page.getByTestId("tile-2")).not.toContainText("`");
   await page.getByTestId("tile-1").click();
   await expect.poll(async () => (await written(page, 185)).answer).toBe("Decision D1: H1 Sunlit Outline");
 });

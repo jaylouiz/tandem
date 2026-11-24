@@ -257,26 +257,30 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
     <aside className={`pane sheet ${mode}`} data-testid="detail" aria-label={`Card ${card.key}`}>
       <div className="sheet-head">
         <div className="sheet-top">
-          <RepoTag repo={card.repo} number={card.number} />
-          <PhaseTrack phase={card.phase} />
-          {card.onHold && <span className="chip danger">On hold</span>}
-          {card.fog && <span className="chip accent">Needs wayfinder</span>}
-          {card.pullRequest?.state === "open" && (
-            <a className="chip ok" href={card.pullRequest.url} target="_blank" rel="noreferrer" title="Open the pull request on GitHub">
-              PR #{card.pullRequest.number}
-            </a>
-          )}
-          <span className="spacer" />
-          {/* the Card behind an ask of Focus is not changed from here: its drawer only leads to GitHub */}
-          {drawer ? (
-            <a className="btn ghost" href={card.url} target="_blank" rel="noreferrer">
-              GitHub
-              <Ext />
-            </a>
-          ) : (
-            <MoreMenu card={card} />
-          )}
-          {(mode === "aside" || drawer) && <CloseKey label={drawer ? "Close the Card details" : "Close the Card"} onClose={close} />}
+          {/* at the 400px pane only this group wraps: More and the close key stay on the first line */}
+          <div className="sheet-tags">
+            <RepoTag repo={card.repo} number={card.number} />
+            <PhaseTrack phase={card.phase} />
+            {card.onHold && <span className="chip danger">On hold</span>}
+            {card.fog && <span className="chip accent">Needs wayfinder</span>}
+            {card.pullRequest?.state === "open" && (
+              <a className="chip ok" href={card.pullRequest.url} target="_blank" rel="noreferrer" title="Open the pull request on GitHub">
+                PR #{card.pullRequest.number}
+              </a>
+            )}
+          </div>
+          <div className="sheet-actions">
+            {/* the Card behind an ask of Focus is not changed from here: its drawer only leads to GitHub */}
+            {drawer ? (
+              <a className="btn ghost" href={card.url} target="_blank" rel="noreferrer">
+                GitHub
+                <Ext />
+              </a>
+            ) : (
+              <MoreMenu card={card} />
+            )}
+            {(mode === "aside" || drawer) && <CloseKey label={drawer ? "Close the Card details" : "Close the Card"} onClose={close} />}
+          </div>
         </div>
         <h2>{card.title}</h2>
       </div>

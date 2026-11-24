@@ -21,6 +21,26 @@ describe("giveFeedback", () => {
     expect(store.useStore.getState().failures[card.key]).toContain("boom");
   });
 
+  it("a failed answer is said once, on the Card's sheet: no toast beside it; where no sheet shows the Card the toast says it", async () => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ error: "boom" }), { status: 500, headers: { "content-type": "application/json" } }));
+    store.useStore.setState({ selected: null, notice: null, focus: false, view: "board", marked: [] });
+    await store.giveFeedback(card, "answer", {}, {});
+    expect(store.useStore.getState().failures[card.key]).toBe("boom");
+    expect(store.useStore.getState().notice).toBeNull();
+    store.useStore.setState({ marked: ["o/r#1", "o/r#2"] }); // the aside shows "2 Cards selected", not the sheet
+    await store.giveFeedback(card, "answer", {}, {});
+    expect(store.useStore.getState().notice).toMatchObject({ text: "Failed: boom", failed: true });
+    store.useStore.setState({ marked: [], notice: null });
+  });
+
+  it("a server that does not answer is said in plain words, not as the browser's fetch error", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    await store.giveFeedback(card, "answer", {}, {});
+    expect(store.useStore.getState().failures[card.key]).toBe("Tandem's server did not answer");
+  });
+
   it("reports whether the write went through, so an answer's draft can be kept or dropped", async () => {
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ error: "boom" }), { status: 500, headers: { "content-type": "application/json" } }));
     expect(await store.giveFeedback(card, "answer", {}, {})).toBe(false);

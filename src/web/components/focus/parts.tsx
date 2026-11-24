@@ -48,8 +48,8 @@ export function Meta({ card, kind }: { card: Card; kind: Kind }) {
 export interface TileProps {
   n: number;
   /** the option's key (`B`) or the verdict's name */
-  head: string;
-  text?: string;
+  head: ReactNode;
+  text?: ReactNode;
   /** the comment a click writes, word for word; absent while the note is open (the Send bar shows the whole comment then) */
   writes?: ReactNode;
   /** the note is open: the tile is a toggle that only picks */

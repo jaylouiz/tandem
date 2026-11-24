@@ -2,13 +2,14 @@
 // once; the tile says beforehand which comment that writes. "Answer with a note" is the second path: with the note open the tiles only
 // pick, the Send bar shows the whole comment and ⌘↵ sends it.
 import { feedbackComment, optionKey, optionText } from "../../../core/answer.ts";
+import { askQuestions, recommendedOf } from "../../../core/questions.ts";
 import type { Card } from "../../../core/types.ts";
 import { useDecisionAnswer } from "../../feedback/answers.ts";
 import { useRegisterPanel } from "../../feedback/panel.ts";
 import { useFocusKeys } from "../../focus/keys.ts";
 import { focusSend, useFocus } from "../../focus/session.ts";
 import { keyOf } from "../../keys.ts";
-import { Ext } from "../bits.tsx";
+import { Ext, Inline } from "../bits.tsx";
 import { KeyLine, Meta, Note, SendBar, Tile, useCover } from "./parts.tsx";
 
 const clip = (o: string) => (o.length > 60 ? `${o.slice(0, 59)}…` : o);
@@ -54,23 +55,27 @@ export function DecisionCover({ card }: { card: Card }) {
 
   const req = a.req;
   if (!req) return null;
-  const rec = req.recommendation;
-  const recommended = (opt: string) => !!rec && optionKey(opt).toLowerCase() === rec.split(/[\s(]/)[0]!.toLowerCase();
-  const confidence = /confidence\s+(\w+)/i.exec(rec ?? "")?.[1] ?? "";
+  // the ★ as the sheet reads it (`askQuestions`): a key of several words (`H1 Sunlit Outline`) is matched whole
+  const ask = askQuestions(card);
+  const recKey = ask?.questions.length === 1 ? recommendedOf(ask.questions[0]!) : null;
+  const recommended = (opt: string) => !!recKey && optionKey(opt) === recKey;
+  const confidence = /confidence\s+(\w+)/i.exec(req.recommendation ?? "")?.[1] ?? "";
   return (
     <>
       <div className="cover-scroll">
         <div className="cover-col" data-testid="cover-decision">
           <Meta card={card} kind="decision" />
-          <h1 className="cover-q">{req.question}</h1>
+          <h1 className="cover-q">
+            <Inline text={req.question} />
+          </h1>
           {options.length > 0 && (
             <div className="tiles" role="group" aria-label="Options">
               {options.map((o, i) => (
                 <Tile
                   key={o}
                   n={i + 1}
-                  head={optionKey(o)}
-                  text={optionText(o)}
+                  head={<Inline text={optionKey(o)} />}
+                  text={optionText(o) ? <Inline text={optionText(o)} /> : undefined}
                   writes={noting ? undefined : feedbackComment(a.feedbackOf(o, "")!)}
                   picks={noting}
                   picked={a.choice === o}

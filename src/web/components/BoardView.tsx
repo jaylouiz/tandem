@@ -188,14 +188,33 @@ export function BoardView({ cards }: { cards: Card[] }) {
   // half in view (#50). It snaps when the pane opens and when the selection moves to another Phase, not for a move inside the column,
   // so a look at the neighbour by scrolling is not undone. Runs after BoardCard's own scrollIntoView (a parent's effect follows its children's).
   const phase = cards.find((c) => c.key === selected)?.phase ?? null;
-  useEffect(() => {
+  const snap = useRef(() => {});
+  snap.current = () => {
     const root = board.current;
     const scroller = root?.closest<HTMLElement>(".scroll");
     const col = phase && root?.querySelector<HTMLElement>(`[data-column="${phase}"]`);
     if (!narrow || !root || !scroller || !col) return;
     const pad = parseFloat(getComputedStyle(root).paddingLeft) || 0;
     scroller.scrollLeft += col.getBoundingClientRect().left - scroller.getBoundingClientRect().left - pad;
-  }, [narrow, phase]);
+  };
+  useEffect(() => snap.current(), [narrow, phase]);
+  // on a deep link or a reload the Card pane takes its width after the Board's first layout: the open Card was scrolled into a wider
+  // Board and ends up under the pane. When the Board's width changes, the open Card is brought into view (and its column snapped) again.
+  useEffect(() => {
+    const scroller = board.current?.closest<HTMLElement>(".scroll");
+    if (!scroller || typeof ResizeObserver === "undefined") return;
+    let width = scroller.clientWidth;
+    const watch = new ResizeObserver(() => {
+      if (scroller.clientWidth === width) return;
+      width = scroller.clientWidth;
+      const key = useStore.getState().selected;
+      if (!key) return;
+      board.current?.querySelector<HTMLElement>(`[data-card="${CSS.escape(key)}"]`)?.scrollIntoView?.({ block: "nearest" });
+      snap.current();
+    });
+    watch.observe(scroller);
+    return () => watch.disconnect();
+  }, []);
   // a click closes the Card pane only when press and release are the same empty spot: not a drag or text selection (a drag that ends on
   // another element makes the click land on a common ancestor); the marks stay
   const down = useRef<{ target: EventTarget; x: number; y: number } | null>(null);

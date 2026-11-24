@@ -108,6 +108,7 @@ function MarkedPaneNote({ count }: { count: number }) {
 export function App() {
   const board = useStore((s) => s.board);
   const connected = useStore((s) => s.connected);
+  const unreachable = useStore((s) => s.unreachable);
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const selected = useStore((s) => s.selected);
@@ -144,7 +145,8 @@ export function App() {
 
   const errors = board ? Object.entries(board.sync).filter(([, s]) => s.error) : [];
   const nav: [View, string, number | null, number | null][] = [
-    ["waiting", "Waiting on me", waitingCount, allWaiting],
+    // no count before the first snapshot: a 0 would read as a fact
+    ["waiting", "Waiting on me", board ? waitingCount : null, allWaiting],
     ["board", "Board", null, null],
     ["settings", "Settings", null, null],
   ];
@@ -173,7 +175,7 @@ export function App() {
             )}
           </button>
         ))}
-        <AgentsLine cards={cards} scope={filter} />
+        {board && <AgentsLine cards={cards} scope={filter} />}
         <Repos />
         <button className="nav-item" onClick={() => setPalette(true)} style={{ marginTop: 8 }}>
           Command <kbd>{keyOf("palette")}</kbd>
@@ -252,7 +254,9 @@ export function App() {
           ) : (
           <div className="scroll" ref={scroller}>
             {!board ? (
-              <div className="empty">Loading…</div>
+              <div className="empty" data-testid="loading" role="status">
+                {unreachable ? "Cannot reach Tandem's server. Retrying…" : "Loading…"}
+              </div>
             ) : board.repos.length === 0 && view !== "settings" ? (
               <div className="empty">
                 No repos on the Board yet.{" "}

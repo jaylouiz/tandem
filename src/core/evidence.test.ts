@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prEvidence, whyStopped } from "./evidence.ts";
+import { prEvidence } from "./evidence.ts";
 
 const done = (...texts: string[]) => texts.map((text) => ({ text, open: false }));
 
@@ -48,20 +48,5 @@ describe("a PR body's evidence", () => {
   it("takes any heading level, case and a trailing colon, but not a heading that only starts with the word", () => {
     expect(prEvidence("### verification:\n- a\r\n# REVIEW\n- b")).toEqual({ verification: done("a"), review: done("b") });
     expect(prEvidence("## Review notes\n- a\n## Verification steps\n- b")).toEqual({ verification: null, review: null });
-  });
-});
-
-describe("why the merge stopped", () => {
-  it("is the question without its closing question sentence", () => {
-    expect(whyStopped("Merge held: the PR touches the sync store (risk area). Merge?")).toBe("Merge held: the PR touches the sync store (risk area).");
-    expect(whyStopped("Merge held: risk area. Merge?")).toBe("Merge held: risk area.");
-    expect(whyStopped("Two findings are open. The review calls them low. Merge anyway?")).toBe("Two findings are open. The review calls them low.");
-  });
-
-  it("is left out when the question is one sentence, or does not end in a question", () => {
-    expect(whyStopped("Merge?")).toBeNull();
-    expect(whyStopped("Should this PR be merged now?")).toBeNull();
-    expect(whyStopped("Merge held. The PR touches a risk area.")).toBeNull();
-    expect(whyStopped("")).toBeNull();
   });
 });

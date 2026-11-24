@@ -97,8 +97,10 @@ test("a click sends a PR approval; its evidence is read from the PR body; Hold m
   await page.keyboard.press("Enter");
   await on(page, 106);
   const facts = page.getByTestId("facts");
-  await expect(facts).toContainText("Why it stopped");
-  await expect(facts).toContainText("Merge held: the PR touches the sync store (risk area).");
+  // why the merge stopped is the headline, said once: no column repeats it
+  await expect(page.getByTestId("cover-pr-approval").getByRole("heading", { level: 1 })).toContainText("Merge held: the PR touches the sync store (risk area).");
+  await expect(facts).not.toContainText("Why it stopped");
+  await expect(facts).not.toContainText("Merge held");
   await expect(facts.locator(".fact", { hasText: "Verification" }).locator("li")).toHaveText(["unit 212/212", "e2e 31/31"]);
   await expect(facts.locator(".fact", { hasText: "Review" })).toContainText("No findings above low.");
   await expect(facts.getByRole("link", { name: /PR #210: diff on GitHub/ })).toHaveAttribute("href", /pull\/210\/files$/);
