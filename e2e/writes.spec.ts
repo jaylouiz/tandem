@@ -9,6 +9,7 @@ const toSettings = async (page: Page) => {
   await expect(page.getByTestId("waiting-list").locator(".qrow").first()).toBeVisible();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByTestId("settings")).toBeVisible();
+  await expect(boxes(page).first()).toBeVisible(); // the page shows its Theme and Notifications at once; the repos arrive with their own request
 };
 const boxes = (page: Page) => page.getByTestId("settings").getByRole("checkbox");
 
