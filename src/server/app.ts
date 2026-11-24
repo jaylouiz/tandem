@@ -133,7 +133,7 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
    * write stops before anything is sent (a Push cannot be taken back). When `send` throws or what it returns did not arrive, each status goes
    * back to what it was (the unhanded status when there was none: a status cannot be cleared). `restoreError`: why that last write failed.
    */
-  async function handOver<T>(repo: string, numbers: number[], send: () => Promise<T>, arrived: (result: T) => boolean): Promise<{ result: T; restoreError: string | null }> {
+  async function handOver<T>(repo: string, numbers: number[], send: () => Promise<T>, arrived: (result: T) => boolean, keepStarted = false): Promise<{ result: T; restoreError: string | null }> {
     const cfg = board.workflow;
     const set: { n: number; before: string | null }[] = [];
     const restore = async () => {
@@ -154,6 +154,8 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
       for (const n of numbers) {
         const before = board.rawIssue(repo, n)?.status ?? null;
         if (before === cfg.handedStatus) continue;
+        // Start coordinator never undoes itself: a Card that has started work keeps that status
+        if (keepStarted && before !== null && cfg.startedStatuses.includes(before)) continue;
         // false: the repo offers no such status, the hand-over goes on without one
         if (await source.setStatus(repo, n, cfg.handedStatus)) {
           set.push({ n, before });
@@ -265,7 +267,7 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
     const path = store.state.repoPaths[repo] ?? (await pusher.knownPaths())[repo];
     if (!path) return c.json({ error: `No local checkout known for ${repo}. Set its path in Settings.` }, 400);
     // it starts with these numbers, so they count as handed
-    await handOver(repo, numbers, () => pusher.startCoordinator(repo, path, numbers), () => true);
+    await handOver(repo, numbers, () => pusher.startCoordinator(repo, path, numbers), () => true, true);
     return c.json({ ok: true });
   });
 

@@ -25,6 +25,8 @@ export interface WorkflowConfig {
   nextStep: Record<string, NextStep>;
   /** the native issue status that means "handed to an agent, not started yet"; Tandem sets it on "Hand to agent" */
   handedStatus: string;
+  /** the statuses that mean work has started: a hand-over that cannot be taken back (Start coordinator) leaves them alone */
+  startedStatuses: string[];
   /** the status a handed Card goes back to when it is re-steered or its Push did not arrive (a status cannot be cleared) */
   unhandedStatus: string;
   /** labels that put a Card on hold */
@@ -69,6 +71,7 @@ export const DEFAULT_WORKFLOW: WorkflowConfig = {
   ],
   nextStep: { "needs-design": "design", "needs-spec": "specify", ready: "build" },
   handedStatus: "Todo",
+  startedStatuses: ["In progress", "In review"],
   unhandedStatus: "Backlog",
   holdLabels: ["on-hold", "on-hold-after-spec", "do-not-merge"],
   holdLabel: "on-hold",

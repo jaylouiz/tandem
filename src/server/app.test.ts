@@ -257,6 +257,18 @@ describe("Hand to agent writes the native issue status (#18)", () => {
     expect([await status(B, 40), await status(B, 21)]).toEqual(["Backlog", "Backlog"]);
   });
 
+  it("Start coordinator leaves a Card that has started work at its status and hands the others", async () => {
+    store.setRepoPath(B, "/tmp/agent-workflow");
+    await source.setStatus(B, 40, "In progress");
+    await source.setStatus(B, 21, "In review");
+    await board.refreshAll(true);
+    const set = vi.spyOn(source, "setStatus");
+    expect((await post("/api/coordinator/start", { repo: B, numbers: [40, 21, 22] })).status).toBe(200);
+    expect(set.mock.calls.map((c) => [c[1], c[2]])).not.toContainEqual([40, "Todo"]);
+    expect(set.mock.calls.map((c) => [c[1], c[2]])).not.toContainEqual([21, "Todo"]);
+    expect([await status(B, 40), await status(B, 21), await status(B, 22)]).toEqual(["In progress", "In review", "Todo"]);
+  });
+
   it("Start coordinator whose second status write fails starts nothing and puts the first back", async () => {
     store.setRepoPath(B, "/tmp/agent-workflow");
     const start = vi.spyOn(pusher, "startCoordinator");
