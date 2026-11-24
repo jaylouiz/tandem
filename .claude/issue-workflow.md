@@ -52,7 +52,7 @@ Own components in `src/web/components/`; `cmdk` for the command palette (https:/
 - switcher: `src/web/prototype/Switcher.tsx`, created on the first proto branch (fixed bottom pill, ← key →, updates `?variant=`); not on main
 - branch: `proto/<n>-<slug>`, own worktree, never merged
 - share: the local URL and the start command; when a preview deploy is asked for, `scripts/deploy-preview.sh proto-<n>` (or `pr-<n>`): builds the static demo and publishes it under `/tandem/<name>/` on gh-pages (demo data only, runs in the page)
-- data: fixtures only (`src/core/fixtures.ts`); extend them on the proto branch when a variant needs more states; numbers stay unique (unit-tested). Fixture moves live in the dev server's memory: `curl -X POST localhost:<port>/api/fixture/reset` (or a restart) before each screenshot
+- data: fixtures only (`src/core/fixtures.ts`); extend them on the proto branch when a variant needs more states; numbers stay unique (unit-tested). Fixture moves live in the dev server's memory: `curl -X POST localhost:<port>/api/fixture/reset` (or a restart) before each screenshot. Vite and tsx watch miss edits in an Orca worktree: restart the dev server before each screenshot pass and check `/api/board` shows the new fixture first
 - look (Build's Look comment): `Preview:` is the local start command plus URL; `Path:` the route and query
 
 ## Canvas
@@ -78,6 +78,8 @@ none
 - unit tests next to the code (`*.test.ts`); E2E in `e2e/`
 - E2E shares one fixture server, reset before every test (`e2e/fixtures.ts` auto-fixture → `POST /api/fixture/reset`, fixture mode only): specs import `test`/`expect` from `./fixtures.ts` (`npm run check:e2e-reset`), start from boot-state demo data and may change any Card; new demo Cards go in `src/core/fixtures.ts` (numbers are unit-tested unique); `--repeat-each` is safe on any test with `--workers=1` only (several workers reset the one server under each other: every test that writes fails at random)
 - E2E intercepts (`page.route`) go in before `page.goto`: one registered a few ms before the key or click that sends is not always in force yet, and the write reaches the server
+- after a sheet or pane redesign the first full E2E run is mostly 12 s timeouts (20 min): run `--timeout=5000` per file first to list the breakage, fix by file, then the full gate
+- a screenshot of a popover or dialog waits ~300 ms after opening (the 120 ms fade shows half transparent)
 - anything that changes what Tandem writes to GitHub: a unit test asserting the exact comment text and that `parseMarker` returns null for it
 
 ## Pull requests
@@ -96,6 +98,9 @@ none
 - runner: Orca; max workers: 3
 - executable facts: `.claude/issue-workflow.sh`
 - merge gate: `npm run verify` in `merge-pr.sh prep`; no CI
+- parallel leads: the note names the shared web files (`CardPane.tsx`, `triage.ts`, `store.ts`), not only core files; or the smaller PR goes first
+- copy: no Copy section (no copy pass); UI copy follows `GLOSSARY.md`
+- drafts: a new question panel's draft id goes into `liveDraftIds` (`core/drafts.ts`), or the next snapshot prunes it
 
 ## Retro
 
