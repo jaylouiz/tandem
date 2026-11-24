@@ -35,8 +35,11 @@ test("? opens the overview with every group, Esc closes it, and the page behind 
   await expect(d.locator('[data-binding="pick-choice"] kbd')).toHaveText(["1–9"]);
   await expect(d.locator('[data-binding="shortcuts"] kbd')).toHaveText(["?"]);
   await expect(d.locator('[data-binding="gallery-viewport"] kbd')).toHaveText(["v"]);
-  // the triage keys are in it too, with where a digit means something else
-  await expect(d.locator('[data-binding="priority-1"]')).toContainText("without a Feedback panel");
+  // the triage keys are in it too; a priority is no longer set from Tandem (#17); `[` `]` are the questions of an ask
+  await expect(d.locator('[data-binding="next-design"] kbd')).toHaveText(["d"]);
+  await expect(d.locator('[data-binding^="priority"]')).toHaveCount(0);
+  await expect(d.locator('[data-binding="question"]')).toContainText("Previous / next question · an ask with several questions");
+  await expect(d.locator('[data-binding="question"] kbd')).toHaveText(["[", "]"]);
   await page.keyboard.press("Escape");
   await expect(d).toHaveCount(0);
 });
@@ -89,9 +92,8 @@ test("a PR approval: the palette picks Approve, Hold merge and Send back with th
   await page.keyboard.press("Escape");
 });
 
-test("agent decisions: Accept all and Challenge D2 sit in the palette on the Decided tab, with the digits the panel uses", async ({ page }) => {
-  await open(page, 181, "board");
-  await page.keyboard.press("]");
+test("agent decisions: Accept all and Challenge D2 sit in the palette while Decided is open and nothing is asked, with the digits the panel uses", async ({ page }) => {
+  await open(page, 181, "board"); // Decided starts open: it holds new agent decisions
   const panel = page.getByTestId("panel-agent-decision");
   await expect(panel).toBeVisible();
   await page.keyboard.press("ControlOrMeta+k");
@@ -119,6 +121,6 @@ test("Card entries: mark the open Card, close it, and show the coordination log 
   await expect(page.getByTestId("markbar")).toHaveCount(0);
   await page.keyboard.press("ControlOrMeta+k");
   await option(page, /Show coordination log/).click();
-  await expect(page.getByTestId("tab-activity")).toBeVisible();
-  await expect(page.getByTestId("tab-activity").getByTestId("status")).toBeVisible();
+  await expect(page.getByTestId("fold-activity").locator(".fold-head")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByTestId("fold-activity").getByTestId("status")).toBeVisible();
 });

@@ -1,4 +1,4 @@
-import { expect, test, toast } from "./fixtures.ts";
+import { expect, openFold, test, toast } from "./fixtures.ts";
 
 // Every test starts on boot-state demo data (e2e/fixtures.ts).
 
@@ -24,26 +24,29 @@ test("answer a decision request in place and Push", async ({ page }) => {
   const panel = page.getByTestId("panel-decision");
   // a failed answer on #117 is that Card's draft only: #105 has a request with the same id (D1) and starts empty
   await page.locator('[data-card="acme/app#117"]').click();
-  await panel.getByRole("button", { name: /B: 200 MB/ }).click();
-  await panel.locator("textarea").fill("with a note");
+  await panel.getByTestId("option-C").click();
+  await panel.getByTestId("note-add").click();
+  await panel.getByTestId("note").fill("with a note");
+  await expect(panel.getByTestId("writes")).toHaveText("Decision D1: C. with a note");
   await page.route("**/api/cards/acme/app/117/answer", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
-  await panel.getByRole("button", { name: "Answer" }).click();
+  await panel.getByTestId("send").click();
   await expect(toast(page, "Failed: boom")).toBeVisible();
   await page.locator('[data-card="acme/app#105"]').click();
   await expect(panel).toContainText("How should conflicting edits be resolved?");
-  await expect(panel.locator("textarea")).toHaveValue("");
-  await expect(panel.locator(".option.selected")).toHaveCount(0);
-  await expect(panel.getByRole("button", { name: "Answer" })).toBeDisabled();
-  await panel.getByRole("button", { name: /B: field-level merge/ }).click();
-  await panel.getByRole("button", { name: "Answer" }).click();
+  await expect(panel.getByTestId("note")).toHaveCount(0); // no note here
+  await expect(panel.getByRole("radio", { checked: true })).toHaveText(/field-level merge/); // its own recommendation, not #117's pick
+  await expect(panel.getByTestId("writes")).toHaveText("Decision D1: B");
+  await panel.getByTestId("option-A").click();
+  await panel.getByTestId("option-B").click();
+  await panel.getByTestId("send").click();
   await expect(toast(page, "pushed to the coordinator")).toBeVisible();
   // the answered Card moves to Awaiting pickup and the next blocker opens
   await expect(page.getByTestId("detail")).not.toHaveAttribute("aria-label", "Card acme/app#105");
   await page.locator('[data-card="acme/app#105"]').click();
   // the Card says its own state; nothing claims that a coordinator runs or not, and no button starts one from here (#14)
   const pickup = page.getByTestId("awaiting-pickup");
-  await expect(pickup).toContainText("Feedback given, awaiting pickup");
-  await expect(pickup).toContainText("Nothing waits on you");
+  await expect(pickup).toContainText("Feedback given, awaiting pickup.");
+  await expect(pickup).toContainText("You answered “Decision D1: B”, the run has not resumed");
   await expect(pickup.getByRole("button")).toHaveCount(0);
   await expect(page.getByTestId("detail")).not.toContainText(/coordinator (is )?running/i);
 });
@@ -108,7 +111,7 @@ test("gallery by keyboard only: variants, viewport, pick, send", async ({ page }
   await expect(toast(page, "Feedback given")).toBeVisible();
   // the answered round moves to "earlier": the old palette request does not open a gallery there
   await page.locator('[data-card="acme/app#110"]').click();
-  await page.keyboard.press("]");
+  await openFold(page, "decided");
   await expect(page.getByTestId("earlier-rounds")).toBeVisible();
   await expect(gallery).toBeHidden();
 });
@@ -116,7 +119,7 @@ test("gallery by keyboard only: variants, viewport, pick, send", async ({ page }
 test("earlier rounds are read-only in the same gallery", async ({ page }) => {
   await page.goto("/");
   await page.locator('[data-card="acme/app#104"]').click();
-  await page.keyboard.press("]"); // the Decided tab lists the earlier rounds
+  await openFold(page, "decided"); // Decided lists the earlier rounds
   await expect(page.getByTestId("earlier-rounds")).toBeVisible();
   await expect(page.getByTestId("round-1")).toContainText("R1");
   await page.getByTestId("round-1").locator(".thumb").first().click();

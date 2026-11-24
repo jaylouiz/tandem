@@ -15,7 +15,8 @@ test("#39: an answer that arrives from outside leaves the open Card open and sho
   await ready(page);
   await row(page, 170).click();
   await isOpen(page, 170);
-  await page.getByTestId("panel-decision").locator("textarea").fill("half typed");
+  await page.getByTestId("panel-decision").getByTestId("note-add").click();
+  await page.getByTestId("panel-decision").getByTestId("note").fill("half typed");
   await outside(page, 170, "answer", { requestId: "D1", answer: "B", push: false });
   await expect(row(page, 170).locator(".kind-chip")).toHaveText("Awaiting pickup"); // the snapshot arrived: it is no blocker any more
   await expect(page.getByTestId("awaiting-pickup")).toBeVisible(); // the pane shows the new state
@@ -24,8 +25,8 @@ test("#39: an answer that arrives from outside leaves the open Card open and sho
   await expect(list(page).locator('.qrow[aria-selected="true"]')).toHaveCount(1); // the Card is still listed (Awaiting pickup) and is the open one
   // an answer given here still opens the next blocker
   await row(page, 171).click();
-  await page.getByTestId("panel-decision").getByRole("button", { name: /A: first/ }).click();
-  await page.getByTestId("panel-decision").getByRole("button", { name: "Answer" }).click();
+  await page.getByTestId("panel-decision").getByTestId("option-A").click();
+  await page.getByTestId("panel-decision").getByTestId("send").click();
   await expect(detail(page)).not.toHaveAttribute("aria-label", "Card acme/app#171");
   await expect(detail(page)).toHaveAttribute("aria-label", /#\d+$/);
 });
@@ -74,8 +75,9 @@ test("#40: drafts of every panel survive Card switches, view changes and snapsho
   await pr.getByRole("button", { name: /Hold/ }).click();
   await pr.locator("textarea").fill("pr note");
   await row(page, 172).click();
-  await decision.getByRole("button", { name: /B: second/ }).click();
-  await decision.locator("textarea").fill("decision note");
+  await decision.getByTestId("option-A").click();
+  await decision.getByTestId("note-add").click();
+  await decision.getByTestId("note").fill("decision note");
   await decision.getByTestId("push-toggle").uncheck();
   // another Card, then back
   await row(page, 175).click();
@@ -88,21 +90,21 @@ test("#40: drafts of every panel survive Card switches, view changes and snapsho
   await expect(pr.locator("textarea")).toHaveValue("pr note");
   // a snapshot (a label from elsewhere) while typing
   await row(page, 172).click();
-  await decision.locator("textarea").focus();
+  await decision.getByTestId("note").focus();
   await page.keyboard.press("End");
   await page.keyboard.type(" and more");
   await page.request.post("/api/cards/acme/app/172/labels", { data: { add: ["stability-touch"] }, headers: WRITE }); // a new snapshot
   await expect.poll(async () => ((await (await page.request.get("/api/board")).json()) as { cards: { key: string; labels: string[] }[] }).cards.find((c) => c.key === "acme/app#172")!.labels).toContain("stability-touch");
   await page.waitForTimeout(400); // the snapshot reached the page
-  await expect(decision.locator("textarea")).toHaveValue("decision note and more");
+  await expect(decision.getByTestId("note")).toHaveValue("decision note and more");
   // another view, then back
   await board(page);
   await expect(page.getByTestId("board")).toBeVisible();
   await waiting(page);
   await ready(page);
   await row(page, 172).click();
-  await expect(decision.getByRole("button", { name: /B: second/ })).toHaveClass(/selected/);
-  await expect(decision.locator("textarea")).toHaveValue("decision note and more");
+  await expect(decision.getByTestId("option-A")).toHaveAttribute("aria-checked", "true"); // the developer's pick, not the recommendation (B)
+  await expect(decision.getByTestId("note")).toHaveValue("decision note and more");
   await expect(decision.getByTestId("push-toggle")).not.toBeChecked();
   // an answer given elsewhere: the Card shows its new state, the panel and its draft are gone
   await outside(page, 172, "answer", { requestId: "D1", answer: "B", push: false });
@@ -113,14 +115,12 @@ test("#40: drafts of every panel survive Card switches, view changes and snapsho
 test("#40: the agent decision pick survives a Card switch", async ({ page }) => {
   await page.goto("/");
   await board(page);
-  await row(page, 174).click();
-  await page.keyboard.press("]");
+  await row(page, 174).click(); // Decided starts open: it holds a new agent decision
   const panel = page.getByTestId("panel-agent-decision");
   await panel.getByRole("button", { name: /Accept all/ }).click();
   await expect(panel.getByRole("button", { name: /Accept all/ })).toHaveClass(/selected/);
   await row(page, 175).click();
-  await row(page, 174).click();
-  await page.keyboard.press("]");
+  await row(page, 174).click(); // Decided starts open: it holds a new agent decision
   await expect(panel.getByRole("button", { name: /Accept all/ })).toHaveClass(/selected/);
 });
 
@@ -156,8 +156,7 @@ test("#51: Accept all picks and Send writes, in Decided", async ({ page }) => {
   page.on("request", (r) => r.method() === "POST" && r.url().endsWith("/174/accept") && sent.push(r.url()));
   await page.goto("/");
   await board(page);
-  await row(page, 174).click();
-  await page.keyboard.press("]");
+  await row(page, 174).click(); // Decided starts open: it holds a new agent decision
   const panel = page.getByTestId("panel-agent-decision");
   const send = panel.getByRole("button", { name: "Send", exact: true });
   await expect(send).toBeDisabled();

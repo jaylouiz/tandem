@@ -1,6 +1,7 @@
 // What the command palette offers, built from state (`paletteActions`, pure) so a unit test can build the fullest palette and check it against the
 // key table: every binding in `BINDINGS` has an entry here or a reason in `NO_ENTRY`. An entry with a `binding` shows that binding's key, read from
 // the table (never typed here); an entry without one has no key. Palette.tsx only collects the state, renders the entries and adds the Cards and Repos.
+import { decidedSummary } from "../core/ask.ts";
 import type { ShotsTarget } from "../core/gallery.ts";
 import type { Card } from "../core/types.ts";
 import { keyCaps, BINDINGS, runBinding } from "./keys.ts";
@@ -89,7 +90,8 @@ export function paletteActions(c: ActionCtx): PaletteAction[] {
     add({ id: "open", group: "Card", label: "Open on GitHub", binding: "open", run: () => void window.open(card.url, "_blank") });
   } else if (card) {
     // the folds of the sheet: a command opens one and brings it into view (they have no key: a click or Enter on the fold's head opens it)
-    for (const f of FOLDS)
+    // only the folds this Card has: a Done Card has no Activity, a Card with nothing decided no Decided
+    for (const f of FOLDS.filter((x) => (x.id === "activity" ? card.phase !== "Done" : x.id === "decided" ? decidedSummary(card) !== "" : true)))
       add({ id: f.id === "activity" ? "show-log" : `show-${f.id}`, group: "Card", label: f.id === "activity" ? "Show coordination log" : `Show ${f.label}`, search: `card fold ${f.label.toLowerCase()}`, run: () => s().requestFold(card.key, f.id) });
     if (cards) {
       add({ id: "next", group: "Card", label: "Next Card", binding: "next", run: run("next", "j") });

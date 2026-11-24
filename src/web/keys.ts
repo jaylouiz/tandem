@@ -7,7 +7,7 @@ import { extendSelection, keyFocus, selectGroup } from "./select.ts";
 import { markSelectionSeen, openFromList } from "./seen.ts";
 import { anyDialogOpen, keyFromDialog } from "./ui/Dialog.tsx";
 import { keyFromToast, undoLatest } from "./ui/Toast.tsx";
-import { showsCards, useStore, type View } from "./store.ts";
+import { showsCards, useStore, writing, type View } from "./store.ts";
 import { runFocusKey, type FocusKeyId } from "./focus/keys.ts";
 import { useFocus } from "./focus/session.ts";
 import { MOVE_ENTRIES, TRIAGE_ENTRIES, runMove, runTriage } from "./triage.ts";
@@ -135,6 +135,9 @@ export const BINDINGS: Binding[] = [
       const panel = livePanel();
       if (!panel) return false;
       if (e.repeat) return; // a held key writes once
+      // one write per Card at a time: a second ⌘↵ while another piece of Feedback on this Card is still being written (a challenge sent
+      // from its field a moment ago) must not send the ask's picked answer on top of it
+      if (writing(panel.cardKey)) return;
       panel.send();
     },
   },

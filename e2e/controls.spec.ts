@@ -11,29 +11,42 @@ const card = (page: Page, n: number) => page.locator(`[data-card="acme/app#${n}"
 test("a disabled control carries its reason as title and aria-describedby, stays focusable, and does nothing", async ({ page }) => {
   await toBoard(page);
   await card(page, 117).click(); // a Build Card: Next step does not apply
-  const next = page.getByTestId("triage").getByRole("button", { name: /design/ });
+  // a menu item that does nothing is disabled, says why under its label, and stays reachable by the arrow keys
+  await page.getByTestId("detail").getByTestId("more").click();
+  const next = page.getByTestId("more-next-design");
   await expect(next).toHaveAttribute("aria-disabled", "true");
-  await expect(next).toHaveAttribute("title", "Not applicable: Build");
-  const id = await next.getAttribute("aria-describedby");
-  await expect(page.locator(`[id="${id}"]`)).toHaveText("Not applicable: Build");
-  await next.focus();
-  await expect(next).toBeFocused(); // a `disabled` button would have dropped focus: the reason stays reachable by keyboard
+  await expect(next).toContainText("Not applicable: Build");
+  await page.keyboard.press("ArrowDown");
+  await expect(next).toBeFocused(); // the reason is reachable by keyboard
   await page.keyboard.press("Enter");
+  await page.keyboard.press("d"); // its key does nothing either, with the menu open
   await expect(page.locator(".toast")).toHaveCount(0); // and nothing ran
-  // the Feedback panel's Answer says what is missing, then loses it
-  const answer = page.getByTestId("panel-decision").getByRole("button", { name: "Answer" });
+  await page.keyboard.press("Escape");
+  // the Feedback panel's Send says what is missing (the recommendation is picked from the start: take it back), then loses it
+  const panel = page.getByTestId("panel-decision");
+  const answer = panel.getByTestId("send");
+  await expect(answer).not.toHaveAttribute("aria-disabled", "true");
+  await panel.getByTestId("option-B").click();
+  await expect(answer).toHaveAttribute("aria-disabled", "true");
   await expect(answer).toHaveAttribute("title", "Pick an option or write an answer");
-  await page.getByTestId("panel-decision").getByRole("button", { name: /A: 50 MB/ }).click();
+  const id = await answer.getAttribute("aria-describedby");
+  await expect(page.locator(`[id="${id}"]`)).toHaveText("Pick an option or write an answer");
+  await answer.focus();
+  await expect(answer).toBeFocused(); // a `disabled` button would have dropped focus
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".toast")).toHaveCount(0);
+  await panel.getByTestId("option-A").click();
   await expect(answer).not.toHaveAttribute("aria-disabled", "true");
   await expect(answer).not.toHaveAttribute("aria-describedby", /.+/);
 });
 
-test("the two holds read differently on one pane: Hold merge (PR) and Hold Card (label)", async ({ page }) => {
+test("the two holds read differently on one sheet: Hold merge (PR) and Hold Card (label, in the More menu)", async ({ page }) => {
   await toBoard(page);
   await card(page, 173).click();
   const pane = page.getByTestId("detail");
   await expect(pane.getByTestId("panel-pr-approval").getByRole("button", { name: /Hold merge/ })).toBeVisible();
-  await expect(pane.getByTestId("triage").getByRole("button", { name: /Hold Card/ })).toBeVisible();
+  await pane.getByTestId("more").click();
+  await expect(page.getByTestId("more-menu").getByRole("menuitem", { name: /Hold Card/ })).toBeVisible();
 });
 
 test("an icon-only button shows its key in a tooltip, on hover and on keyboard focus; Esc closes the tooltip only", async ({ page }) => {
@@ -100,7 +113,7 @@ test("the sync error detail opens by keyboard and Esc closes it", async ({ page 
 test("buttons have a pressed state, one step below hover", async ({ page }) => {
   await toBoard(page);
   await card(page, 117).click();
-  const build = page.getByTestId("triage").getByRole("button", { name: /^P2/ });
+  const build = page.getByTestId("panel-decision").getByTestId("send");
   const bg = () => build.evaluate((el) => getComputedStyle(el).backgroundColor);
   await build.hover();
   await page.waitForTimeout(200);

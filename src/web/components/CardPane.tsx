@@ -49,13 +49,9 @@ function ActivityLine({ card, act }: { card: Card; act: Activity | null }) {
     <span className="act-line" data-state={act.state}>
       <ActDot state={act.state} />
       <b>{STATE_LABEL[act.state]}</b>
-      <span className="act-sep" aria-hidden>
-        ·
-      </span>
+      <span className="act-sep">{" · "}</span>
       <span className="act-last">{act.last ?? STATE_DEFAULT_TEXT[act.state]}</span>
-      <span className="act-sep" aria-hidden>
-        ·
-      </span>
+      <span className="act-sep">{" · "}</span>
       <span className="act-at">{agoText(act.at)}</span>
     </span>
   );

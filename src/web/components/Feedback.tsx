@@ -95,7 +95,7 @@ export function DecisionPanel({ card }: { card: Card }) {
   );
 }
 
-/** `keys`: its digits and ⌘↵ are live (the Decided fold is open and no ask panel has them). */
+/** `keys`: its digits and ⌘↵ are live (no ask panel has them); else the buttons show no key and the challenge is sent from its text field. */
 export function AgentDecisionPanel({ card, keys }: { card: Card; keys: boolean }) {
   const pending = card.agentDecisions.filter((d) => card.decisionsToAccept.includes(d.id));
   // mode: "accept" (key 1), or the id of the decision being challenged (keys 2…), or nothing chosen yet
@@ -155,7 +155,7 @@ export function AgentDecisionPanel({ card, keys }: { card: Card; keys: boolean }
             aria-pressed={challenging === d.id}
             onClick={() => edit({ mode: challenging === d.id ? null : d.id })}
           >
-            Challenge {d.id} <kbd>{i + 2}</kbd>
+            Challenge {d.id} {keys && <kbd>{i + 2}</kbd>}
           </button>
         </div>
       ))}
@@ -173,7 +173,7 @@ export function AgentDecisionPanel({ card, keys }: { card: Card; keys: boolean }
         <PushToggle push={push} setPush={(p) => edit({ push: p })} />
         <span className="spacer" />
         <button className={`btn ${mode === "accept" ? "selected" : ""}`} aria-pressed={mode === "accept"} onClick={() => edit({ mode: mode === "accept" ? null : "accept" })}>
-          Accept all <kbd>1</kbd>
+          Accept all {keys && <kbd>1</kbd>}
         </button>
         <Btn
           className="btn primary"

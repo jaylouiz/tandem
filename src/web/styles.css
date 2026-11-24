@@ -1701,8 +1701,10 @@ button.focus-next:hover { background: var(--bg-hover); }
 .fold-body { padding: var(--s-1) 2px var(--s-4) 20px; display: flex; flex-direction: column; gap: var(--s-3); min-width: 0; }
 .issue-text { max-width: 72ch; overflow-wrap: anywhere; }
 .issue-text .markdown :where(pre, table) { max-width: 100%; overflow-x: auto; }
-.act-line { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; vertical-align: bottom; }
+.act-line { display: inline-flex; align-items: center; gap: 0; min-width: 0; max-width: 100%; vertical-align: bottom; }
+.act-line .act-dot { margin-right: 6px; }
 .act-line b { font-weight: 500; color: var(--text); flex-shrink: 0; }
+.act-sep { white-space: pre; }
 .act-line[data-state="stuck"] b { color: var(--danger); }
 .act-line .act-last { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .act-line .act-at, .act-line .act-sep { flex-shrink: 0; }
@@ -1729,7 +1731,7 @@ button.focus-next:hover { background: var(--bg-hover); }
 .markdown-inline strong { font-weight: 600; }
 .markdown-inline a { color: var(--accent); }
 .star { flex-shrink: 0; color: var(--accent); }
-.link-quiet { padding: 0; border: 0; border-radius: 2px; background: none; font: inherit; font-size: var(--fs-sm); color: var(--text-muted); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; white-space: nowrap; }
+.link-quiet { align-self: flex-start; padding: 0; border: 0; border-radius: 2px; background: none; font: inherit; font-size: var(--fs-sm); color: var(--text-muted); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; white-space: nowrap; }
 .link-quiet:hover { color: var(--text); }
 .askp { container-type: inline-size; }
 .askp .panel-head .section-title { max-width: 60ch; }
@@ -1790,7 +1792,7 @@ button.focus-next:hover { background: var(--bg-hover); }
 .qsend .btn { white-space: nowrap; }
 /* the 400px pane (beside the Board at 1024): option name and "in short" stack, a step shows its number and letter only, Send gets its own row */
 @container (max-width: 480px) {
-  .qopt-main { flex-direction: column; }
+  .qopt-short { flex-basis: 100%; }
   .qopt-rec { align-self: flex-start; }
   .qsteps [role="tab"] { padding-inline: 7px; }
   .qsteps [role="tab"]:not([data-testid="step-review"]) .qstep-label { display: none; }

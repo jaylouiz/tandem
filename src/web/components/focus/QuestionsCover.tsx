@@ -34,7 +34,8 @@ export function QuestionsCover({ card, ask, signed }: { card: Card; ask: Ask; si
   );
   const why = sendBlocked(ask, a);
   const comment = writtenComment(a);
-  const most = Math.max(...ask.questions.map((x) => Math.min(9, x.options.length)));
+  // the digits of the question on screen (on Review they pick nothing)
+  const most = Math.min(9, q?.options.length ?? 0);
   const digits = most > 1 ? `1–${most}` : "1";
   return (
     <>
@@ -92,7 +93,7 @@ export function QuestionsCover({ card, ask, signed }: { card: Card; ask: Ask; si
         hints={
           a.multi
             ? [
-                [digits, "pick, then the next question"],
+                ...(q ? [[digits, "pick, then the next question"] as [string, string]] : []),
                 ["[ ]", "question"],
                 [keyOf("send-feedback"), "send the answer"],
               ]

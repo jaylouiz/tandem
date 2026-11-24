@@ -14,7 +14,7 @@ export interface GalleryKey {
 export const GALLERY_KEYS: GalleryKey[] = [
   { id: "next", keys: ["ArrowRight", "l"], label: "Next screenshot" },
   { id: "previous", keys: ["ArrowLeft", "h"], label: "Previous screenshot" },
-  { id: "variant", keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9"], label: "Jump to a variant" },
+  { id: "variant", keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9"], label: "Jump to a variant; on a question's screenshot: pick an option" },
   { id: "next-variant", keys: ["]"], label: "Next variant" },
   { id: "previous-variant", keys: ["["], label: "Previous variant" },
   { id: "viewport", keys: ["v"], label: "Switch desktop / mobile" },
@@ -38,7 +38,7 @@ export interface LegendGroup {
 }
 
 /** The legend's shape (#5): three groups, the keys that answer first. Each entry names bindings of `GALLERY_KEYS` (their first caps are shown) and says what they do in a word or two. */
-const LEGEND: { name: string; items: { ids: GalleryKey["id"][]; text: string; caps?: string[] }[] }[] = [
+const LEGEND: { name: string; items: { ids: GalleryKey["id"][]; text: string }[] }[] = [
   { name: "Pick", items: [{ ids: ["pick"], text: "pick" }, { ids: ["reject"], text: "reject" }, { ids: ["send"], text: "send" }] },
   { name: "Move", items: [{ ids: ["previous", "next"], text: "screenshot" }, { ids: ["previous-variant", "next-variant"], text: "variant" }, { ids: ["variant"], text: "jump to a variant" }] },
   { name: "View", items: [{ ids: ["viewport"], text: "desktop / mobile" }, { ids: ["close"], text: "close" }] },

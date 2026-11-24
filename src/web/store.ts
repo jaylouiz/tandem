@@ -324,6 +324,9 @@ useStore.subscribe((s, was) => {
 /** card key -> writes in flight; their optimistic patches survive snapshots */
 const inflight = new Map<string, number>();
 
+/** A write to this Card is under way (its optimistic patch is showing). */
+export const writing = (key: string | null) => !!key && inflight.has(key);
+
 /** Where the page is in a sync: `empty` = nothing to show yet while repos still load (first run, no cache). */
 export function syncProgress(board: BoardView) {
   const entries = board.repos.map((r) => [r, board.sync[r]] as const);

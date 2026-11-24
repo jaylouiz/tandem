@@ -78,8 +78,8 @@ test("a digit sends a decision at once: the tile showed the comment that is writ
   await row(page, 170).click();
   await expect(page.getByTestId("cover-decision").getByRole("heading", { level: 1 })).toHaveText("Which option for stability demo 1?");
   // every option shows, before it is clicked, the exact comment it will write
-  await expect(page.getByTestId("tile-writes-1")).toHaveText("D1: A");
-  await expect(page.getByTestId("tile-writes-2")).toHaveText("D1: B");
+  await expect(page.getByTestId("tile-writes-1")).toHaveText("Decision D1: A");
+  await expect(page.getByTestId("tile-writes-2")).toHaveText("Decision D1: B");
   await expect(page.getByTestId("tile-2")).toContainText("The agent recommends this, confidence medium");
   await expect(bar(page)).toContainText("sends it at once");
   const total = (await count(page).textContent())!.split(" of ")[1]!;
@@ -87,7 +87,7 @@ test("a digit sends a decision at once: the tile showed the comment that is writ
   await on(page, 127); // the next open ask
   await expect(count(page)).toHaveText(`6 of ${total}`);
   await expect(page.getByTestId("focus-pips").locator('button[data-state="done"]')).toHaveCount(1);
-  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["D1: B"]);
+  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["Decision D1: B"]);
   expect((await answers(page, 170)).pickup).toBe(true);
   await expect(page.locator(".toast")).toHaveCount(0); // the next ask says it went through
 });
@@ -102,17 +102,17 @@ test("a click sends a PR approval; its evidence is read from the PR body; Hold m
   await expect(facts.locator(".fact", { hasText: "Verification" }).locator("li")).toHaveText(["unit 212/212", "e2e 31/31"]);
   await expect(facts.locator(".fact", { hasText: "Review" })).toContainText("No findings above low.");
   await expect(facts.getByRole("link", { name: /PR #210: diff on GitHub/ })).toHaveAttribute("href", /pull\/210\/files$/);
-  await expect(page.getByTestId("tile-writes-1")).toHaveText("D1: Approve: merge");
-  await expect(page.getByTestId("tile-writes-2")).toHaveText("D1: Hold");
-  await expect(page.getByTestId("tile-writes-3")).toHaveText("D1: Send back. your note");
+  await expect(page.getByTestId("tile-writes-1")).toHaveText("Decision D1: Approve: merge");
+  await expect(page.getByTestId("tile-writes-2")).toHaveText("Decision D1: Hold");
+  await expect(page.getByTestId("tile-writes-3")).toHaveText("Decision D1: Send back. your note");
   await page.getByTestId("tile-1").click();
   await on(page, 173);
-  await expect.poll(async () => (await answers(page, 106)).answers).toEqual(["D1: Approve: merge"]);
+  await expect.poll(async () => (await answers(page, 106)).answers).toEqual(["Decision D1: Approve: merge"]);
   // a PR body without a Verification section says so
   await expect(page.getByTestId("facts").locator(".fact", { hasText: "Verification" })).toContainText("Nothing reported");
   await page.getByTestId("tile-2").click();
   await on(page, 177);
-  await expect.poll(async () => (await answers(page, 173)).answers).toEqual(["D1: Hold"]);
+  await expect.poll(async () => (await answers(page, 173)).answers).toEqual(["Decision D1: Hold"]);
   expect((await answers(page, 173)).labels).toContain("do-not-merge");
 });
 
@@ -131,11 +131,11 @@ test("Send back opens the note instead of sending and cannot be sent without one
   await page.keyboard.press("ControlOrMeta+Enter"); // from the field: still nothing to send
   await on(page, 106);
   await page.getByTestId("note").fill("the empty state is missing");
-  await expect(page.getByTestId("writes")).toHaveText("D1: Send back. the empty state is missing");
+  await expect(page.getByTestId("writes")).toHaveText("Decision D1: Send back. the empty state is missing");
   await expect(bar(page)).toContainText("Writes on app#106");
   await page.keyboard.press("ControlOrMeta+Enter");
   await on(page, 173);
-  await expect.poll(async () => (await answers(page, 106)).answers).toEqual(["D1: Send back. the empty state is missing"]);
+  await expect.poll(async () => (await answers(page, 106)).answers).toEqual(["Decision D1: Send back. the empty state is missing"]);
 });
 
 test("Answer with a note: options only pick, the Send bar shows the whole comment, ⌘↵ sends, Esc cancels", async ({ page }) => {
@@ -144,20 +144,20 @@ test("Answer with a note: options only pick, the Send bar shows the whole commen
   await page.keyboard.press("n");
   await expect(page.getByTestId("note")).toBeFocused();
   await page.getByTestId("note").fill("keep the undo toast");
-  await expect(page.getByTestId("writes")).toHaveText("D1: keep the undo toast"); // a note alone is an answer
+  await expect(page.getByTestId("writes")).toHaveText("Decision D1: keep the undo toast"); // a note alone is an answer
   await page.keyboard.press("Escape"); // leaves the field, keeps the text
   await page.keyboard.press("2"); // picks, does not send
   await on(page, 170);
   await expect(page.getByTestId("tile-2")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByTestId("writes")).toHaveText("D1: B. keep the undo toast");
+  await expect(page.getByTestId("writes")).toHaveText("Decision D1: B. keep the undo toast");
   await expect(page.getByTestId("tile-writes-2")).toHaveCount(0); // the bar shows the comment now
   expect((await answers(page, 170)).answers).toEqual([null]);
   await page.getByTestId("tile-1").click(); // a click picks too
-  await expect(page.getByTestId("writes")).toHaveText("D1: A. keep the undo toast");
+  await expect(page.getByTestId("writes")).toHaveText("Decision D1: A. keep the undo toast");
   // Esc cancels the note: back to one click per option, nothing kept
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("note")).toHaveCount(0);
-  await expect(page.getByTestId("tile-writes-1")).toHaveText("D1: A");
+  await expect(page.getByTestId("tile-writes-1")).toHaveText("Decision D1: A");
   await on(page, 170);
   // again, and send it this time
   await page.getByTestId("note-open").click();
@@ -165,7 +165,7 @@ test("Answer with a note: options only pick, the Send bar shows the whole commen
   await page.getByTestId("tile-2").click();
   await page.getByTestId("send").click();
   await on(page, 127);
-  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["D1: B. with a note"]);
+  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["Decision D1: B. with a note"]);
 });
 
 test("a design round shows its screenshot at real size; a pick sends at once, a reject goes through the comment", async ({ page }) => {
@@ -294,7 +294,7 @@ test("a failed send stays on its Card: Not sent with the reason, the answer kept
   await expect(page.getByTestId("not-sent")).toHaveText("Not sent. boom");
   await on(page, 170); // Focus did not move on
   await expect(page.getByTestId("tile-2")).toHaveAttribute("data-picked", "true"); // the option stays picked
-  await expect(page.getByTestId("writes")).toHaveText("D1: B");
+  await expect(page.getByTestId("writes")).toHaveText("Decision D1: B");
   await expect(page.getByTestId("send")).toHaveText(/Send again/);
   await expect(page.locator(".toast")).toHaveCount(0);
   await expect(page.getByTestId("focus-pips").locator('button[data-state="done"]')).toHaveCount(0);
@@ -305,7 +305,7 @@ test("a failed send stays on its Card: Not sent with the reason, the answer kept
   await page.unroute("**/api/cards/acme/app/170/answer");
   await page.keyboard.press("ControlOrMeta+Enter");
   await on(page, 127);
-  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["D1: B"]);
+  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["Decision D1: B"]);
   await expect(page.getByTestId("focus-pips").locator('button[data-state="failed"]')).toHaveCount(0);
 });
 
@@ -332,7 +332,7 @@ test("an option cannot send twice: while the write is under way the ask stays, s
   release();
   await on(page, 127);
   expect(posts).toBe(1);
-  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["D1: A"]);
+  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["Decision D1: A"]);
 });
 
 test("a held digit answers one ask, not the next ones too", async ({ page }) => {
@@ -345,7 +345,7 @@ test("a held digit answers one ask, not the next ones too", async ({ page }) => 
   await page.keyboard.up("1");
   await on(page, 127);
   await expect(bar(page)).toHaveAttribute("data-state", "hint");
-  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["D1: A"]);
+  await expect.poll(async () => (await answers(page, 170)).answers).toEqual(["Decision D1: A"]);
   expect((await answers(page, 127)).pickup).toBe(false);
   await page.keyboard.press("1"); // a fresh press does send
   await on(page, 171);
@@ -371,7 +371,7 @@ test("a send that fails after the developer moved on says so in a toast; back on
   await page.keyboard.press("k");
   await on(page, 170);
   await expect(page.getByTestId("not-sent")).toHaveText("Not sent. boom");
-  await expect(page.getByTestId("writes")).toHaveText("D1: B");
+  await expect(page.getByTestId("writes")).toHaveText("Decision D1: B");
 });
 
 test("an ask answered somewhere else while it is on screen is not swapped for the next one under the keyboard", async ({ page }) => {
@@ -415,7 +415,9 @@ test("the end is a receipt: every Card answered in this Focus with the comment w
     await on(page, Number(key.split("#")[1]));
     await expect(focus(page)).toHaveAttribute("data-kind", kind);
     await expect(bar(page)).not.toHaveAttribute("data-state", "sending");
-    for (const k of key === "acme/app#182" ? ["1", "3", "5"] : [kind === "look" ? "l" : "1"]) await page.keyboard.press(k);
+    // an ask with several questions (#183, #184) is never sent by a digit: ⌘↵ sends its recommendations
+    const several = key === "acme/app#183" || key === "acme/app#184";
+    for (const k of key === "acme/app#182" ? ["1", "3", "5"] : [kind === "look" ? "l" : several ? "ControlOrMeta+Enter" : "1"]) await page.keyboard.press(k);
   }
   const done = page.getByTestId("focus-done");
   await expect(done.getByRole("heading", { level: 1 })).toHaveText("All clear");
@@ -426,7 +428,7 @@ test("the end is a receipt: every Card answered in this Focus with the comment w
   for (const [key, kind] of rows) {
     const line = page.getByTestId("receipt").locator("li", { hasText: `#${key.split("#")[1]}` });
     if (kind === "look") await expect(line).toContainText("Marked Seen");
-    else await expect(line.locator("code")).toHaveText(/^(D\d+: \S+|R\d+:\n- pick: \S+)/);
+    else await expect(line.locator("code")).toHaveText(/^(Decision D\d+: \S+|R\d+:\n- pick: \S+)/);
   }
   await expect(done.getByRole("button", { name: /Open the Board/ })).toBeVisible();
   await done.getByRole("button", { name: /Agent activity/ }).click();
@@ -515,30 +517,34 @@ test("in Focus the Selection, tab and triage keys leave the Card behind the ask 
   await expect(focus(page)).toHaveCount(0);
 });
 
-test("the drawer behind e shows the Card's Decided, Activity and Issue tabs; Esc closes it first, then the note, then the overview", async ({ page }) => {
+test("the drawer behind e shows the Card's sheet without the ask: Issue, Decided and Activity; Esc closes it first, then the note, then the overview", async ({ page }) => {
   await start(page);
   await row(page, 127).click(); // carries new agent decisions
   const line = page.getByTestId("decisions-line");
   await expect(line).toHaveText("2 agent decisions, not blocking");
   await line.click();
   const drawer = page.getByTestId("focus-drawer");
-  await expect(drawer.getByRole("tab")).toHaveText(["Decided", "Activity", "Issue"]); // not Now: the ask is on the cover
-  await expect(drawer.getByRole("tab", { selected: true })).toHaveText("Decided");
+  await expect(drawer.getByRole("tab")).toHaveCount(0); // one page, no tabs
+  await expect(drawer.locator(".fold-head > b")).toHaveText(["Issue", "Decided", "Activity"]);
+  await expect(drawer.getByTestId("fold-decided").locator(".fold-head")).toHaveAttribute("aria-expanded", "true"); // the line asked for it
   await expect(drawer.getByTestId("panel-agent-decision")).toBeVisible();
+  await expect(drawer.getByTestId("sheet-ask")).toHaveCount(0); // the ask is on the cover
+  await expect(drawer.getByTestId("more")).toHaveCount(0); // the Card behind an ask is not changed from here
+  await expect(drawer.getByRole("link", { name: /GitHub/ })).toHaveAttribute("href", /issues\/127$/);
   await expect(drawer.getByTestId("panel-decision")).toHaveCount(0); // no second Feedback panel
   await expect.poll(() => drawer.evaluate((el) => el.contains(document.activeElement))).toBe(true); // the library moves focus a frame later
   // a digit here belongs to the agent decisions, never to the ask under the drawer
   await page.keyboard.press("1");
   await expect(drawer.getByRole("button", { name: /Accept all/ })).toHaveAttribute("aria-pressed", "true");
   expect((await answers(page, 127)).answers.every((a) => a === null || !/^D3/.test(a))).toBe(true);
-  await page.keyboard.press("]");
-  await expect(drawer.getByRole("tab", { selected: true })).toHaveText("Activity");
+  await drawer.getByTestId("fold-activity").locator(".fold-head").click();
+  await expect(drawer.getByTestId("coordination-log")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await on(page, 127);
-  // the digits are the ask's again
+  // the digits are the ask's again; the drawer opens on the issue text
   await page.keyboard.press("e");
-  await expect(drawer.getByRole("tab", { selected: true })).toHaveText("Activity");
+  await expect(drawer.getByTestId("fold-issue").locator(".fold-head")).toHaveAttribute("aria-expanded", "true");
   await page.keyboard.press("Escape");
   await page.keyboard.press("n");
   await page.keyboard.press("e"); // typed into the note
@@ -560,22 +566,22 @@ test("the drawer behind e shows the Card's Decided, Activity and Issue tabs; Esc
 
 test("an earlier round's gallery opened from the drawer owns its keys: they reach neither the drawer nor the ask, and Esc closes one layer at a time", async ({ page }) => {
   await start(page);
-  await row(page, 110).click(); // round 2 waits, round 1 is on Decided
+  await row(page, 110).click(); // round 2 waits, round 1 is in Decided
   await expect(page.getByTestId("stage").locator("img")).toHaveAttribute("alt", "R2 · a · desktop");
   await page.keyboard.press("e");
   const drawer = page.getByTestId("focus-drawer");
-  await drawer.getByRole("tab", { name: "Decided" }).click();
+  await drawer.getByTestId("fold-decided").locator(".fold-head").click();
   await drawer.getByTestId("round-1").locator(".thumb").first().click();
   const gallery = page.getByTestId("gallery");
   await expect(gallery).toBeVisible();
   await expect.poll(() => gallery.evaluate((el) => el.contains(document.activeElement))).toBe(true); // the library moves focus a frame later
-  await page.keyboard.press("]"); // the gallery's next variant, not the drawer's next tab
+  await page.keyboard.press("]"); // the gallery's next variant
   await expect(page.getByTestId("gallery-title")).toContainText("Variant b");
   await page.keyboard.press("2"); // the gallery's jump, not a pick on the ask
   await page.keyboard.press("ControlOrMeta+Enter"); // a read-only gallery sends nothing
   await page.keyboard.press("Escape");
   await expect(gallery).toHaveCount(0);
-  await expect(drawer.getByRole("tab", { selected: true })).toHaveText("Decided");
+  await expect(drawer.getByTestId("fold-decided").locator(".fold-head")).toHaveAttribute("aria-expanded", "true");
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await on(page, 110);

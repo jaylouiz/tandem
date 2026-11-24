@@ -164,6 +164,7 @@ describe("giveFeedback in Waiting on me: only the developer's own answer advance
 });
 
 describe("answer drafts", () => {
+  beforeEach(() => vi.stubGlobal("localStorage", { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) })); // the file's afterEach unstubs it
   it("merge: a panel writes the field it changed", () => {
     const { setDraft, clearDraft } = store.useStore.getState();
     const key = store.draftKey("a/b#9", "D1");
@@ -181,6 +182,34 @@ describe("answer drafts", () => {
     expect(store.useStore.getState().drafts[key]).toEqual({ choice: "B: 200 MB", text: "note", push: false });
     clearDraft(key);
     expect(store.useStore.getState().drafts).toBe(empty);
+  });
+
+  it("are kept in the browser as they change and dropped from it when the last one goes (#13: picks, notes and the step survive a reload)", () => {
+    const { setDraft, clearDraft } = store.useStore.getState();
+    const key = store.draftKey("acme/app#183", "D1");
+    setDraft(key, { picks: { 1: "A" }, notes: { 1: "but calmer" }, step: 2, push: false });
+    const kept = JSON.parse(mem.get("tandem.drafts")!) as { at: number; drafts: Record<string, unknown> };
+    expect(kept.drafts[key]).toEqual({ picks: { 1: "A" }, notes: { 1: "but calmer" }, step: 2, push: false });
+    expect(Date.now() - kept.at).toBeLessThan(5_000);
+    clearDraft(key);
+    expect(mem.has("tandem.drafts")).toBe(false);
+  });
+
+  it("are restored when the page loads, unless they are older than two weeks or unreadable", async () => {
+    const key = store.draftKey("acme/app#183", "D1");
+    const load = async (stored: string | null) => {
+      if (stored === null) mem.delete("tandem.drafts");
+      else mem.set("tandem.drafts", stored);
+      vi.resetModules();
+      const fresh = await import("./store.ts");
+      return fresh.useStore.getState().drafts;
+    };
+    expect(await load(JSON.stringify({ at: Date.now() - 60_000, drafts: { [key]: { picks: { 2: "B" }, step: 1 } } }))).toEqual({ [key]: { picks: { 2: "B" }, step: 1 } });
+    expect(await load(JSON.stringify({ at: Date.now() - 15 * 86_400_000, drafts: { [key]: { picks: { 2: "B" } } } }))).toEqual({});
+    expect(await load("{not json")).toEqual({});
+    expect(await load(JSON.stringify({ drafts: { [key]: {} } }))).toEqual({}); // no time: not ours
+    expect(await load(null)).toEqual({});
+    mem.delete("tandem.drafts");
   });
 
   it("belong to one Card: the same request id on another Card (D1 repeats everywhere) has no draft", () => {
