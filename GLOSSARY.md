@@ -61,7 +61,7 @@ The developer checking the finished result of a Card with UX impact after it rea
 _Avoid_: QA, acceptance, review
 
 **Seen**:
-A Done Card whose Look the developer has taken. Seen Cards leave the Board after a while; unseen ones stay. Opening a Card in To look at marks it Seen; so do the row's Mark Seen button and Mark Seen on the Selection bar (key `l`).
+A Done Card whose Look the developer has taken. Seen Cards leave the Board after a while; unseen ones stay. Opening a Card in To look at marks it Seen; so do the row's Mark Seen button and Mark Seen on the Selection bar (key `e`).
 _Avoid_: read, acknowledged
 
 **Push**:

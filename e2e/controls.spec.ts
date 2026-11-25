@@ -68,7 +68,7 @@ test("an icon-only button shows its key in a tooltip, on hover and on keyboard f
   await expect(page.getByTestId("detail")).toBeVisible(); // the first Esc closed the tooltip, not the Card
 });
 
-test("a row's Mark Seen button names no key: `l` marks the selection, not the hovered row", async ({ page }) => {
+test("a row's Mark Seen button names no key: `e` marks the selection, not the hovered row", async ({ page }) => {
   await page.goto("/");
   const btn = page.locator('[data-card="acme/app#108"]').locator("xpath=..").getByRole("button", { name: "Mark Seen" }); // hover only: the Look stays unseen
   await btn.hover();

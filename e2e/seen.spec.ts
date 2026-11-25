@@ -94,7 +94,7 @@ test("j opens the next To look at Card and marks it Seen; a Card opened from the
 test("the row button marks a To look at Card Seen without opening it; a failure rolls it back with a message", async ({ page }) => {
   await page.goto("/");
   const btn = rowButton(page, 161);
-  await expect(btn).not.toHaveAttribute("aria-keyshortcuts", /.+/); // `l` marks the selection, not this row: no key is advertised (#46)
+  await expect(btn).not.toHaveAttribute("aria-keyshortcuts", /.+/); // `e` marks the selection, not this row: no key is advertised (#46)
   await page.route("**/api/cards/acme/app/161/seen", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await btn.click();
   await expect(toast(page, "Not marked Seen: boom")).toBeVisible();
@@ -131,7 +131,7 @@ test("mark two To look at rows, Mark Seen from the Selection bar: both leave; Es
   await row(page, 162).click({ modifiers: ["Shift"] });
   await expect(bar).toContainText("2 selected");
   await page.keyboard.press("ControlOrMeta+k");
-  await expect(page.getByRole("option", { name: /Mark Seen/ })).toContainText("l");
+  await expect(page.getByRole("option", { name: /Mark Seen/ }).locator("kbd")).toHaveText("e");
   await page.keyboard.press("Escape");
   const calls: string[] = [];
   page.on("request", (r) => r.method() === "POST" && r.url().endsWith("/seen") && calls.push(r.url()));
@@ -146,12 +146,12 @@ test("mark two To look at rows, Mark Seen from the Selection bar: both leave; Es
   await expect(row(page, 163)).toBeVisible();
 });
 
-test("the key l marks the marked Cards Seen; one failure rolls back with one message", async ({ page }) => {
+test("the key e marks the marked Cards Seen; one failure rolls back with one message", async ({ page }) => {
   await page.goto("/");
   await page.route("**/api/cards/acme/app/163/seen", (r) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "boom" }) }));
   await row(page, 162).click({ modifiers: [mod] });
   await row(page, 163).click({ modifiers: [mod] });
-  await page.keyboard.press("l");
+  await page.keyboard.press("e");
   await expect(row(page, 162)).toHaveCount(0);
   await expect(row(page, 163)).toBeVisible(); // rolled back
   await expect(toast(page, "1 of 2 marked Seen. Failed: boom")).toBeVisible();

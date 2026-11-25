@@ -84,7 +84,7 @@ export function paletteActions(c: ActionCtx): PaletteAction[] {
 
   const card = c.card;
   if (card && c.focus) {
-    // the ask is on the cover: the Card behind it is reached through its details (`e`), not through marks or triage
+    // the ask is on the cover: the Card behind it is reached through its details (`i`), not through marks or triage
     add({ id: "next", group: "Card", label: "Skip to the next Card", binding: "next", run: run("next", "j") });
     add({ id: "previous", group: "Card", label: "Back to the previous Card", binding: "previous", run: run("previous", "k") });
     add({ id: "open", group: "Card", label: "Open on GitHub", binding: "open", run: () => void window.open(card.url, "_blank") });

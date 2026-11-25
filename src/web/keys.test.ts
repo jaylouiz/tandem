@@ -29,7 +29,7 @@ describe("the key table", () => {
     expect(at("focus-reject")).toBeLessThan(at("mark"));
     expect(at("focus-step")).toBeLessThan(at("question"));
     // the keys the design round asked for are taken (Move to Inbox, Capture an idea): details and side by side moved (D1)
-    expect(keys.keyOf("focus-details")).toBe("e");
+    expect(keys.keyOf("focus-details")).toBe("i");
     expect(keys.keyOf("focus-side")).toBe("t");
     expect(keys.keyOf("move-inbox")).toBe("i");
     expect(keys.keyOf("capture")).toBe("c");
@@ -65,11 +65,11 @@ describe("the key table", () => {
     expect(useFocus.getState().stage).toBe("start");
     st().select("o/r#1");
     useFocus.getState().setStage("ask");
-    for (const k of ["x", "[", "]"]) expect(press(k), k).toBe(true); // spent in Focus, whatever is on screen
+    for (const k of ["x", "i", "[", "]"]) expect(press(k), k).toBe(true); // spent in Focus, whatever is on screen
     expect(st().marked).toEqual([]);
     expect(press("a", true)).toBe(true); // ⌘A marks nothing
     expect(st().marked).toEqual([]);
-    for (const k of ["d", "s", "b", "h", "a", "w", "m", "i"]) expect(press(k), k).toBe(false); // triage: nothing runs, the key is nobody's
+    for (const k of ["d", "s", "b", "h", "a", "w", "m"]) expect(press(k), k).toBe(false); // triage: nothing runs, the key is nobody's
     expect(st().notice).toBeNull();
     // Esc: back to the overview is the frame's (not mounted here), so the key leaves Focus
     press("Escape");
@@ -79,7 +79,7 @@ describe("the key table", () => {
   });
 
   it("scopes every key that acts on Cards to the views that list Cards (not Settings)", () => {
-    const cardKeys = ["j", "k", "x", "l", "o", "m", "i", "d", "s", "b", "h", "w", "a", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "[", "]", "J", "K", "ArrowDown", "ArrowUp"];
+    const cardKeys = ["j", "k", "x", "e", "o", "m", "i", "d", "s", "b", "h", "w", "a", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "[", "]", "J", "K", "ArrowDown", "ArrowUp"];
     for (const k of cardKeys) for (const b of keys.BINDINGS.filter((b) => !b.chord && !b.mod && b.keys.includes(k))) expect(b.scope, `${b.id} on ${k}`).toBe("cards");
     // the chords with ⌘/Ctrl that act on the open Card: ⌘A (mark the column) and ⌘↵ (send the Feedback)
     for (const id of ["select-all", "send-feedback"]) expect(keys.BINDINGS.find((b) => b.id === id)?.scope, id).toBe("cards");

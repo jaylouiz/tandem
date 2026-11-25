@@ -1,6 +1,6 @@
 // A Look in Focus: the result itself. Its screenshot stands on the stage at real size (its states as tabs, `[` `]` step them, `v`
 // switches desktop and mobile); beside it the headline, what to check and the preview. Passing a Look does not mark it: Mark Seen
-// (`l`) is the developer's own reaction, and nothing is written to GitHub.
+// (`e`) is the developer's own reaction, and nothing is written to GitHub.
 import { useMemo, useState } from "react";
 import { buildNav, nextGroup, jumpGroup, toggleViewport, viewportPref, type Viewport } from "../../../core/gallery.ts";
 import type { Card } from "../../../core/types.ts";

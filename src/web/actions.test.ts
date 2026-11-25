@@ -155,7 +155,7 @@ describe("the palette lists every key binding", () => {
     expect(entries.filter((a) => a.group === "Focus").map((a) => [a.label, actions.keyShown(a)])).toEqual([
       ["Start with the first Card", "↵"],
       ["Answer with a note", "n"],
-      ["Card details: Decided, Activity, Issue", "e"],
+      ["Card details: Decided, Activity, Issue", "i"],
       ["All variants side by side", "t"],
       ["Show the mobile screenshot", "v"],
       ["Next variant", "]"],

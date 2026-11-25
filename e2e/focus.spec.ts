@@ -280,7 +280,7 @@ test("Focus does not mark a Look Seen by passing it; l and Mark Seen do, and mov
   await on(page, num(looks[1]!));
   await page.getByTestId("focus-seen").click();
   await on(page, num(looks[2]!));
-  await page.keyboard.press("l"); // the key does the same
+  await page.keyboard.press("e"); // the key does the same
   await on(page, num(looks[3]!));
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
@@ -422,7 +422,7 @@ test("the end is a receipt: every Card answered in this Focus with the comment w
     await expect(bar(page)).not.toHaveAttribute("data-state", "sending");
     // an ask with several questions (#183, #184) is never sent by a digit: ⌘↵ sends its recommendations
     const several = key === "acme/app#183" || key === "acme/app#184";
-    for (const k of key === "acme/app#182" ? ["1", "3", "5"] : [kind === "look" ? "l" : several ? "ControlOrMeta+Enter" : "1"]) await page.keyboard.press(k);
+    for (const k of key === "acme/app#182" ? ["1", "3", "5"] : [kind === "look" ? "e" : several ? "ControlOrMeta+Enter" : "1"]) await page.keyboard.press(k);
   }
   const done = page.getByTestId("focus-done");
   await expect(done.getByRole("heading", { level: 1 })).toHaveText("All clear");
@@ -499,14 +499,14 @@ test("f starts Focus from the Board; with nothing waiting it says so, with the t
 test("in Focus the Selection, tab and triage keys leave the Card behind the ask alone; o, c, ? and g chords keep working", async ({ page }) => {
   await start(page);
   await row(page, 170).click();
-  for (const key of ["x", "[", "]", "d", "s", "b", "h", "a", "w", "m", "i", "0", "ControlOrMeta+a"]) await page.keyboard.press(key);
+  for (const key of ["x", "[", "]", "d", "s", "b", "h", "a", "w", "m", "0", "ControlOrMeta+a"]) await page.keyboard.press(key);
   await on(page, 170);
   await expect(page.locator(".toast")).toHaveCount(0); // no move, no priority, no hold
   await expect(page.getByTestId("mark-bar")).toHaveCount(0);
   expect((await answers(page, 170)).labels).not.toContain("on-hold");
   await page.keyboard.press("?");
   await expect(page.getByTestId("shortcuts")).toBeVisible();
-  await expect(page.getByTestId("shortcuts-Focus").locator('[data-binding="focus-details"]')).toContainText("e");
+  await expect(page.getByTestId("shortcuts-Focus").locator('[data-binding="focus-details"]')).toContainText("i");
   await expect(page.getByTestId("shortcuts-Focus").locator('[data-binding="focus-side"]')).toContainText("t");
   await page.keyboard.press("Escape");
   await page.keyboard.press("c");
@@ -548,14 +548,14 @@ test("the drawer behind e shows the Card's sheet without the ask: Issue, Decided
   await expect(drawer).toHaveCount(0);
   await on(page, 127);
   // the digits are the ask's again; the drawer opens on the issue text
-  await page.keyboard.press("e");
+  await page.keyboard.press("i");
   await expect(drawer.getByTestId("fold-issue").locator(".fold-head")).toHaveAttribute("aria-expanded", "true");
   await page.keyboard.press("Escape");
   await page.keyboard.press("n");
-  await page.keyboard.press("e"); // typed into the note
-  await expect(page.getByTestId("note")).toHaveValue("e");
+  await page.keyboard.press("i"); // typed into the note
+  await expect(page.getByTestId("note")).toHaveValue("i");
   await page.keyboard.press("Escape"); // leaves the field
-  await page.keyboard.press("e");
+  await page.keyboard.press("i");
   await expect(drawer).toBeVisible();
   await page.keyboard.press("Escape"); // 1: the drawer
   await expect(drawer).toHaveCount(0);
@@ -573,7 +573,7 @@ test("an earlier round's gallery opened from the drawer owns its keys: they reac
   await start(page);
   await row(page, 110).click(); // round 2 waits, round 1 is in Decided
   await expect(page.getByTestId("stage").locator("img")).toHaveAttribute("alt", "R2 · a · desktop");
-  await page.keyboard.press("e");
+  await page.keyboard.press("i");
   const drawer = page.getByTestId("focus-drawer");
   await drawer.getByTestId("fold-decided").locator(".fold-head").click();
   await drawer.getByTestId("round-1").locator(".thumb").first().click();

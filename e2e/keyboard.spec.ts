@@ -87,7 +87,7 @@ test("Card keys and the Selection bar are not live where there are no Cards: Set
   // Settings has no Card pane: a Card picked in the palette opens on the Board instead of acting unseen
   await page.getByRole("navigation", { name: "Views" }).getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  for (const key of ["x", "h", "m", "i", "a", "d", "s", "b", "1", "2", "3", "0", "w", "l", "j", "k", "ArrowDown", "ControlOrMeta+a", "Shift+J"]) await page.keyboard.press(key);
+  for (const key of ["x", "h", "m", "i", "a", "d", "s", "b", "1", "2", "3", "0", "w", "e", "j", "k", "ArrowDown", "ControlOrMeta+a", "Shift+J"]) await page.keyboard.press(key);
   await expect(bar(page)).toBeHidden();
   await expect(page.getByTestId("toast")).toHaveCount(0); // nothing was written or Pushed
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();

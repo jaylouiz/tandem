@@ -185,7 +185,7 @@ export const BINDINGS: Binding[] = [
   // Enter on a button or a link stays that control's own (the act passes); elsewhere on the start screen it starts
   { id: "focus-start", group: "Focus", when: "Focus", keys: ["Enter"], label: "Start with the first Card", scope: "cards", run: (e) => inFocus() && runFocusKey("focus-start", e) },
   focusKey("focus-note", ["n"], "Answer with a note (a design round: react with a comment)"),
-  focusKey("focus-details", ["e"], "Card details: Decided, Activity, Issue"),
+  focusKey("focus-details", ["i"], "Card details: Decided, Activity, Issue"),
   focusKey("focus-side", ["t"], "Design round: all variants side by side"),
   focusKey("focus-viewport", ["v"], "Switch the screenshot between desktop and mobile"),
   focusKey("focus-step", ["[", "]"], "Previous / next question of an ask, variant of a design round, or state of a Look"),
@@ -233,7 +233,7 @@ export const BINDINGS: Binding[] = [
     },
   },
   // in Focus only the Look on screen is marked, by the developer's own key; on any other ask the key does nothing
-  { id: "seen", group: "Cards", keys: ["l"], label: "Mark Seen", scope: "cards", run: (e) => void (inFocus() ? !e.repeat && runFocusKey("seen", e) : markSelectionSeen()) },
+  { id: "seen", group: "Cards", keys: ["e"], label: "Mark Seen", scope: "cards", run: (e) => void (inFocus() ? !e.repeat && runFocusKey("seen", e) : markSelectionSeen()) },
   // an ask with several questions (#13): `[` `]` move between its steps without picking; on any other Card they do nothing
   {
     id: "question",
