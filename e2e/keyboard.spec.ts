@@ -45,6 +45,43 @@ test("Board j/k/arrows keep the selected Card in view and focused, so Enter acts
   await expect(page.locator('.card[aria-selected="true"]')).toBeInViewport();
 });
 
+/** Presses Tab until focus is in the open Card's sheet; fails when it lands on another Card or row on the way. */
+const tabToSheet = async (page: Page, max = 8) => {
+  for (let i = 0; i < max; i++) {
+    await page.keyboard.press("Tab");
+    const at = await page.evaluate(() => ({ inSheet: !!document.activeElement?.closest('[data-testid="detail"]'), row: !!document.activeElement?.matches(".card, .qrow") }));
+    expect(at.row).toBe(false);
+    if (at.inSheet) return;
+  }
+  throw new Error(`Tab did not reach the sheet in ${max} presses`);
+};
+
+test("the Board and the Waiting list are one tab stop each: the open Card, else the first; Tab goes on to the sheet (J3)", async ({ page }) => {
+  await toBoard(page);
+  const stops = page.locator('.board .card[tabindex="0"]');
+  await expect(stops).toHaveCount(1); // nothing open: the first Card
+  await page.locator('[data-card="acme/app#117"]').click();
+  await expect(stops).toHaveCount(1);
+  await expect(stops).toHaveAttribute("data-card", "acme/app#117");
+  await page.keyboard.press("j");
+  const open = page.locator('.card[aria-selected="true"]');
+  await expect(open).toBeFocused();
+  await expect(open).toHaveAttribute("tabindex", "0");
+  await tabToSheet(page);
+
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /^Waiting on me/ }).click();
+  const rows = page.locator('[data-testid="waiting-list"] .qrow[tabindex="0"]');
+  await expect(rows).toHaveCount(1);
+  await page.locator('[data-testid="waiting-list"] .qrow').first().click();
+  await page.keyboard.press("j");
+  const row = page.locator('[data-testid="waiting-list"] .qrow[aria-selected="true"]');
+  await expect(row).toBeFocused(); // j carries the focus along
+  await expect(rows).toHaveCount(1);
+  await expect(row).toHaveAttribute("tabindex", "0");
+  await tabToSheet(page, 3);
+});
+
 test("Card keys and the Selection bar are not live where there are no Cards: Settings (U4)", async ({ page }) => {
   await page.goto("/");
   // Settings has no Card pane: a Card picked in the palette opens on the Board instead of acting unseen

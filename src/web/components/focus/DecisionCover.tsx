@@ -10,9 +10,12 @@ import { useFocusKeys } from "../../focus/keys.ts";
 import { focusSend, useFocus } from "../../focus/session.ts";
 import { keyOf } from "../../keys.ts";
 import { Ext, Inline } from "../bits.tsx";
+import { Why } from "../Questions.tsx";
 import { KeyLine, Meta, Note, SendBar, Tile, useCover } from "./parts.tsx";
 
 const clip = (o: string) => (o.length > 60 ? `${o.slice(0, 59)}…` : o);
+/** An option without a short key (`Or a mix ("H1 outlines with A3 pill headings"), then round 3.`): its whole line is the key. */
+const longKey = (key: string) => key.length > 32 || key.split(/\s+/).length > 4;
 
 export function DecisionCover({ card }: { card: Card }) {
   const a = useDecisionAnswer(card, focusSend);
@@ -59,7 +62,6 @@ export function DecisionCover({ card }: { card: Card }) {
   const ask = askQuestions(card);
   const recKey = ask?.questions.length === 1 ? recommendedOf(ask.questions[0]!) : null;
   const recommended = (opt: string) => !!recKey && optionKey(opt) === recKey;
-  const confidence = /confidence\s+(\w+)/i.exec(req.recommendation ?? "")?.[1] ?? "";
   return (
     <>
       <div className="cover-scroll">
@@ -74,17 +76,25 @@ export function DecisionCover({ card }: { card: Card }) {
                 <Tile
                   key={o}
                   n={i + 1}
-                  head={<Inline text={optionKey(o)} />}
-                  text={optionText(o) ? <Inline text={optionText(o)} /> : undefined}
+                  // a long key is no heading: the digit heads the tile and the line reads at text size
+                  head={longKey(optionKey(o)) ? undefined : <Inline text={optionKey(o)} />}
+                  text={
+                    longKey(optionKey(o)) ? (
+                      <Inline text={optionText(o) ? `${optionKey(o)}: ${optionText(o)}` : optionKey(o)} />
+                    ) : optionText(o) ? (
+                      <Inline text={optionText(o)} />
+                    ) : undefined
+                  }
                   writes={noting ? undefined : feedbackComment(a.feedbackOf(o, "")!)}
                   picks={noting}
                   picked={a.choice === o}
-                  recommended={recommended(o) ? confidence : null}
+                  recommended={recommended(o)}
                   onClick={() => pick(i + 1)}
                 />
               ))}
             </div>
           )}
+          {ask?.questions.length === 1 && <Why ask={ask} q={ask.questions[0]!} />}
           <div className="cover-under">
             <Note
               open={noting}

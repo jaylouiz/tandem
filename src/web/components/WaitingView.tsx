@@ -29,16 +29,26 @@ const SEEN_ICON = (
   </svg>
 );
 
-/** `group`: the Cards of the row's group (shift-click marks a range inside it); `kind` is the group's, a Seen Card still listed in To look at keeps "look". */
-function Row({ card, group, kind }: { card: Card; group: Card[]; kind: Kind }) {
+/**
+ * `group`: the Cards of the row's group (shift-click marks a range inside it); `kind` is the group's, a Seen Card still listed in To look at keeps "look".
+ * `stop`: the list is one tab stop (roving tabindex), the open Card's row, else the first.
+ */
+function Row({ card, group, kind, stop }: { card: Card; group: Card[]; kind: Kind; stop: boolean }) {
   const selected = useStore((s) => s.selected === card.key);
+  const el = useRef<HTMLButtonElement>(null);
+  // j/k carry the focus along when it is on a row, so Tab goes on from the open Card's row to the sheet
+  useEffect(() => {
+    if (selected && document.activeElement?.classList.contains("qrow")) el.current?.focus({ preventScroll: true });
+  }, [selected]);
   const marked = useStore((s) => s.marked.includes(card.key));
   const failed = useStore((s) => card.key in s.failures);
   const unseen = kind === "look" && !card.seenAt;
   return (
     <div className="qrow-wrap" data-look={kind === "look" || undefined}>
       <button
+        ref={el}
         className="qrow"
+        tabIndex={stop ? 0 : -1}
         aria-selected={selected}
         data-card={card.key}
         data-kind={kind}
@@ -62,7 +72,7 @@ function Row({ card, group, kind }: { card: Card; group: Card[]; kind: Kind }) {
       </button>
       {unseen && (
         <Tooltip label="Mark Seen">
-          <button className="qrow-seen" aria-label="Mark Seen" onClick={() => void markSeen([card])}>
+          <button className="qrow-seen" aria-label="Mark Seen" tabIndex={-1} onClick={() => void markSeen([card])}>
             {SEEN_ICON}
           </button>
         </Tooltip>
@@ -105,11 +115,13 @@ function Start({ waiting, look }: { waiting: Card[]; look: Card[] }) {
   const kinds = KIND_ORDER.map((k) => [k, waiting.filter((c) => kindOf(c) === k).length] as const).filter(([, n]) => n > 0);
   const unseen = look.filter((c) => !c.seenAt).length;
   const total = waiting.length + unseen;
+  // the headline counts everything Focus goes through; the kinds under it are the blockers (the Looks are in the headline)
+  const headline = [waiting.length ? `${waiting.length} ${waiting.length === 1 ? "Card waits" : "Cards wait"} on you` : "", unseen ? `${unseen} to look at` : ""].filter(Boolean).join(" · ");
   return (
     <div className="empty pane-empty start" data-testid="waiting-start">
       {total > 0 ? (
         <>
-          <h2 className="start-title">{waiting.length ? `${waiting.length} ${waiting.length === 1 ? "Card waits" : "Cards wait"} on you` : `${unseen} to look at`}</h2>
+          <h2 className="start-title">{headline}</h2>
           <ul className="start-kinds">
             {kinds.map(([k, n]) => (
               <li key={k} data-kind={k}>
@@ -117,12 +129,6 @@ function Start({ waiting, look }: { waiting: Card[]; look: Card[] }) {
                 <b>{n}</b> {n === 1 ? KIND_LABEL[k] : KIND_MANY[k]}
               </li>
             ))}
-            {unseen > 0 && (
-              <li data-kind="look">
-                <KindGlyph kind="look" box />
-                <b>{unseen}</b> to look at
-              </li>
-            )}
           </ul>
           <button className="btn primary big" data-testid="focus-start" onClick={() => setFocus(true)}>
             Go through them one by one <kbd>{keyOf("focus")}</kbd>
@@ -148,6 +154,7 @@ function WaitingList({ cards }: { cards: Card[] }) {
   const linger = useStore((s) => s.linger);
   const { waiting, look, pickup, order } = queueOf(cards, linger);
   const selected = useStore((s) => s.selected);
+  const stop = order.find((c) => c.key === selected)?.key ?? order[0]?.key;
   const list = useRef<HTMLDivElement>(null);
   useScrollMemory(list, "waiting");
   // a failed answer brought its Card back: the row appears again and is brought into view like a new selection
@@ -163,17 +170,17 @@ function WaitingList({ cards }: { cards: Card[] }) {
     <div className="split" data-testid="waiting">
       <div className="split-list" ref={list} tabIndex={-1} data-testid="waiting-list" aria-label="Waiting on me">
         {!order.length && <Nothing />}
-        {waiting.length > 0 && <GroupHead label="Waiting on me" count={waiting.length} />}
+        {/* no "Waiting on me" head over the blockers: the top bar and the sidebar say it */}
         {waiting.map((c) => (
-          <Row key={c.key} card={c} group={waiting} kind={kindOf(c)!} />
+          <Row key={c.key} card={c} group={waiting} kind={kindOf(c)!} stop={c.key === stop} />
         ))}
         {look.length > 0 && <GroupHead label="To look at" count={look.length} />}
         {look.map((c) => (
-          <Row key={c.key} card={c} group={look} kind="look" />
+          <Row key={c.key} card={c} group={look} kind="look" stop={c.key === stop} />
         ))}
         {pickup.length > 0 && <GroupHead label="Awaiting pickup" count={pickup.length} />}
         {pickup.map((c) => (
-          <Row key={c.key} card={c} group={pickup} kind="pickup" />
+          <Row key={c.key} card={c} group={pickup} kind="pickup" stop={c.key === stop} />
         ))}
       </div>
       {selected && cards.some((c) => c.key === selected) ? (

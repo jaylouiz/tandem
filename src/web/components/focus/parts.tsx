@@ -4,7 +4,7 @@ import { KIND_LABEL, askOf, kindOf, sinceOf, type Kind } from "../../../core/ask
 import type { Card } from "../../../core/types.ts";
 import { keyOf, runBinding } from "../../keys.ts";
 import { useFocus } from "../../focus/session.ts";
-import { Btn, KindGlyph, RepoTag, ago, shortRepo } from "../bits.tsx";
+import { Btn, KindGlyph, RepoTag, Star, ago, shortRepo } from "../bits.tsx";
 
 /** What the frame tells the cover on screen. */
 export interface CoverState {
@@ -47,15 +47,16 @@ export function Meta({ card, kind }: { card: Card; kind: Kind }) {
 
 export interface TileProps {
   n: number;
-  /** the option's key (`B`) or the verdict's name */
-  head: ReactNode;
+  /** the option's key (`B`) or the verdict's name; none when the option has no short key (its digit is the head then) */
+  head?: ReactNode;
   text?: ReactNode;
   /** the comment a click writes, word for word; absent while the note is open (the Send bar shows the whole comment then) */
   writes?: ReactNode;
-  /** the note is open: the tile is a toggle that only picks */
+  /** the note is open: the tile is a toggle that only picks (and shows its check when picked) */
   picks: boolean;
   picked: boolean;
-  recommended?: string | null;
+  /** the agent's pick: "★ Recommended" in the head, as in the sheet */
+  recommended?: boolean;
   onClick: () => void;
 }
 
@@ -66,20 +67,19 @@ export function Tile({ n, head, text, writes, picks, picked, recommended, onClic
     <Btn className="tile" data-testid={`tile-${n}`} data-picked={picked || undefined} aria-pressed={picks ? picked : undefined} why={sending ? "Sending…" : null} onClick={onClick}>
       <span className="tile-top">
         <kbd>{n}</kbd>
-        <b>{head}</b>
-        {picked && <Check />}
+        {head && <b>{head}</b>}
+        {recommended && (
+          <span className="tile-rec">
+            <Star /> Recommended
+          </span>
+        )}
+        {picks && picked && <Check />}
       </span>
       {text && <span className="tile-text">{text}</span>}
       {writes && (
         <code className="tile-writes" data-testid={`tile-writes-${n}`}>
           {writes}
         </code>
-      )}
-      {recommended !== undefined && recommended !== null && (
-        <span className="tile-rec">
-          <i aria-hidden />
-          The agent recommends this{recommended ? `, confidence ${recommended}` : ""}
-        </span>
       )}
     </Btn>
   );

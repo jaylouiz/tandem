@@ -42,8 +42,11 @@ function useActivityOf(card: Card | null): Activity | null {
   return card && cfg ? classifyActivity(card, activity[card.key], now, cfg) : null;
 }
 
-/** Where the Card stands, in one line: the agent's state, what it last reported and when; without agent activity, when the Card last moved (#20: "just now", never "now ago"). */
-function ActivityLine({ card, act }: { card: Card; act: Activity | null }) {
+/**
+ * Where the Card stands, in one line: the agent's state, what it last reported and when; without agent activity, when the Card last moved (#20: "just now", never "now ago").
+ * `brief`: an ask or the Queued line above says what the Card waits on, so only the state and its age ("Parked · 21h ago").
+ */
+function ActivityLine({ card, act, brief = false }: { card: Card; act: Activity | null; brief?: boolean }) {
   if (!act) return <>Moved {agoText(card.updatedAt)}</>;
   return (
     <span className="act-line" data-state={act.state}>
@@ -52,8 +55,12 @@ function ActivityLine({ card, act }: { card: Card; act: Activity | null }) {
         <ActDot state={act.state} />
       </span>
       <b>{STATE_LABEL[act.state]}</b>
-      <span className="act-sep">{" · "}</span>
-      <span className="act-last">{act.last ?? STATE_DEFAULT_TEXT[act.state]}</span>
+      {!brief && (
+        <>
+          <span className="act-sep">{" · "}</span>
+          <span className="act-last">{act.last ?? STATE_DEFAULT_TEXT[act.state]}</span>
+        </>
+      )}
       <span className="act-sep">{" · "}</span>
       <span className="act-at">{agoText(act.at)}</span>
     </span>
@@ -330,7 +337,7 @@ export function CardPane({ cardKey, mode, onClose }: { cardKey: string; mode: "s
             </Fold>
           )}
           {card.phase !== "Done" && (
-            <Fold id="activity" title="Activity" summary={<ActivityLine card={card} act={act} />} open={open.activity} onToggle={() => toggle("activity")} reveal={revealOf("activity")}>
+            <Fold id="activity" title="Activity" summary={<ActivityLine card={card} act={act} brief={!!card.waiting || card.awaitingPickup} />} open={open.activity} onToggle={() => toggle("activity")} reveal={revealOf("activity")}>
               <div className="act-head" data-testid="status">
                 <ActivityLine card={card} act={act} />
               </div>

@@ -162,6 +162,17 @@ export interface QuestionShots {
   onRetry: () => Promise<boolean>;
 }
 
+/** The agent's reason, once, under the options: "Why B: …" (the sheet and Focus alike). */
+export function Why({ ask, q }: { ask: Ask; q: Question }) {
+  if (!q.why) return null;
+  const rec = recommendedOf(q);
+  return (
+    <p className="qwhy" data-testid="why">
+      <b>{ask.legacy ? (rec ? "Why:" : "The agent says:") : `Why ${rec ?? ""}:`}</b> <Inline text={q.why} />
+    </p>
+  );
+}
+
 /**
  * One question: what it decides, its options as rows (digit, letter, name, "today", in short, ★ Recommended), the agent's reason once,
  * a note, its screenshot. `onPick` is the caller's (the sheet picks and moves on; Focus with one question sends).
@@ -225,11 +236,7 @@ export function QuestionView({ ask, q, a, keys, onPick, shots, big, toggle = tru
           </button>
         ))}
       </div>
-      {q.why && (
-        <p className="qwhy" data-testid="why">
-          <b>{ask.legacy ? (rec ? "Why:" : "The agent says:") : `Why ${rec ?? ""}:`}</b> <Inline text={q.why} />
-        </p>
-      )}
+      <Why ask={ask} q={q} />
       {noteOpen && (
         <input
           className="input qnote"

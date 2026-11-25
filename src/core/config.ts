@@ -23,6 +23,8 @@ export interface WorkflowConfig {
   phaseRules: PhaseRule[];
   /** lane label -> Next step */
   nextStep: Record<string, NextStep>;
+  /** the Next step a Phase is itself doing: a Card there shows its Next step only when it differs (a Build Card still to specify) */
+  phaseStep: Partial<Record<Phase, NextStep>>;
   /** the native issue status that means "handed to an agent, not started yet"; Tandem sets it on "Hand to agent" */
   handedStatus: string;
   /** the statuses that mean work has started: a hand-over that cannot be taken back (Start coordinator) leaves them alone */
@@ -70,6 +72,7 @@ export const DEFAULT_WORKFLOW: WorkflowConfig = {
     { phase: "Inbox", when: {} },
   ],
   nextStep: { "needs-design": "design", "needs-spec": "specify", ready: "build" },
+  phaseStep: { "UX Design": "design", Build: "build" },
   handedStatus: "Todo",
   startedStatuses: ["In progress", "In review"],
   unhandedStatus: "Backlog",

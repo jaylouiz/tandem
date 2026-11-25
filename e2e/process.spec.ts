@@ -17,6 +17,11 @@ test("nothing is open on entry; j opens the first blocker, then j and k move the
   await page.goto("/");
   await expect(list(page).locator(".qrow").first()).toBeVisible();
   await expect(page.getByTestId("waiting")).toContainText("Select a Card");
+  // the headline counts what Focus goes through: the blockers and the Looks, the kinds under it are the blockers'
+  const blockers = await list(page).locator('.qrow:not([data-kind="look"]):not([data-kind="pickup"])').count();
+  const looks = await list(page).locator('.qrow[data-kind="look"]').count();
+  await expect(page.getByTestId("waiting-start").locator(".start-title")).toHaveText(`${blockers} Cards wait on you · ${looks} to look at`);
+  await expect(page.getByTestId("waiting-start").locator('.start-kinds [data-kind="look"]')).toHaveCount(0);
   await expect(page.getByTestId("detail")).toHaveCount(0);
   await expect(list(page).locator('.qrow[aria-selected="true"]')).toHaveCount(0);
   await page.keyboard.press("j"); // with nothing open, j opens the first row (k does too)
@@ -30,7 +35,8 @@ test("nothing is open on entry; j opens the first blocker, then j and k move the
   await page.keyboard.press("k");
   await expect(page.getByTestId("detail")).toHaveAttribute("aria-label", `Card ${first}`);
   // the groups, each row with a kind label and the ask
-  for (const g of ["Waiting on me", "To look at", "Awaiting pickup"]) await expect(list(page).locator(".group-head", { hasText: g })).toBeVisible();
+  for (const g of ["To look at", "Awaiting pickup"]) await expect(list(page).locator(".group-head", { hasText: g })).toBeVisible();
+  await expect(list(page).locator(".group-head", { hasText: "Waiting on me" })).toHaveCount(0); // the top bar says it
   await expect(row(page, 106)).toContainText("PR approval");
   await expect(row(page, 107)).toHaveCount(0); // an agent decision is not a blocker (decisions.spec.ts)
   await expect(row(page, 119)).toContainText("Look");
@@ -61,7 +67,6 @@ test("a digit picks a decision option, ⌘↵ sends, the next blocker opens; a f
   await expect(panel.getByTestId("note")).toHaveValue("with a note");
   await expect(panel.getByTestId("push-toggle")).not.toBeChecked(); // the Push choice is part of the draft
   await expect(row(page, 117)).toBeVisible();
-  await expect(list(page).locator(".group-head", { hasText: "Waiting on me" })).toContainText("Waiting on me");
   await page.unroute("**/api/cards/acme/app/117/answer");
   // the panel was rebuilt for the returning Card, and it kept the drafted choice
   await expect(panel.getByTestId("option-B")).toHaveAttribute("aria-checked", "true");
@@ -156,7 +161,7 @@ test("Agent activity: Tab cycles inside the overlay and never reaches the Board 
 test("Agent activity: status line, g a overlay by state, a row opens the Card with its Activity fold open", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("agents-line")).toContainText(/\d+ working, [1-9]\d* stuck/);
-  await expect(page.getByTestId("stuck-count")).toHaveClass(/bad/);
+  await expect(page.getByTestId("stuck-count").locator(".act-dot")).toHaveCount(1); // the signal is the dot, the text stays neutral
   await page.keyboard.press("g");
   await page.keyboard.press("a");
   const agents = page.getByRole("dialog", { name: "Agent activity" });
@@ -166,6 +171,8 @@ test("Agent activity: status line, g a overlay by state, a row opens the Card wi
   expect(headings.map((h) => h.replace(/\s*\d+$/, "").trim())).toEqual(order);
   await expect(page.getByTestId("agents-stuck")).toContainText("worker session ended without worker_done");
   await expect(page.getByTestId("agents-hold")).toContainText("Bulk edit tags");
+  await expect(agents.locator(".group-head .act-dot")).toHaveCount(headings.length); // the dot is the group's
+  await expect(agents.locator(".arow .act-dot")).toHaveCount(0); // not every row's
   await page.keyboard.press("Escape");
   await expect(agents).toBeHidden();
   await page.getByTestId("agents-line").click();

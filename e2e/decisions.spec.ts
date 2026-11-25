@@ -14,7 +14,7 @@ const toBoard = async (page: Page) => {
 test("a Card with only an agent decision is not Waiting on me: no ask panel, Decided starts open with the new decision", async ({ page }) => {
   await page.goto("/");
   await expect(row(page, 107)).toHaveCount(0);
-  await expect(list(page).locator(".group-head", { hasText: "Waiting on me" })).toBeVisible();
+  await expect(list(page).locator('.qrow:not([data-kind="look"]):not([data-kind="pickup"])').first()).toBeVisible(); // there are blockers
   await toBoard(page);
   await row(page, 107).click();
   await pane(page, 107);

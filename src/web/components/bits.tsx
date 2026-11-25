@@ -4,6 +4,7 @@ import { STATE_LABEL, type AgentState } from "../../core/activity.ts";
 import { NO_REPOS, useStore, type View } from "../store.ts";
 import { PHASES, type Card, type Phase, type WaitingKind } from "../../core/types.ts";
 import { ago } from "../ago.ts";
+import { nextStepNote } from "../../core/card.ts";
 
 export const PHASE_COLOR: Record<Phase, string> = {
   Inbox: "var(--phase-inbox)",
@@ -54,16 +55,18 @@ export { ago, agoText } from "../ago.ts";
 export const shortRepo = (repo: string) => repo.split("/")[1] ?? repo;
 
 export function CardChips({ card }: { card: Card }) {
+  const workflow = useStore((s) => s.board?.workflow);
+  const next = nextStepNote(card, workflow);
   // no "Selected" chip: marking must not add a line to a Card (#29); the mark is the outline and background (`data-marked`)
+  // no "New · Look" chip: an unseen Look only ever stands under Done's "To look at" head, which says it
   return (
     <>
       {card.waiting && <span className="chip waiting">{WAITING_LABEL[card.waiting.kind]}</span>}
       {card.awaitingPickup && <span className="chip accent">Awaiting pickup</span>}
-      {card.needsLook && !card.seenAt && <span className="chip accent">New · Look</span>}
       {card.priority && <span className="chip">P{card.priority}</span>}
       {card.fog && <span className="chip accent">Needs wayfinder</span>}
       {card.onHold && <span className="chip danger">On hold</span>}
-      {card.nextStep && card.phase !== "Done" && <span className="chip">Next: {card.nextStep}</span>}
+      {next && <span className="chip">Next: {next}</span>}
       {card.pullRequest?.state === "open" && <span className="chip ok">PR #{card.pullRequest.number}</span>}
     </>
   );

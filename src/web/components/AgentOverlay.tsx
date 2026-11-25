@@ -15,14 +15,15 @@ export function useAgentGroups(cards: Card[]) {
   return cfg ? agentGroups(cards, activity, now, cfg) : [];
 }
 
-/** Sidebar status line: "N working, M stuck" (stuck in the danger colour). */
+/** Sidebar status line: "N working, M stuck"; the text stays neutral, a stuck Card puts the state's dot before "stuck" (Meaning Is A Dot). */
 export function AgentsLine({ cards, scope }: { cards: Card[]; scope?: string | null }) {
   const { working, stuck } = agentCounts(useAgentGroups(cards));
   return (
     <button className="nav-item agents-line" onClick={() => useStore.getState().setAgentsOpen(true)} data-testid="agents-line" title={scope ? `Agent activity · ${scope} only` : "Agent activity"}>
       <span>
         {working} working,{" "}
-        <span className={stuck ? "bad" : undefined} data-testid="stuck-count">
+        <span className="stuck-count" data-testid="stuck-count">
+          {stuck > 0 && <ActDot state="stuck" />}
           {stuck} stuck
         </span>
       </span>
@@ -31,13 +32,11 @@ export function AgentsLine({ cards, scope }: { cards: Card[]; scope?: string | n
   );
 }
 
+/** A row of its state's group: the group head carries the state's dot, the row does not repeat it. */
 function Row({ row, onOpen }: { row: AgentRow; onOpen: (c: Card) => void }) {
   const { card, act } = row;
   return (
     <button className="qrow arow" data-state={act.state} data-card={card.key} onClick={() => onOpen(card)}>
-      <span className="act-box">
-        <ActDot state={act.state} />
-      </span>
       <span className="q-main">
         <span className="q-title">
           <span className="title">{card.title}</span>

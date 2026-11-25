@@ -468,7 +468,8 @@ export function PrPanel({ card }: { card: Card }) {
   const req = card.requests.find((r) => r.id === card.waiting?.requestId);
   return (
     <div className="section waiting" data-testid="panel-pr-approval">
-      <PanelHead question={req?.question ?? `PR #${pr.number} awaits approval`} id={`PR #${pr.number}`} since={card.waiting?.since ?? null}>
+      {/* an open PR's number is the chip in the sheet's head: not said again here */}
+      <PanelHead question={req?.question ?? `PR #${pr.number} awaits approval`} id={pr.state === "open" ? undefined : `PR #${pr.number}`} since={card.waiting?.since ?? null}>
         <a href={`${pr.url}/files`} target="_blank" rel="noreferrer">
           Diff on GitHub
           <Ext />

@@ -395,12 +395,23 @@ test("Focus: one question with a ★ option: a click on the ★ tile sends it, a
 test("Focus: a click on the ★ option of a one-question decision sends it", async ({ page }) => {
   await startFocusOn(page, 185);
   await expect(page.getByTestId("tile-1")).toBeVisible();
-  // the ★ of a key of several words is read as the sheet reads it; the only tile with the agent's line
-  await expect(page.getByTestId("tile-1")).toContainText("The agent recommends this");
+  // the ★ of a key of several words is read as the sheet reads it; the only tile with ★ Recommended, its reason once under the tiles
+  await expect(page.getByTestId("tile-1").locator(".tile-rec")).toHaveText("Recommended");
   await expect(page.locator(".tile-rec")).toHaveCount(1);
+  await expect(page.getByTestId("why")).toContainText("It keeps the clear outlines you liked");
+  await expect(page.locator(".tile-check")).toHaveCount(0); // a click sends: no check on the preselected tile
+  await page.keyboard.press("n");
+  await expect(page.getByTestId("tile-1").locator(".tile-check")).toHaveCount(1); // with the note open a click only picks
+  await page.keyboard.press("Escape"); // leaves the field
+  await page.keyboard.press("Escape"); // cancels the note
+  await expect(page.getByTestId("note")).toHaveCount(0);
   // an option's Markdown is rendered, not shown raw
   await expect(page.getByTestId("tile-2").locator(".tile-text code")).toHaveText("Jetzt");
   await expect(page.getByTestId("tile-2")).not.toContainText("`");
+  // an option without a short key is no heading: its digit heads the tile, the line reads at text size
+  await expect(page.getByTestId("tile-4").locator(".tile-top b")).toHaveCount(0);
+  await expect(page.getByTestId("tile-4").locator(".tile-text")).toContainText("Or a mix");
+  await expect(page.getByTestId("tile-1").locator(".tile-top b")).toHaveText("H1 Sunlit Outline");
   await page.getByTestId("tile-1").click();
   await expect.poll(async () => (await written(page, 185)).answer).toBe("Decision D1: H1 Sunlit Outline");
 });

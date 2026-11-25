@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore, type MouseEvent } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore, type MouseEvent } from "react";
 import { boardOrder } from "../../core/card.ts";
 import { groupByDay, splitDone } from "../../core/days.ts";
 import { PHASES, type Card, type Phase } from "../../core/types.ts";
@@ -29,8 +29,12 @@ export function boardNavGroups(cards: Card[], openDays: Record<string, boolean>,
 /** All of them in one list (j/k skip Cards in collapsed days and lanes). */
 export const boardNavOrder = (cards: Card[], openDays: Record<string, boolean>, lanes: LaneView | null = null): Card[] => boardNavGroups(cards, openDays, lanes).flat();
 
+/** The Board is one tab stop (roving tabindex): the open Card, else the first on screen. j/k and the arrows move it. */
+const TabStop = createContext<string | null>(null);
+
 function BoardCard({ card }: { card: Card }) {
   const selected = useStore((s) => s.selected === card.key);
+  const stop = useContext(TabStop) === card.key;
   const marked = useStore((s) => s.marked.includes(card.key));
   const dragging = useStore((s) => !!s.drag?.keys.includes(card.key));
   const el = useRef<HTMLButtonElement>(null);
@@ -48,6 +52,7 @@ function BoardCard({ card }: { card: Card }) {
     <button
       ref={el}
       className="card"
+      tabIndex={stop ? 0 : -1}
       aria-selected={selected}
       aria-pressed={marked}
       data-card={card.key}
@@ -176,6 +181,21 @@ function Column({ phase, cards, head, testId, lane, verdicts }: { phase: Phase; 
 }
 
 export function BoardView({ cards }: { cards: Card[] }) {
+  const selected = useStore((s) => s.selected);
+  const openDays = useStore((s) => s.openDays);
+  const lanes = useLaneView();
+  const stop = useMemo(() => {
+    const order = boardNavOrder(cards, openDays, lanes);
+    return order.find((c) => c.key === selected)?.key ?? order[0]?.key ?? null;
+  }, [cards, openDays, lanes, selected]);
+  return (
+    <TabStop.Provider value={stop}>
+      <Board cards={cards} />
+    </TabStop.Provider>
+  );
+}
+
+function Board({ cards }: { cards: Card[] }) {
   const drag = useStore((s) => s.drag);
   const select = useStore((s) => s.select);
   const selected = useStore((s) => s.selected);
