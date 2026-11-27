@@ -14,6 +14,14 @@ WF_CHECKS_TSV="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/nu
 # cwd: the PR's worktree, after the base branch was merged in.
 wf_verify() { [ -d node_modules ] || npm ci --silent; E2E_PORT="${PORT:-4399}" npm run verify; }
 
+# cwd: the PR's worktree, on every prep. merge-pr.sh prep verifies only a head it changed (behind or unpushed); a lead's own run is scoped,
+# so the full gate runs here unless prep just verified this head (its prep-expect file names the pushed sha; retro W24).
+wf_prep_check() {
+  local f; f="$(git rev-parse --absolute-git-dir)/prep-expect"
+  if [ -f "$f" ] && [ "$(cut -d' ' -f1 "$f")" = "$(git rev-parse HEAD)" ]; then return 0; fi
+  wf_verify
+}
+
 # cwd: the main checkout, after the merge.
 wf_after_merge() {
   if [ "$(git branch --show-current)" != main ]; then echo "main checkout not on main: skipped the fast-forward"; return 0; fi

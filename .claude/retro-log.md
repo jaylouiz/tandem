@@ -14,6 +14,7 @@
 | 2026-11-15 | session 04e95acf (design rounds with further axes, PR #12) | 617 / 33 | 564 / 30 | 1050 | 2231 | profile +25 words (cross-repo git refused, no prettier); no convergence pass needed, no rule-overload |
 | 2026-11-24 | run_ee1bf230eab9 (#11 #14 #17 #18) | 829 / 5115 | 564 / 3883 | 1196 | 2589 | profile +134 words (W21-W23); no convergence needed |
 | 2026-11-27 | run_3b1436bdaba6 (#33 #35) | 876 / 5300 | 575 / 3954 | 1202 | 2653 | start 57404; no edits; 9 min friction |
+| 2026-11-27 | run_55dc23e83d43 (#32 #39) | - | 604 / 4207 | 1277 | - | start n/a; wf_prep_check added to issue-workflow.sh (W24); 5 min friction |
 
 ## Watch list
 | id | root cause | kind | target | seen | last | status |
@@ -41,4 +42,5 @@
 | W21 | dev server in an Orca worktree serves stale code/fixtures (8 min); first full E2E after a redesign is mostly timeouts (20 min); popover screenshot taken in the fade (3 min) | tool-failure | issue-workflow.md Prototype, Verification | 1 | run_ee1bf230eab9 | fixed 2026-11-24 issue-workflow.md: expect no stale-prototype or timeout-flood pass |
 | W22 | missing profile facts: no Copy section, liveDraftIds for new question panels | missing-instruction | issue-workflow.md Orchestration | 1 | run_ee1bf230eab9 | fixed 2026-11-24 issue-workflow.md: expect no rediscovery |
 | W23 | guard.sh loads the session cwd's project check for `gh pr create -R <other repo>`; Playwright MCP needs Chrome; merge-pr.sh prep/after only for the session's repo | tool-failure | orchestrate-gh-issues (agent-workflow) | 1 | run_ee1bf230eab9 | watching: user step, inbox issue in agent-workflow |
-| W24 | merge-pr.sh prep says ready for an up-to-date pushed head without wf_verify; lead ran one E2E file only | missing-instruction | agent-workflow bin/merge-pr.sh | 1 | run_3b1436bdaba6 | watching: agent-workflow#48 (inbox) |
+| W24 | merge-pr.sh prep says ready for an up-to-date pushed head without wf_verify; lead ran one E2E file only | missing-instruction | agent-workflow bin/merge-pr.sh | 2 | run_55dc23e83d43 | fixed 2026-11-27 .claude/issue-workflow.sh wf_prep_check (full verify unless prep just verified the head; seen again run_55dc23e83d43, PR #42 merged on 6 specs, full suite green after): expect prep to run npm verify for every PR; agent-workflow#48 still open for the general fix |
+| W25 | reviewer brief told it to edit the issue's E2E-at-risk line; auto mode denies issue edits (ownership is the PR body) | wrong-instruction | coordinator review brief | 1 | run_55dc23e83d43 | watching: brief puts missing specs in the Review section |
