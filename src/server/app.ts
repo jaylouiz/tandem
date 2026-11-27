@@ -267,7 +267,7 @@ export function createApp({ board, source, store, pusher, pages, version, reset,
     const path = store.state.repoPaths[repo] ?? (await pusher.knownPaths())[repo];
     if (!path) return c.json({ error: `No local checkout known for ${repo}. Set its path in Settings.` }, 400);
     // it starts with these numbers, so they count as handed
-    await handOver(repo, numbers, () => pusher.startCoordinator(repo, path, numbers), () => true, true);
+    await handOver(repo, numbers, () => pusher.startCoordinator(repo, path, numbers, board.workflow.coordinatorCommand), () => true, true);
     return c.json({ ok: true });
   });
 

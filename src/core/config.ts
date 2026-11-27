@@ -1,5 +1,5 @@
 // Phase mapping is configuration, not code (brief "Board model"). Defaults mirror the agent-workflow README
-// table "Clients such as Tandem group issues by phase" (status first, labels as the fallback); a user file (~/.tandem/config.json, key "workflow")
+// table "Clients such as Tandem group issues by phase" (status first, labels as the fallback); the developer's `~/.tandem/state.json` (key "workflow")
 // overrides any field.
 import type { NextStep, Phase } from "./types.ts";
 
@@ -55,6 +55,8 @@ export interface WorkflowConfig {
   closedLookbackDays: number;
   /** hours between two full fetches of a repo: the pass that drops issues GitHub no longer has (deleted, transferred, the repo recreated) */
   fullSyncHours: number;
+  /** the slash command "Start coordinator" launches, followed by the Card numbers (`<command> #<n> …`); a renamed coordinator skill is this one field */
+  coordinatorCommand: string;
 }
 
 export const DEFAULT_WORKFLOW: WorkflowConfig = {
@@ -89,6 +91,7 @@ export const DEFAULT_WORKFLOW: WorkflowConfig = {
   stuckAfterHours: 3,
   closedLookbackDays: 60,
   fullSyncHours: 6,
+  coordinatorCommand: "/aw-orchestrate",
 };
 
 export function mergeWorkflow(override: Partial<WorkflowConfig> | undefined): WorkflowConfig {
