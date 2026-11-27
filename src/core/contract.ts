@@ -1,5 +1,5 @@
 // Reads and writes the agent-workflow comment contract (agent-workflow README "Comment markers",
-// skills/orchestrate-gh-issues/decide.sh). Tandem acts as the user: everything it writes for the user is an
+// bin/decide.sh). Tandem acts as the user: everything it writes for the user is an
 // UNMARKED comment, because "any later comment without a marker counts as the user's".
 import type {
   AgentDecision,

@@ -952,7 +952,11 @@ describe("localhost guard (DNS rebinding, CSRF; SECURITY.md)", () => {
     expect((await post("/api/coordinator/start", { repo: "acme/not-on-board", numbers: [1] })).status).toBe(400);
     expect(spy).not.toHaveBeenCalled();
     expect((await post("/api/coordinator/start", { repo: "acme/app", numbers: [105, 106] })).status).toBe(200);
-    expect(spy).toHaveBeenCalledWith("acme/app", "/tmp/acme/app", [105, 106]);
+    expect(spy).toHaveBeenCalledWith("acme/app", "/tmp/acme/app", [105, 106], "/aw-orchestrate");
+    // a renamed coordinator skill is a config change (#33): the developer's override is what Start coordinator launches
+    store.state.workflow = { coordinatorCommand: "/my-coordinator" };
+    expect((await post("/api/coordinator/start", { repo: "acme/app", numbers: [105] })).status).toBe(200);
+    expect(spy).toHaveBeenLastCalledWith("acme/app", "/tmp/acme/app", [105], "/my-coordinator");
   });
 
   it("checks the repo and number of every card route", async () => {

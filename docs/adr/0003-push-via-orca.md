@@ -17,3 +17,7 @@ Tandem has no agent operations layer. Feedback must reach the running `/orchestr
 
 - Coordinators must handle `tandem push:` messages (agent-workflow issue).
 - A coordinator that ran `/clear` but kept its terminal still counts as live. Its Run then gets the message, and the next real coordinator sweep picks the Feedback up from GitHub anyway.
+
+## Note, 2026-11-27 (#33)
+
+agent-workflow renamed its skills with an `aw-` prefix (agent-workflow#29): the coordinator skill named `/orchestrate-gh-issues` above is now `/aw-orchestrate`. The decision stands. "Start coordinator" no longer hard-codes the name: it launches `<coordinatorCommand> #<n>`, where `coordinatorCommand` is a field of the workflow config (`DEFAULT_WORKFLOW` in `src/core/config.ts`, default `/aw-orchestrate`; `~/.tandem/state.json` key `workflow` overrides it, ADR 0004), so the next rename is a config change. The Push subject `tandem push: <owner/repo>#<n> <feedback|start>` does not carry the skill name and is unchanged.

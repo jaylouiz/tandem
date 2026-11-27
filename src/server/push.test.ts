@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NO_RUN } from "../core/types.ts";
-import { OrcaPusher, pushBody, pushSubject, type Exec } from "./push.ts";
+import { DEFAULT_WORKFLOW, mergeWorkflow } from "../core/config.ts";
+import { coordinatorPrompt, OrcaPusher, pushBody, pushSubject, type Exec } from "./push.ts";
 
 /** A stubbed `orca` + `git`: the Orca CLI is never called for real. */
 function orcaStub() {
@@ -152,5 +153,40 @@ describe("finding the Run to send to (only for a Push: the Board never shows it,
     o.terminals.push({ handle: "term_w", connected: true, worktreePath: "/w/app/wt" }, { handle: "term_t", connected: true, worktreePath: "/w/tandem" });
     o.remotes["/w/app/wt"] = o.remotes["/w/app"]!;
     expect(await new OrcaPusher(o.run).knownPaths()).toEqual({ [repo]: "/w/app", "acme/tandem": "/w/tandem" });
+  });
+});
+
+describe("Start coordinator: the launched prompt comes from the workflow config (#33)", () => {
+  const launches = (o: ReturnType<typeof orcaStub>) => o.calls.filter((c) => c[1] === "agent" && c[2] === "launch");
+
+  it("launches the default coordinator skill with the Card numbers in the repo's checkout", async () => {
+    expect(DEFAULT_WORKFLOW.coordinatorCommand).toBe("/aw-orchestrate");
+    const o = orcaStub();
+    await new OrcaPusher(o.run).startCoordinator(repo, "/w/app", [7], DEFAULT_WORKFLOW.coordinatorCommand);
+    expect(launches(o)).toEqual([["orca", "agent", "launch", "--agent", "claude", "--worktree", "path:/w/app", "--prompt", "/aw-orchestrate #7", "--json"]]);
+  });
+
+  it("several Cards go into one prompt", () => {
+    expect(coordinatorPrompt("/aw-orchestrate", [105, 106])).toBe("/aw-orchestrate #105 #106");
+  });
+
+  it("a renamed skill is a config change: the user's override is what gets launched", async () => {
+    const o = orcaStub();
+    await new OrcaPusher(o.run).startCoordinator(repo, "/w/app", [7, 9], mergeWorkflow({ coordinatorCommand: "/my-coordinator" }).coordinatorCommand);
+    const args = launches(o)[0]!;
+    expect(args[args.indexOf("--prompt") + 1]).toBe("/my-coordinator #7 #9");
+  });
+
+  it("an override that is blank or not text launches the default, never a prompt of bare numbers", () => {
+    expect(coordinatorPrompt("  ", [7])).toBe("/aw-orchestrate #7");
+    expect(coordinatorPrompt(" /x ", [7])).toBe("/x #7");
+    expect(coordinatorPrompt(42 as unknown as string, [7])).toBe("/aw-orchestrate #7");
+  });
+
+  it("the Push subject and body do not carry the skill name: a rename leaves a running coordinator's contract alone", () => {
+    expect(pushSubject("acme/app", 7, "feedback")).toBe("tandem push: acme/app#7 feedback");
+    expect(pushSubject("acme/app", 7, "start")).toBe("tandem push: acme/app#7 start");
+    expect(pushBody("acme/app", 7, "start", "build")).not.toMatch(/orchestrate/);
+    expect(pushBody("acme/app", 7, "feedback", "D1 answered")).not.toMatch(/orchestrate/);
   });
 });

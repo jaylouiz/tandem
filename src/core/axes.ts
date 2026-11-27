@@ -1,5 +1,5 @@
 // Axes of a design round. A round that asks more than one question in one prototype (a design batch, agent-workflow
-// design-gh-issue "Several issues on one surface") has the main variants (`a`, `b`, `c`) and further axes the developer
+// aw-ui-design "Several issues on one surface") has the main variants (`a`, `b`, `c`) and further axes the developer
 // combines freely with them (`slide`: `o`, `a`). A variant of a further axis is keyed `<axis>=<option>` (`slide=a`), so
 // screenshots, picks and rejects stay plain string keys; a main variant keeps its bare key, as in a one-question round.
 import type { DesignRound } from "./types.ts";

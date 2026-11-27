@@ -1,9 +1,10 @@
-// Push: tell the running /orchestrate-gh-issues coordinator that Feedback arrived or a Card should start
+// Push: tell the running coordinator (agent-workflow's /aw-orchestrate) that Feedback arrived or a Card should start
 // (ADR 0003). Tandem never types into terminals and never runs agents itself; it only sends an Orca
 // orchestration message to the coordinator's Run, or launches a coordinator when the developer asks.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { DEFAULT_WORKFLOW } from "../core/config.ts";
 import { NO_RUN } from "../core/types.ts";
 
 /** The Run a Push for a repo is sent to: found at the moment of the Push, never shown as a state (#14). */
@@ -26,11 +27,21 @@ export interface Pusher {
   /** local checkout paths Orca knows, per repo (to start a coordinator) */
   knownPaths(): Promise<Record<string, string>>;
   push(repo: string, number: number, event: PushEvent, text: string): Promise<PushResult>;
-  startCoordinator(repo: string, path: string, numbers: number[]): Promise<void>;
+  /** `command`: the workflow config's `coordinatorCommand` */
+  startCoordinator(repo: string, path: string, numbers: number[], command: string): Promise<void>;
 }
 
 /** Subject line a coordinator matches on: `tandem push: <owner/repo>#<n> <feedback|start>`. */
 export const pushSubject = (repo: string, n: number, event: PushEvent) => `tandem push: ${repo}#${n} ${event}`;
+
+/**
+ * The prompt "Start coordinator" launches: the configured command, then the Card numbers. An override that is blank or not text
+ * launches the default: a prompt of bare numbers would start an agent with no skill.
+ */
+export function coordinatorPrompt(command: string, numbers: number[]) {
+  const cmd = (typeof command === "string" && command.trim()) || DEFAULT_WORKFLOW.coordinatorCommand;
+  return `${cmd} ${numbers.map((n) => `#${n}`).join(" ")}`;
+}
 
 export function pushBody(repo: string, n: number, event: PushEvent, text: string) {
   return event === "feedback"
@@ -171,9 +182,9 @@ export class OrcaPusher implements Pusher {
     return { delivered: true, runId: c.runId, reason: null };
   }
 
-  async startCoordinator(repo: string, path: string, numbers: number[]) {
+  async startCoordinator(repo: string, path: string, numbers: number[], command: string) {
     this.cache = null;
-    await orca(this.run, ["agent", "launch", "--agent", "claude", "--worktree", `path:${path}`, "--prompt", `/orchestrate-gh-issues ${numbers.map((n) => `#${n}`).join(" ")}`]);
+    await orca(this.run, ["agent", "launch", "--agent", "claude", "--worktree", `path:${path}`, "--prompt", coordinatorPrompt(command, numbers)]);
   }
 }
 

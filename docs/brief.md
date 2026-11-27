@@ -53,7 +53,7 @@ The Board shows Cards from the repos the developer opts into, across all of them
 
 Tandem has **no agent operations layer of its own**: it does not run, host or supervise agents. When the developer gives Feedback, or hands a Card to an agent, Tandem pushes it on through the local Orca CLI (`orca`; see `orca agent-context` for its schema):
 
-- The Push goes to the running `/orchestrate-gh-issues` coordinator, which already knows how to resume parked issues.
+- The Push goes to the running `/aw-orchestrate` coordinator, which already knows how to resume parked issues.
 - Tandem never types into worker terminals and never changes the developer's own Orca or Claude Code setup.
 - Tandem does not show whether a coordinator is running (#14): it cannot know reliably. A Card with answered Feedback shows "Feedback given, awaiting pickup". A Push that finds no Orca Run to send to says so and offers to start a coordinator.
 - Push is on by default and can be switched off for a single piece of Feedback.
@@ -77,7 +77,7 @@ Tandem relies on these. File them as issues in the agent-workflow repo; Tandem o
 
 ## Decide yourself
 
-UI and interaction design, information architecture, tech stack, how GitHub data is fetched and kept fresh, packaging and launch, how the coordinator is found, and the Seen store. Use the developer's workflow for it: Design for the UX (`/design-gh-issue`), then Specify and Build.
+UI and interaction design, information architecture, tech stack, how GitHub data is fetched and kept fresh, packaging and launch, how the coordinator is found, and the Seen store. Use the developer's workflow for it: Design for the UX (`/aw-ui-design`), then Specify and Build.
 
 ## Out of scope
 
