@@ -1,12 +1,14 @@
 # shellcheck shell=bash
-# issue-workflow config: tandem. Sourced by the orchestrate-gh-issues scripts. Prose facts: .claude/issue-workflow.md.
+# issue-workflow config: tandem. Sourced by the agent-workflow scripts (spec.sh, merge-pr.sh, guard.sh). Prose facts: .claude/issue-workflow.md.
+# Check the result with: bash ~/.claude/agent-workflow/bin/settings.sh show
 
 WF_PORTS=4401-4405                    # one per worker: API on <port>, Vite on <port+100>, E2E_PORT=<port>
+WF_PROTO_PORTS=4411-4419              # prototype previews that stay up while a design decision waits (Vite on <port+100>); outside WF_PORTS
 WF_MAX_WORKERS=3
 WF_RISK_GLOBS=('src/core/contract.ts' 'src/core/card.ts' 'src/core/config.ts' 'src/server/github.ts' 'src/server/board.ts' 'src/server/push.ts')
 WF_IGNORE_GLOBS=(package-lock.json '*.md' 'docs/**')
 WF_REVIEW_LINES=400
-WF_HOLD_LABELS="on-hold-after-spec do-not-merge"
+WF_HOLD_LABELS="on-hold on-hold-after-spec do-not-merge"   # hold a merge; on-hold (Tandem's Hold Card) also stops every stage start (agent-workflow docs/contract.md)
 WF_CHECKS_TSV="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/agent-ledgers/checks.tsv"
 
 # cwd: the PR's worktree, after the base branch was merged in.
