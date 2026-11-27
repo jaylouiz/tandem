@@ -1,6 +1,6 @@
-// Reads and writes the agent-workflow comment contract (agent-workflow README "Comment markers",
-// bin/decide.sh). Tandem acts as the user: everything it writes for the user is an
-// UNMARKED comment, because "any later comment without a marker counts as the user's".
+// Reads and writes the agent-workflow board client contract: agent-workflow docs/contract.md (the comments under
+// "Comment markers" to "Replies a client writes", written by bin/decide.sh). Tandem acts as the user: everything it
+// writes for the user is an UNMARKED comment, because "a comment without a marker is the user's".
 import type {
   AgentDecision,
   DecisionRequest,
@@ -12,6 +12,12 @@ import type {
 } from "./types.ts";
 import { axisKey, byAxis } from "./axes.ts";
 import { roundQuestions } from "./questions.ts";
+
+/**
+ * The version of agent-workflow's docs/contract.md ("Board client contract v<n>") that Tandem implements: the one place it is
+ * recorded. `contract-v1.test.ts` holds it against the golden fixtures vendored in ./contract-fixtures (their revision: PIN.json).
+ */
+export const CONTRACT_VERSION = 1;
 
 const MARKER = /<!--\s*decision-([a-z]+)(?:\s+([^>]*?))?\s*-->/;
 
@@ -121,7 +127,7 @@ export interface ThreadDigest {
 
 /**
  * Which marked comment each unmarked comment replies to: index of the marked comment -> its replies in thread order.
- * One rule, read the same way by agent-workflow's `decide.sh` (scan/status/digest, jaylouiz/agent-workflow#16):
+ * One rule (agent-workflow docs/contract.md "Comment markers"), read the same way by `bin/decide.sh` (scan/status/digest, jaylouiz/agent-workflow#16):
  * 1. an unmarked comment whose first text is `Decision D<k>:` (what Tandem writes on every answer, challenge and verdict, #1) or
  *    `D<k>:` (what it wrote before, and what a person types), with a `request`/`record` D<k> earlier in the thread, belongs to
  *    that decision (so a challenge to D2 written while D3 is open stays D2's);

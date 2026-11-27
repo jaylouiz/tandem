@@ -1,0 +1,30 @@
+{
+  "repo": "jaylouiz/agent-workflow",
+  "path": "docs/contract-fixtures",
+  "revision": "467191a9e6895058f8b48c8f5db7598e67d8209b",
+  "contract": 1,
+  "files": {
+    "answer.json": "c4cab16278bb964c9605576dea8e38736403223350c7a6e1e2cb1385336ec40e",
+    "answer.md": "6ec13bbd0737e83d81b4c74fef06ddf3c229b332c9e2717d5192084c3698f635",
+    "answers.json": "10e164b5847d48d5e6172f215a9291ec9992e42e88b202b27c25dffbbf0f7969",
+    "coordination-log.json": "534d38fd101c46083b4d702da6d0f50244b4b5f1be5af65c389cf3266603e331",
+    "coordination-log.md": "15bb2f3d671a90081b9930141a36be6fefeceecf4be6df1d23448e5965bb483f",
+    "followup.json": "c5d6be874098006bb8b73a5a0d7fcc20ae1c992f2b0bdb26024d215f25089114",
+    "followup.md": "51ea7ffeb154549a6be5fa4f6c692648e8b0c8665ed0cd7deff74185a35f2611",
+    "look.json": "0cfa252d481e78df5c8f6eafd2e9cede4894f5bb4d1cbf98672d165fe68d2912",
+    "look.md": "d210aaed8ded32f495557b895b2b4764b68890057015520caa793b33d8781ad7",
+    "manifest.json": "f9f653625b61630cae08d4a8eecc9f310bb09d961ffbc155c21497e919c7035c",
+    "record.json": "43e653a1739624aeb4d8632d7508ec9de96be4437ce8c85eeb0a02ca71a549d2",
+    "record.md": "caaea27a90f8dd578079c58d6f2eee29f2ef719d9a5edc3f2bfc00762af0a160",
+    "request-multi.json": "82b7df63fe137ca1a01bf2f536cb11751212d3329ef0e103d89ffc68b8ed4515",
+    "request-multi.md": "ea2a140e0657171b23c46faa905adce4ca08f6d3b68cceb5a49725f8a74d116f",
+    "request-open.json": "1e16ea3221aa00f91ce8f1e316df2f28f149e8405d80d279f1e7d02d1645415a",
+    "request-open.md": "784bcaa5ef5ee50f8b1d09849e2943d458d783826e93aa1aea685fc70bdbe6f5",
+    "request-single.json": "c3847d80a183fe2f79cded556fde9095231b04390eb2f1c13b36ae48e4af06fa",
+    "request-single.md": "ffdf86b8cf29490fb9663f607b065fb86b5ac731fcb665aca476691ade364a1c",
+    "resolved.json": "b1a9bea0da7aa79755931426527dc3c3fecc71bb8fdc0fe9e502ce14c448decb",
+    "resolved.md": "a9d040aa1c8fd7a7907bbe3a33a401025367e0d264df1481c91f098a5a773861",
+    "round.json": "14af2b5d4cf738dbd1896130b4d676e48984c8561b44b98209cb25b534b1d9ab",
+    "round.md": "20b2f1720cb2cd913139db3700fa854fde3e3c0d5c308be75d3bfc86bcd460ac"
+  }
+}

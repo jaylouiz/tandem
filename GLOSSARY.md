@@ -73,7 +73,7 @@ An orchestration run in Orca: where a Push is sent (`run:<id>`). Tandem looks on
 _Avoid_: coordinator state, session
 
 **On hold**:
-A Card the developer parked with the hold label (Hold Card in the Card's More menu, key `h`; Release hold takes it back). An agent does not pick it up. Not the same as **Hold merge**, the verdict on a PR approval that keeps the PR open. The toast says "Held" or "Released".
+A Card the developer parked with the hold label (Hold Card in the Card's More menu, key `h`; Release hold takes it back). No stage starts on it and its pull request is not merged, as agent-workflow reads the label `on-hold` (its `docs/contract.md`, "Labels"); Hand to agent is not offered for it. Not the same as **Hold merge**, the verdict on a PR approval that keeps the PR open. The toast says "Held" or "Released".
 _Avoid_: pause, freeze, a bare "Hold" on a control (it names both)
 
 **Agent activity**:

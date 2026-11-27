@@ -26,6 +26,7 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "verify": "npm run check:selectors && npm run check:e2e-reset && npm run typecheck && npm run test && npm run build && npm run e2e",
+    "contract:update": "node scripts/update-contract-fixtures.mjs",
     "check:e2e-reset": "! grep -rlE --include='*.ts' '@playwright/test' e2e --exclude=fixtures.ts || (echo 'a spec imports @playwright/test: import test and expect from ./fixtures.ts, which resets the fixture server before every test (CLAUDE.md)' && false)",
     "check:selectors": "! grep -rnE 'useStore\\(.*\\?\\? *(\\[\\]|\\{\\})' src/web || (echo 'zustand selector returns a fresh literal: use a module constant (CLAUDE.md)' && false)"
   },

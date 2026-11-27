@@ -20,3 +20,7 @@ A Card's Phase came from conventions only Tandem and agent-workflow read (`phase
 - Lanes, holds, `inbox` and `needs-decision` stay labels: no status fits them.
 - With an agent-workflow that writes labels only, a Card that returns from UX Design to Backlog still reads as handed (Todo was never taken back); hold and release clears it.
 - The cut-over is a switch in agent-workflow and, later, the removal of the two label rules here.
+
+## Note, 2026-11-27 (#32)
+
+The statuses agent-workflow writes, and `Todo` as the one status a client writes, are part of its board client contract v1 (`docs/contract.md`, "Phases and statuses"), which Tandem pins (ADR 0004, note of the same day).

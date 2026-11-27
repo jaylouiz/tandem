@@ -1,4 +1,4 @@
-// The question level of a decision (agent-workflow docs/decision-format.md): what a request's hidden `choices` lines and a round's
+// The question level of a decision (agent-workflow docs/contract.md "Request" and "Round and options note"; the human side is docs/decision-format.md): what a request's hidden `choices` lines and a round's
 // question sections say, and from them the one thing a Card asks (`askOf`). Pure and read-only: what is written lives in `answer.ts`.
 import type { Card, DecisionRequest, DesignRound, Question, QuestionOption, Screenshot } from "./types.ts";
 
@@ -29,6 +29,9 @@ export function choicesOf(body: string): Question[] {
     }),
   }));
 }
+
+/** The comment that describes a request's options: the link after `Options with screenshots:`, or null. */
+export const overviewOf = (body: string): string | null => /Options with screenshots:\s*(\S+)/.exec(body)?.[1] ?? null;
 
 /** The question a screenshot belongs to, from its alt `R<k> · <n>. <label> · <what it shows>`; null for any other alt. */
 export const shotQuestion = (s: Pick<Screenshot, "alt">): number | null => {
@@ -113,7 +116,7 @@ export function askQuestions(card: Pick<Card, "waiting" | "requests" | "rounds">
       return { ...q, about: s.about, why: s.why, shots: s.shots, options: q.options.map((o) => ({ ...o, short: described(o.letter)?.short ?? "", name: described(o.letter)?.name ?? o.name })) };
     });
     if (questions.every((q) => q.options.length >= 2))
-      return { ...base, round: sections.length && round ? round.round : null, questions, overview: (sections.length ? round?.url : null) ?? /Options with screenshots:\s*(\S+)/.exec(req.body)?.[1] ?? null, legacy: false };
+      return { ...base, round: sections.length && round ? round.round : null, questions, overview: (sections.length ? round?.url : null) ?? overviewOf(req.body), legacy: false };
   }
   if (round) return null;
   const list = listQuestion(req);

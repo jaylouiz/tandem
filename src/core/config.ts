@@ -1,5 +1,5 @@
-// Phase mapping is configuration, not code (brief "Board model"). Defaults mirror the agent-workflow README
-// table "Clients such as Tandem group issues by phase" (status first, labels as the fallback); the developer's `~/.tandem/state.json` (key "workflow")
+// Phase mapping is configuration, not code (brief "Board model"). Defaults mirror agent-workflow docs/contract.md, "Labels" and
+// "Phases and statuses" (status first, labels as the fallback); the developer's `~/.tandem/state.json` (key "workflow")
 // overrides any field.
 import type { NextStep, Phase } from "./types.ts";
 
@@ -31,7 +31,7 @@ export interface WorkflowConfig {
   startedStatuses: string[];
   /** the status a handed Card goes back to when it is re-steered or its Push did not arrive (a status cannot be cleared) */
   unhandedStatus: string;
-  /** labels that put a Card on hold */
+  /** labels that put a Card on hold: `on-hold` (no stage starts, no merge) and the workflow's merge holds (docs/contract.md "Labels") */
   holdLabels: string[];
   /** the hold label Tandem itself sets and clears (the others belong to the workflow) */
   holdLabel: string;
@@ -40,7 +40,7 @@ export interface WorkflowConfig {
   /** label that marks agent decisions the user has not reviewed */
   agentDecidedLabel: string;
   needsDecisionLabel: string;
-  /** an Inbox Card that needs /wayfinder first: no Next step (agents never start wayfinder) */
+  /** fog (docs/contract.md "Labels"): the direction is open and the developer sets it, so the Card has no Next step and agents never start it */
   fogLabel: string;
   /** priority labels are `<prefix><n>` (1 highest), at most one per Card */
   priorityLabelPrefix: string;
@@ -83,7 +83,7 @@ export const DEFAULT_WORKFLOW: WorkflowConfig = {
   lookLabels: ["ux-impact"],
   agentDecidedLabel: "agent-decided",
   needsDecisionLabel: "needs-decision",
-  fogLabel: "needs-wayfinder",
+  fogLabel: "needs-direction",
   priorityLabelPrefix: "priority:",
   wayfinderMapLabel: "wayfinder:map",
   wayfinderTicketPrefix: "wayfinder:",
