@@ -160,14 +160,14 @@ describe("Start coordinator: the launched prompt comes from the workflow config 
   const launches = (o: ReturnType<typeof orcaStub>) => o.calls.filter((c) => c[1] === "agent" && c[2] === "launch");
 
   it("launches the default coordinator skill with the Card numbers in the repo's checkout", async () => {
-    expect(DEFAULT_WORKFLOW.coordinatorCommand).toBe("/aw-orchestrate");
+    expect(DEFAULT_WORKFLOW.coordinatorCommand).toBe("/aw-coordinate");
     const o = orcaStub();
     await new OrcaPusher(o.run).startCoordinator(repo, "/w/app", [7], DEFAULT_WORKFLOW.coordinatorCommand);
-    expect(launches(o)).toEqual([["orca", "agent", "launch", "--agent", "claude", "--worktree", "path:/w/app", "--prompt", "/aw-orchestrate #7", "--json"]]);
+    expect(launches(o)).toEqual([["orca", "agent", "launch", "--agent", "claude", "--worktree", "path:/w/app", "--prompt", "/aw-coordinate #7", "--json"]]);
   });
 
   it("several Cards go into one prompt", () => {
-    expect(coordinatorPrompt("/aw-orchestrate", [105, 106])).toBe("/aw-orchestrate #105 #106");
+    expect(coordinatorPrompt("/aw-coordinate", [105, 106])).toBe("/aw-coordinate #105 #106");
   });
 
   it("a renamed skill is a config change: the user's override is what gets launched", async () => {
@@ -178,15 +178,15 @@ describe("Start coordinator: the launched prompt comes from the workflow config 
   });
 
   it("an override that is blank or not text launches the default, never a prompt of bare numbers", () => {
-    expect(coordinatorPrompt("  ", [7])).toBe("/aw-orchestrate #7");
+    expect(coordinatorPrompt("  ", [7])).toBe("/aw-coordinate #7");
     expect(coordinatorPrompt(" /x ", [7])).toBe("/x #7");
-    expect(coordinatorPrompt(42 as unknown as string, [7])).toBe("/aw-orchestrate #7");
+    expect(coordinatorPrompt(42 as unknown as string, [7])).toBe("/aw-coordinate #7");
   });
 
   it("the Push subject and body do not carry the skill name: a rename leaves a running coordinator's contract alone", () => {
     expect(pushSubject("acme/app", 7, "feedback")).toBe("tandem push: acme/app#7 feedback");
     expect(pushSubject("acme/app", 7, "start")).toBe("tandem push: acme/app#7 start");
-    expect(pushBody("acme/app", 7, "start", "build")).not.toMatch(/orchestrate/);
-    expect(pushBody("acme/app", 7, "feedback", "D1 answered")).not.toMatch(/orchestrate/);
+    expect(pushBody("acme/app", 7, "start", "build")).not.toMatch(/coordinate/);
+    expect(pushBody("acme/app", 7, "feedback", "D1 answered")).not.toMatch(/coordinate/);
   });
 });

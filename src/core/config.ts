@@ -91,7 +91,7 @@ export const DEFAULT_WORKFLOW: WorkflowConfig = {
   stuckAfterHours: 3,
   closedLookbackDays: 60,
   fullSyncHours: 6,
-  coordinatorCommand: "/aw-orchestrate",
+  coordinatorCommand: "/aw-coordinate",
 };
 
 export function mergeWorkflow(override: Partial<WorkflowConfig> | undefined): WorkflowConfig {

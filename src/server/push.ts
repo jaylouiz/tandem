@@ -1,4 +1,4 @@
-// Push: tell the running coordinator (agent-workflow's /aw-orchestrate) that Feedback arrived or a Card should start
+// Push: tell the running coordinator (agent-workflow's /aw-coordinate) that Feedback arrived or a Card should start
 // (ADR 0003). Tandem never types into terminals and never runs agents itself; it only sends an Orca
 // orchestration message to the coordinator's Run, or launches a coordinator when the developer asks.
 import { execFile } from "node:child_process";
