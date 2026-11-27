@@ -14,7 +14,7 @@ Issue and PR numbers `#n` up to 70 in code, docs and commit history refer to the
 
 ## Layout
 
-- `src/core`: pure domain shared by server and web: `contract.ts` (agent-workflow comment markers: read and write), `card.ts` (Phase, Next step, handed, Waiting on me, Look/Seen), `config.ts` (Phase rules: GitHub's issue status first, labels as the fallback; ADR 0006), `fixtures.ts` (demo threads in the exact agent-workflow shapes)
+- `src/core`: pure domain shared by server and web: `contract.ts` (agent-workflow's board client contract, its `docs/contract.md`: comments read and written; `CONTRACT_VERSION`), `contract-fixtures/` (the contract's golden fixtures, vendored at the revision in `PIN.json` and read by `contract-v1.test.ts`; never edit by hand: `npm run contract:update -- <revision>`), `card.ts` (Phase, Next step, handed, Waiting on me, Look/Seen), `config.ts` (Phase rules: GitHub's issue status first, labels as the fallback; ADR 0006), `fixtures.ts` (demo threads in the exact agent-workflow shapes)
 - `src/server`: `github.ts` (gh token, ETag poll, GraphQL), `fixture.ts`, `board.ts` (cache + snapshots), `push.ts` (Orca), `notifier.ts` (desktop notifications when no page), `launchd.ts` + `version.ts` (agent, build stamp), `store.ts` (`~/.tandem`), `app.ts` (API + SSE)
 - `src/web`: React SPA; `store.ts` (zustand: SSE snapshot + optimistic patches), `route.ts` + `routing.ts` (URL sync, #48), `components/` (`focus/`: the covers of Focus, where an option sends on a click), `feedback/` (what an answer is and how it is sent, shared by the Card pane's panels and Focus), `focus/` (one Focus visit: stage, receipt, its keys), `ui/` (Base UI wrappers, the only importers of `@base-ui/react`; ADR 0005)
 

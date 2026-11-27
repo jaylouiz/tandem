@@ -1,12 +1,14 @@
 # issue-workflow profile: tandem
 
+<!-- profile-template: 1 -->
+
 <!-- Read by the agent-workflow skills (https://github.com/jaylouiz/agent-workflow). Project facts only; commands and
      invariants live in CLAUDE.md. -->
 
 ## Labels
 
-- lanes: `needs-design` → `needs-spec` → `ready`; phases `phase:design`, `phase:build` (agent-workflow README)
-- hold: `on-hold-after-spec` = stop after Specify; `do-not-merge`
+- lanes: `needs-design` → `needs-spec` → `ready`; phases `phase:design`, `phase:build` (agent-workflow `docs/contract.md`, "Phases and statuses")
+- hold: `on-hold` (Tandem's Hold Card) always stops every stage start and the merge; `on-hold-after-spec` = stop after Specify; `do-not-merge`
 - context labels triage may add: `enhancement`, `bug`, `polish`, `a11y`, `ux-impact`
 - `inbox` and `wayfinder:*` issues are never in a lane
 
@@ -15,7 +17,11 @@
 - product: `docs/brief.md` (user jobs 1-13, Board model, Push, hard requirements), `GLOSSARY.md` (use its terms in code, UI copy and issues)
 - architecture: `docs/adr/` (0001 local web app, 0002 GitHub sync, 0003 Push via Orca, 0004 config and local state, 0006 native issue status)
 - design system: `DESIGN.md` (direction, tokens, named rules; written by `/impeccable document`), implemented as tokens in `src/web/styles.css` (`:root` with `light-dark()`; dark follows `prefers-color-scheme` unless `[data-theme]`). Update DESIGN.md when a token or named rule changes
-- the contract Tandem reads and writes: agent-workflow README ("Comment markers", phase table) and `skills/orchestrate-gh-issues/decide.sh`; Tandem's side is `src/core/contract.ts`
+- the contract Tandem reads and writes: agent-workflow `docs/contract.md` (board client contract v1; written by `bin/decide.sh`); Tandem's side is `src/core/contract.ts` (`CONTRACT_VERSION`), pinned by the golden fixtures in `src/core/contract-fixtures/`
+
+## Jobs
+
+- list: `docs/brief.md` "User jobs" (numbered 1-13)
 
 ## Design quality
 
@@ -75,6 +81,7 @@ none
 
 - gate command: `npm run verify` (typecheck, vitest, build, Playwright E2E on the built app with demo data)
 - E2E port: `E2E_PORT=<port> npm run e2e`; output outside the worktree: `E2E_OUT=<scratchpad>/e2e`
+- repeat-run command: `E2E_PORT=<port> npx playwright test <spec> -g "<test>" --repeat-each=<n> --retries=0 --workers=1` (10 runs for a new timing test, 30 for a flake proof)
 - unit tests next to the code (`*.test.ts`); E2E in `e2e/`
 - E2E shares one fixture server, reset before every test (`e2e/fixtures.ts` auto-fixture → `POST /api/fixture/reset`, fixture mode only): specs import `test`/`expect` from `./fixtures.ts` (`npm run check:e2e-reset`), start from boot-state demo data and may change any Card; new demo Cards go in `src/core/fixtures.ts` (numbers are unit-tested unique); `--repeat-each` is safe on any test with `--workers=1` only (several workers reset the one server under each other: every test that writes fails at random)
 - E2E intercepts (`page.route`) go in before `page.goto`: one registered a few ms before the key or click that sends is not always in force yet, and the write reaches the server
@@ -106,4 +113,5 @@ none
 
 - running log: `.claude/retro-log.md`
 - context files: `~/.claude/CLAUDE.md`, `CLAUDE.md`, this profile, the agent-workflow skills
+- metric sources: the gate log `WF_CHECKS_TSV` (`.claude/issue-workflow.sh`) and the run's friction ledgers
 - edits land: project facts here or in CLAUDE.md, committed on the PR branch or directly on main for docs-only changes

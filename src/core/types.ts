@@ -44,7 +44,7 @@ export interface RawPullRequest {
   updatedAt: string;
 }
 
-/** A marked agent comment (`<!-- decision-<kind> … -->`), see agent-workflow README "Comment markers". */
+/** A marked agent comment (`<!-- decision-<kind> … -->`), see agent-workflow docs/contract.md "Comment markers". */
 export type MarkerKind = "request" | "record" | "answer" | "resolved" | "followup" | "note";
 
 export interface Marker {
@@ -171,7 +171,7 @@ export interface Card {
   onHold: boolean;
   /** 1 (highest) to 3 from a `priority:<n>` label, or null */
   priority: number | null;
-  /** carries the fog label: needs /wayfinder before it has a Next step */
+  /** carries the fog label (the direction is open, the developer sets it): no Next step until it is cleared */
   fog: boolean;
   createdAt: string;
   updatedAt: string;

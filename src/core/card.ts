@@ -34,7 +34,7 @@ export function priorityOf(labels: string[], cfg: WorkflowConfig): number | null
   return ns.length ? Math.min(...ns) : null;
 }
 
-/** A fog Card has no Next step until it is cleared (agents never start wayfinder). */
+/** A fog Card has no Next step until it is cleared (the developer sets the direction; agents never do). */
 export function nextStepOf(labels: string[], cfg: WorkflowConfig): NextStep | null {
   if (labels.includes(cfg.fogLabel)) return null;
   for (const [label, step] of Object.entries(cfg.nextStep)) if (labels.includes(label)) return step;

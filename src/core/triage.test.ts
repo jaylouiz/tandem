@@ -110,23 +110,23 @@ describe("fog (needs wayfinder)", () => {
     expect(fog()).toMatchObject({ fog: true, phase: "Inbox", nextStep: null });
   });
   it("toggles the fog label on an Inbox Card; a set clears only when every Card has it", () => {
-    expect(triageLabels({ kind: "fog" }, card(101), cfg)).toEqual({ add: ["needs-wayfinder"], remove: [] });
-    expect(triageLabels({ kind: "fog" }, fog(), cfg)).toEqual({ add: [], remove: ["needs-wayfinder"] });
-    expect(planTriage({ kind: "fog" }, [fog(), card(101)], cfg).steps.map((s) => [s.card.number, s.change.add])).toEqual([[101, ["needs-wayfinder"]]]);
-    expect(planTriage({ kind: "fog" }, [fog()], cfg).steps[0]!.change.remove).toEqual(["needs-wayfinder"]);
+    expect(triageLabels({ kind: "fog" }, card(101), cfg)).toEqual({ add: ["needs-direction"], remove: [] });
+    expect(triageLabels({ kind: "fog" }, fog(), cfg)).toEqual({ add: [], remove: ["needs-direction"] });
+    expect(planTriage({ kind: "fog" }, [fog(), card(101)], cfg).steps.map((s) => [s.card.number, s.change.add])).toEqual([[101, ["needs-direction"]]]);
+    expect(planTriage({ kind: "fog" }, [fog()], cfg).steps[0]!.change.remove).toEqual(["needs-direction"]);
   });
   it("is not offered past the Inbox", () => {
     expect(skipReason({ kind: "fog" }, card(103))).toBe("Backlog");
     expect(skipReason({ kind: "fog" }, card(108))).toBe("Done");
   });
   it("a Next step clears the marker and the inbox label", () => {
-    expect(triageLabels({ kind: "next", step: "specify" }, fog(), cfg)).toEqual({ add: ["needs-spec"], remove: ["inbox", "needs-wayfinder"] });
+    expect(triageLabels({ kind: "next", step: "specify" }, fog(), cfg)).toEqual({ add: ["needs-spec"], remove: ["inbox", "needs-direction"] });
   });
   it("cannot be handed to an agent", () => {
     expect(skipReason({ kind: "hand" }, fog())).toBe("needs wayfinder");
   });
   it("relabel shows the chip at once", () => {
-    expect(relabel(card(101), { add: ["needs-wayfinder"], remove: [] }, cfg)).toMatchObject({ fog: true, nextStep: null, phase: "Inbox" });
+    expect(relabel(card(101), { add: ["needs-direction"], remove: [] }, cfg)).toMatchObject({ fog: true, nextStep: null, phase: "Inbox" });
   });
 });
 
@@ -152,6 +152,20 @@ describe("hand to agent: notice and coordinator start", () => {
 describe("handed to the coordinator", () => {
   const issue = (over: Partial<RawIssue> = {}) => ({ ...demoIssues(now).find((i) => i.number === 103 && i.repo === "acme/app")!, ...over });
   const handed = (over: Partial<RawIssue> = {}) => buildCard(issue({ status: "Todo", ...over }), cfg, null);
+  it("is not offered for a Card on hold: no stage starts on it (agent-workflow docs/contract.md, `on-hold`)", () => {
+    const held = (label: string) => buildCard(issue({ labels: ["needs-spec", label] }), cfg, null);
+    expect(skipReason({ kind: "hand" }, buildCard(issue(), cfg, null))).toBeNull();
+    expect(skipReason({ kind: "hand" }, held("on-hold"))).toBe("on hold");
+    expect(planTriage({ kind: "hand" }, [held("on-hold"), card(105)], cfg).skipped.map((s) => [s.card.number, s.reason])).toContainEqual([103, "on hold"]);
+    // the merge holds stop a merge, not a stage start
+    expect(skipReason({ kind: "hand" }, held("on-hold-after-spec"))).toBeNull();
+    expect(skipReason({ kind: "hand" }, held("do-not-merge"))).toBeNull();
+    // the Board's own hold label decides, not a literal
+    expect(skipReason({ kind: "hand" }, held("parked"), { holdLabel: "parked" })).toBe("on hold");
+    expect(planTriage({ kind: "hand" }, [held("parked")], { ...cfg, holdLabel: "parked", holdLabels: ["parked"] }).skipped.map((s) => s.reason)).toEqual(["on hold"]);
+    // released, it can be handed again; the hold itself stays a toggle on a held Card
+    expect(skipReason({ kind: "hold" }, held("on-hold"))).toBeNull();
+  });
   it("is the status Todo, and counts only while the Card is open in Backlog and not on hold", () => {
     expect(handed().handed).toBe(true);
     expect(card(103).handed).toBe(false);

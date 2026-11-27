@@ -148,10 +148,10 @@ describe("triage", () => {
     expect((await card(103)).onHold).toBe(false);
   });
 
-  it("creates a label on first use: priority and needs-wayfinder reach the Card", async () => {
-    await post("/api/cards/acme/app/102/labels", { add: ["priority:3", "needs-wayfinder"], remove: [] });
+  it("creates a label on first use: priority and needs-direction reach the Card", async () => {
+    await post("/api/cards/acme/app/102/labels", { add: ["priority:3", "needs-direction"], remove: [] });
     expect(await card(102)).toMatchObject({ priority: 3, fog: true, nextStep: null, phase: "Inbox" });
-    await post("/api/cards/acme/app/102/labels", { add: ["priority:1"], remove: ["priority:3", "needs-wayfinder"] });
+    await post("/api/cards/acme/app/102/labels", { add: ["priority:1"], remove: ["priority:3", "needs-direction"] });
     expect(await card(102)).toMatchObject({ priority: 1, fog: false });
   });
 

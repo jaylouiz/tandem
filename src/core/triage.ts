@@ -1,7 +1,7 @@
 // Triage actions on Cards (brief jobs 7 and 8). Pure: which labels an action writes, which Cards it applies to,
 // and how a Card looks right after the write (optimistic). The UI (buttons, keys, palette, bulk) only calls this.
 import { handedOf, phaseOf, nextStepOf, priorityOf } from "./card.ts";
-import type { WorkflowConfig } from "./config.ts";
+import { DEFAULT_WORKFLOW, type WorkflowConfig } from "./config.ts";
 import { NO_RUN, type Card, type NextStep, type RawIssue } from "./types.ts";
 
 export type TriageAction =
@@ -23,14 +23,19 @@ const laneOf = (step: NextStep, cfg: WorkflowConfig) => Object.entries(cfg.nextS
 /** A handed Card that is re-steered (another Next step, a hold, a move) is no longer handed: the write takes its status back, so it can be handed again. */
 const unhand = (card: Card, change: LabelChange, cfg: WorkflowConfig): LabelChange => (card.handed ? { ...change, status: cfg.unhandedStatus } : change);
 
-/** Why an action does not apply to a Card, or null when it does. */
-export function skipReason(action: TriageAction, card: Card): string | null {
+/**
+ * Why an action does not apply to a Card, or null when it does. `cfg` names the hold label that stops every stage start
+ * (agent-workflow docs/contract.md, `on-hold`); a caller without the Board's config gets the default's.
+ */
+export function skipReason(action: TriageAction, card: Card, cfg: Pick<WorkflowConfig, "holdLabel"> = DEFAULT_WORKFLOW): string | null {
   if (card.state === "closed" || card.phase === "Done") return "Done";
   if (action.kind === "hold") return null;
   if (action.kind === "fog") return card.phase === "Inbox" ? null : card.phase;
   if (card.phase !== "Inbox" && card.phase !== "Backlog") return card.phase;
   if (action.kind === "hand") {
     if (card.fog) return "needs wayfinder";
+    // no stage starts on an on-hold issue: the workflow would refuse the start this hand-over pushes. The merge holds do not stop one
+    if (card.labels.includes(cfg.holdLabel)) return "on hold";
     if (!card.nextStep) return "no Next step";
     if (card.waiting) return "waiting on you";
     if (card.handed) return "already handed";
@@ -74,7 +79,7 @@ export function planTriage(action: TriageAction, cards: Card[], cfg: WorkflowCon
   const plan: Plan = { steps: [], unchanged: [], skipped: [] };
   const ok: Card[] = [];
   for (const card of cards) {
-    const reason = skipReason(action, card);
+    const reason = skipReason(action, card, cfg);
     if (reason) plan.skipped.push({ card, reason });
     else ok.push(card);
   }

@@ -1,4 +1,5 @@
-// Realistic issue threads in the exact shapes agent-workflow writes (decide.sh, design and build skills).
+// Realistic issue threads in the shapes agent-workflow writes (docs/contract.md; `bin/decide.sh`, the Design and Build skills).
+// Demo data, kept by hand: what pins the shapes is the golden fixtures in ./contract-fixtures (contract-v1.test.ts).
 // Used by unit tests, the fixture source (TANDEM_SOURCE=fixture) and E2E.
 import type { RawComment, RawIssue } from "./types.ts";
 
@@ -235,7 +236,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
   return [
     issue(A, 101, "Export tasks as CSV", { now, ageH: 50, labels: ["inbox"], body: "Users ask for a CSV export." }),
     issue(A, 102, "Fog: rethink recurring tasks", { now, ageH: 80, body: "Unclear what recurring should mean." }),
-    issue(A, 116, "Fog: rethink sharing", { now, ageH: 90, labels: ["inbox", "needs-wayfinder"], body: "Sharing could mean links, teams or export. Too open for one spec." }),
+    issue(A, 116, "Fog: rethink sharing", { now, ageH: 90, labels: ["inbox", "needs-direction"], body: "Sharing could mean links, teams or export. Too open for one spec." }),
     issue(A, 111, "Fog candidate: sync conflicts", { now, ageH: 85, labels: ["inbox"], body: "Unclear how conflicts should surface." }),
     issue(B, 21, "Retro: shrink the build skill", { now, ageH: 30, labels: ["ready"], body: "## Acceptance criteria\n- skill under 80 lines" }),
     issue(A, 103, "Keyboard shortcut for quick add", { now, ageH: 20, labels: ["needs-spec", "priority:2"], body: "Quick add via `q`." }),

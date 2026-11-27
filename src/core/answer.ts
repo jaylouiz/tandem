@@ -18,7 +18,7 @@ const spelled = (q: Question, letter: string) => {
 };
 
 /**
- * The answer to an ask with questions, without its prefix, in the forms agent-workflow's `decision_format.py read` takes:
+ * The answer to an ask with questions, without its prefix, in the forms of agent-workflow docs/contract.md "Replies a client writes" (read by `bin/decision_format.py read`):
  *   `ok`                                    every recommendation
  *   `ok. 1A 3B`                             the recommendations, except these
  *   `1B 2A`                                 when a question has no recommendation
