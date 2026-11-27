@@ -20,7 +20,7 @@ test("keyboard: set a Next step moves an Inbox Card to the Backlog, h holds it",
   await expect(page.locator(".toast", { hasText: "Held · app#101" })).toBeVisible(); // the toast names the outcome (#46)
   await page.getByTestId("detail").getByTestId("more").click();
   await expect(page.getByTestId("more-menu").getByRole("menuitem", { name: /Release hold/ })).toBeVisible();
-  await page.keyboard.press("h"); // the key on the item runs it, also with the menu open
+  await expect(page.getByTestId("more-menu")).toBeFocused(); await page.keyboard.press("h"); // the key on the item runs it, also with the menu open; its keys are the popup's: the library moves the focus in a few ms after the items show, a key before that goes to the button (#35)
   await expect(page.getByTestId("more-menu")).toHaveCount(0);
   await expect(card(page, 101)).not.toContainText("On hold");
   await expect(page.locator(".toast", { hasText: "Released · app#101" })).toBeVisible();
@@ -245,6 +245,9 @@ for (const scheme of ["light", "dark"] as const) {
     const scroller = page.locator(".scroll");
     await card(page, 150).click(); // the Card pane is open while marking
     await expect(page.getByTestId("detail")).toBeVisible();
+    // The pane takes its width a frame after it shows; the Board's ResizeObserver then scrolls the open Card into view (BoardView, deep links). A scroll set
+    // before that is undone (scrollTop 0, #35). This observer is created after the Board's, so its first callback comes after the Board's has run.
+    await scroller.evaluate((el) => new Promise<void>((done) => new ResizeObserver((_, o) => (o.disconnect(), done())).observe(el)));
     await scroller.evaluate((el) => (el.scrollTop = 40));
     const scrolled = await scroller.evaluate((el) => el.scrollTop);
     const before = await boxes();
