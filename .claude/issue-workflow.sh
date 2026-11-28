@@ -9,6 +9,7 @@ WF_RISK_GLOBS=('src/core/contract.ts' 'src/core/card.ts' 'src/core/config.ts' 's
 WF_IGNORE_GLOBS=(package-lock.json '*.md' 'docs/**')
 WF_REVIEW_LINES=400
 WF_HOLD_LABELS="on-hold on-hold-after-spec do-not-merge"   # hold a merge; on-hold (Tandem's Hold Card) also stops every stage start (agent-workflow docs/contract.md)
+WF_PHASE_LABELS=off                   # the GitHub issue status carries the phase; no phase:* labels (agent-workflow docs/phase-label-cutover.md, #43)
 WF_CHECKS_TSV="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/agent-ledgers/checks.tsv"
 
 # cwd: the PR's worktree, after the base branch was merged in.

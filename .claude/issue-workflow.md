@@ -7,7 +7,7 @@
 
 ## Labels
 
-- lanes: `needs-design` → `needs-spec` → `ready`; phases `phase:design`, `phase:build` (agent-workflow `docs/contract.md`, "Phases and statuses")
+- lanes: `needs-design` → `needs-spec` → `ready`; the phase is GitHub's issue status, no `phase:*` labels (`WF_PHASE_LABELS=off`, #43; agent-workflow `docs/contract.md`, "Phases and statuses")
 - hold: `on-hold` (Tandem's Hold Card) always stops every stage start and the merge; `on-hold-after-spec` = stop after Specify; `do-not-merge`
 - context labels triage may add: `enhancement`, `bug`, `polish`, `a11y`, `ux-impact`
 - `inbox` and `wayfinder:*` issues are never in a lane
