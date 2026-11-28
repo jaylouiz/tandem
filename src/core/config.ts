@@ -1,5 +1,5 @@
 // Phase mapping is configuration, not code (brief "Board model"). Defaults mirror agent-workflow docs/contract.md, "Labels" and
-// "Phases and statuses" (status first, labels as the fallback); the developer's `~/.tandem/state.json` (key "workflow")
+// "Phases and statuses" (the status carries started work, the lane labels the rest); the developer's `~/.tandem/state.json` (key "workflow")
 // overrides any field.
 import type { NextStep, Phase } from "./types.ts";
 
@@ -63,12 +63,11 @@ export const DEFAULT_WORKFLOW: WorkflowConfig = {
   phaseRules: [
     { phase: "Done", when: { state: "closed" } },
     { phase: "Inbox", when: { anyLabel: ["inbox"] } },
-    // the native issue status first (#18): "In progress" is UX Design in the design lane, else Build. Backlog, Todo or no status say
-    // nothing about the Phase, so the label rules below decide (every issue from before statuses keeps its Phase)
+    // the native issue status carries started work (#18, #44): "In progress" is UX Design in the design lane, else Build. Backlog,
+    // Todo or no status say nothing about the Phase, so an open PR or the lane labels below decide (no phase labels: a repo
+    // without statuses needs its own rule in `~/.tandem/state.json`, ADR 0006)
     { phase: "UX Design", when: { anyStatus: ["In progress"], anyLabel: ["needs-design"] } },
     { phase: "Build", when: { anyStatus: ["In progress", "In review"] } },
-    { phase: "UX Design", when: { anyLabel: ["phase:design"] } },
-    { phase: "Build", when: { anyLabel: ["phase:build"] } },
     { phase: "Build", when: { openPr: true } },
     { phase: "Backlog", when: { anyLabel: ["needs-design", "needs-spec", "ready"] } },
     { phase: "Inbox", when: {} },
