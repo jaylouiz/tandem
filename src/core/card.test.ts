@@ -44,7 +44,7 @@ describe("phases", () => {
   });
 });
 
-describe("phases from the native issue status (#18): status first, labels as the fallback", () => {
+describe("phases from the native issue status (#18, #44): the status carries started work, no phase labels", () => {
   const raw = (n: number) => demoIssues(now).find((i) => i.repo === "acme/app" && i.number === n)!;
   const phase = (over: Partial<RawIssue>, base = 103) => buildCard({ ...raw(base), ...over }, cfg, null).phase;
   it("In progress is UX Design in the design lane, else Build; In review is Build, with no phase label at all", () => {
@@ -56,23 +56,37 @@ describe("phases from the native issue status (#18): status first, labels as the
     expect(phase({ labels: ["needs-design"], status: "In review" })).toBe("Build");
     expect(card(112)).toMatchObject({ phase: "Build", status: "In progress", labels: ["ready"] }); // the demo Card without a phase label
   });
-  it("Backlog, Todo, no status or an unknown one say nothing: the labels decide, so every running issue keeps its Phase", () => {
+  const openPr = { number: 9, title: "pr", url: "u", state: "open" as const, isDraft: false, labels: [], body: "Closes #103", updatedAt: new Date(now).toISOString() };
+  it("Backlog, Todo, no status or an unknown one say nothing: an open PR or the lane labels decide", () => {
     for (const status of ["Backlog", "Todo", null, undefined, "Something new"]) {
-      expect(phase({ labels: ["needs-design", "phase:design"], status }), String(status)).toBe("UX Design");
-      expect(phase({ labels: ["ready", "phase:build"], status }), String(status)).toBe("Build");
+      expect(phase({ labels: ["needs-design"], status }), String(status)).toBe("Backlog");
       expect(phase({ labels: ["needs-spec"], status }), String(status)).toBe("Backlog");
+      expect(phase({ labels: ["ready"], status }), String(status)).toBe("Backlog");
       expect(phase({ labels: ["inbox"], status }), String(status)).toBe("Inbox");
       expect(phase({ labels: [], status }), String(status)).toBe("Inbox");
+      expect(phase({ labels: ["ready"], status, pullRequests: [{ ...openPr }] }), String(status)).toBe("Build");
     }
-    // an issue read before statuses existed (an older cache, a repo without them) has no `status` key at all
+    // an issue read before statuses existed (an older cache, a repo without them) has no `status` key at all: its lane label decides
     const { status: _, ...old } = raw(105);
-    expect(buildCard(old, cfg, null)).toMatchObject({ phase: "Build", status: null, handed: false });
+    expect(buildCard(old, cfg, null)).toMatchObject({ phase: "Backlog", status: null, handed: false });
   });
-  it("the status wins over a phase label that lags; Inbox and Done stay what labels and state say", () => {
-    expect(phase({ labels: ["needs-spec", "phase:design"], status: "In progress" })).toBe("Build"); // Design handed over, the label not dropped yet
-    expect(phase({ labels: ["inbox"], status: "In progress" })).toBe("Inbox");
+  it("a leftover phase label moves no Card (#44): only the status carries started work", () => {
+    for (const status of ["Backlog", "Todo", null]) {
+      expect(phase({ labels: ["needs-design", "phase:design"], status }), String(status)).toBe("Backlog");
+      expect(phase({ labels: ["ready", "phase:build"], status }), String(status)).toBe("Backlog");
+    }
+    expect(cfg.phaseRules.flatMap((r) => r.when.anyLabel ?? []).filter((l) => l.startsWith("phase:"))).toEqual([]);
+  });
+  it("every Phase without any phase label: UX Design, Build, Backlog, Done", () => {
+    expect(phase({ labels: ["needs-design"], status: "In progress" })).toBe("UX Design");
+    expect(phase({ labels: ["ready"], status: "In progress" })).toBe("Build");
+    expect(phase({ labels: ["ready"], status: "In review" })).toBe("Build");
+    expect(phase({ labels: ["needs-spec"], status: "Backlog" })).toBe("Backlog");
     expect(phase({ state: "closed", stateReason: "completed", status: "Done", closedAt: new Date(now).toISOString() })).toBe("Done");
-    expect(phase({ state: "closed", stateReason: "completed", status: "In progress", closedAt: new Date(now).toISOString() })).toBe("Done");
+    // the demo Cards that are in flight carry In progress and no phase label
+    expect(demoIssues(now).flatMap((i) => i.labels).filter((l) => l.startsWith("phase:"))).toEqual([]);
+    expect(card(104)).toMatchObject({ phase: "UX Design", status: "In progress" });
+    expect(card(106)).toMatchObject({ phase: "Build", status: "In progress" });
   });
   it("is configuration: other status names, or rules without any status, work the same way", () => {
     const named = { ...cfg, phaseRules: cfg.phaseRules.map((r) => (r.when.anyStatus ? { ...r, when: { ...r.when, anyStatus: ["Doing"] } } : r)) };
@@ -268,7 +282,7 @@ describe("what waits, by hand on GitHub or through Tandem (#14, #16)", () => {
     say(requestBody("D2", "Which of the seven A/C variants?\n- A1: Butter Desk\n- H1: Sunlit Outline"), 3),
     say("<!-- decision-note -->\nD2 stays open: the user chose to skip it for now. Nothing else waits.", 4),
   ];
-  const issue = (over: Partial<ReturnType<typeof demoIssues>[number]> = {}) => ({ ...demoIssues(now).find((i) => i.number === 105)!, labels: ["needs-design", "needs-decision", "phase:design"], comments: thread(), ...over });
+  const issue = (over: Partial<ReturnType<typeof demoIssues>[number]> = {}) => ({ ...demoIssues(now).find((i) => i.number === 105)!, labels: ["needs-design", "needs-decision"], status: "In progress", comments: thread(), ...over });
   const build = (over: Parameters<typeof issue>[0] = {}) => buildCard(issue(over), cfg, null);
 
   it("an open request waits while the issue is open and labelled, whatever notes follow it", () => {
@@ -295,7 +309,7 @@ describe("what waits, by hand on GitHub or through Tandem (#14, #16)", () => {
 
   it("a resolved marker, a removed needs-decision label or a closed issue ends the wait and the pickup", () => {
     const resolved = build({ comments: [...thread(), say("D2: H1", 5), say("<!-- decision-resolved D2 -->\nResuming with: H1", 6)] });
-    const unlabelled = build({ labels: ["needs-design", "phase:design"] });
+    const unlabelled = build({ labels: ["needs-design"] });
     const closed = build({ state: "closed", stateReason: "completed", closedAt: at(7) });
     for (const c of [resolved, unlabelled]) expect(c).toMatchObject({ waiting: null, awaitingPickup: false });
     expect(closed.waiting).toBeNull();

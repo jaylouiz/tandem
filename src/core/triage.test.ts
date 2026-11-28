@@ -171,7 +171,8 @@ describe("handed to the coordinator", () => {
     expect(card(103).handed).toBe(false);
     expect(buildCard(issue({ status: null }), cfg, null).handed).toBe(false);
     expect(handed({ labels: ["needs-spec", "on-hold"] }).handed).toBe(false);
-    expect(handed({ labels: ["needs-spec", "phase:build"] }).handed).toBe(false); // work started on an agent-workflow that only writes labels
+    expect(handed({ labels: ["needs-spec", "phase:build"] }).handed).toBe(true); // a leftover phase label says nothing (#44)
+    expect(handed({ status: "In progress" }).handed).toBe(false); // work started
     expect(handed({ labels: ["inbox"] }).handed).toBe(false);
     expect(handed({ state: "closed", stateReason: "completed" }).handed).toBe(false);
     expect(buildCard(issue({ status: "Queued" }), { ...cfg, handedStatus: "Queued" }, null).handed).toBe(true); // the name is configuration

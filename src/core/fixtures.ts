@@ -243,7 +243,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 104, "Statistics page redesign", {
       now,
       ageH: 40,
-      labels: ["needs-design", "phase:design", "needs-decision"],
+      labels: ["needs-design", "needs-decision"], status: "In progress",
       body: "The statistics page is hard to read.",
       comments: [
         comment(roundBody(1, "Statistics page redesign"), ago(now, 30)),
@@ -257,7 +257,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 110, "Task templates", {
       now,
       ageH: 45,
-      labels: ["needs-design", "phase:design", "needs-decision"],
+      labels: ["needs-design", "needs-decision"], status: "In progress",
       body: "Users want to start a task from a template.",
       comments: [
         comment(roundBody(1, "Task templates"), ago(now, 28)),
@@ -268,7 +268,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 105, "Sync conflicts lose edits", {
       now,
       ageH: 26,
-      labels: ["needs-spec", "phase:build", "needs-decision"],
+      labels: ["needs-spec", "needs-decision"], status: "In progress",
       body: "Two devices editing the same task lose one edit.",
       comments: [
         comment(
@@ -280,7 +280,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 106, "Due date picker", {
       now,
       ageH: 60,
-      labels: ["ready", "phase:build", "ux-impact", "needs-decision"],
+      labels: ["ready", "ux-impact", "needs-decision"], status: "In progress",
       body: "Pick a due date with the keyboard.",
       pullRequests: [{ number: 210, title: "feat: due date picker", url: `https://github.com/${A}/pull/210`, state: "open", isDraft: false, labels: [], body: "Closes #106\n\n## Review\nNo findings above low.\n\n## Verification\n- unit 212/212\n- e2e 31/31", updatedAt: ago(now, 2) }],
       comments: [comment(requestBody("D1", "Merge held: the PR touches the sync store (risk area). Merge?\n- approve: merge now\n- hold: keep it open\nRecommendation: approve (confidence high)"), ago(now, 2))],
@@ -288,7 +288,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 107, "Tag colors", {
       now,
       ageH: 15,
-      labels: ["ready", "phase:build", "agent-decided"],
+      labels: ["ready", "agent-decided"], status: "In progress",
       body: "## Decisions\nD1: palette from tokens · alternatives: free hex · why: consistency · cost to switch: low",
       comments: [comment(recordBody("D1", "Chosen: tag colors from the 8 design tokens\nAlternatives: free hex input\nWhy: stays consistent in dark mode\nCost to switch: low"), ago(now, 5))],
     }),
@@ -296,7 +296,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 127, "Retry policy for sync", {
       now,
       ageH: 20,
-      labels: ["ready", "phase:build", "needs-decision", "agent-decided"],
+      labels: ["ready", "needs-decision", "agent-decided"], status: "In progress",
       body: "Retry failed syncs.",
       comments: [
         comment(requestBody("D3", "Give up after how many failed retries?\n- A: 3\n- B: 5\n- C: never\nRecommendation: B (confidence medium)"), ago(now, 19)),
@@ -306,7 +306,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
         comment(recordBody("D4", "Chosen: cap the delay at 5 minutes\nAlternatives: no cap\nWhy: a stuck sync stays visible\nCost to switch: low"), ago(now, 15)),
       ],
     }),
-    issue(B, 22, "Coordinator: digest on idle", { now, ageH: 10, labels: ["ready", "phase:build", "priority:1"], body: "Digest when idle." }),
+    issue(B, 22, "Coordinator: digest on idle", { now, ageH: 10, labels: ["ready", "priority:1"], status: "In progress", body: "Digest when idle." }),
     issue(A, 108, "Theme switch in settings", {
       now,
       ageH: 200,
@@ -322,14 +322,14 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 117, "Cache size limit", {
       now,
       ageH: 12,
-      labels: ["ready", "phase:build", "needs-decision"],
+      labels: ["ready", "needs-decision"], status: "In progress",
       body: "Cap the offline cache.",
       comments: [comment(requestBody("D1", "How large may the offline cache grow?\n- A: 50 MB\n- B: 200 MB\n- C: unlimited\nRecommendation: B (confidence medium)"), ago(now, 8))],
     }),
     issue(A, 118, "Onboarding tour", {
       now,
       ageH: 40,
-      labels: ["needs-design", "phase:design", "needs-decision"],
+      labels: ["needs-design", "needs-decision"], status: "In progress",
       body: "A first-run tour.",
       comments: [
         comment(roundBody(1, "Onboarding tour"), ago(now, 10)),
@@ -372,7 +372,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
       issue(A, n, `Stability demo: decision ${i + 1}`, {
         now,
         ageH: 30 - i,
-        labels: ["ready", "phase:build", "needs-decision"],
+        labels: ["ready", "needs-decision"], status: "In progress",
         body: "Fixture for answers from outside and drafts.",
         comments: [comment(requestBody("D1", `Which option for stability demo ${i + 1}?\n- A: first\n- B: second\nRecommendation: B (confidence medium)`), ago(now, 20 - i))],
       }),
@@ -380,7 +380,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 173, "Stability demo: PR approval", {
       now,
       ageH: 31,
-      labels: ["ready", "phase:build", "needs-decision"],
+      labels: ["ready", "needs-decision"], status: "In progress",
       body: "Fixture for pick-then-send on a PR approval.",
       pullRequests: [{ number: 212, title: "feat: stability demo", url: `https://github.com/${A}/pull/212`, state: "open", isDraft: false, labels: [], body: "Closes #173\n\n## Review\nNo findings above low.", updatedAt: ago(now, 2) }],
       comments: [comment(requestBody("D1", "Merge held: risk area. Merge?\n- approve: merge now\n- hold: keep it open\nRecommendation: approve (confidence high)"), ago(now, 2))],
@@ -388,7 +388,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 177, "Stability demo: PR approval for clicks", {
       now,
       ageH: 32,
-      labels: ["ready", "phase:build", "needs-decision"],
+      labels: ["ready", "needs-decision"], status: "In progress",
       body: "Fixture for pick-then-send on a PR approval.",
       pullRequests: [{ number: 213, title: "feat: stability clicks", url: `https://github.com/${A}/pull/213`, state: "open", isDraft: false, labels: [], body: "Closes #177\n\n## Review\nNo findings above low.", updatedAt: ago(now, 2) }],
       comments: [comment(requestBody("D1", "Merge held: risk area. Merge?\n- approve: merge now\n- hold: keep it open\nRecommendation: approve (confidence high)"), ago(now, 2))],
@@ -407,14 +407,14 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 174, "Stability demo: agent decisions", {
       now,
       ageH: 15,
-      labels: ["ready", "phase:build", "agent-decided"],
+      labels: ["ready", "agent-decided"], status: "In progress",
       body: "## Decisions\nD1: a · alternatives: b · why: c · cost to switch: low",
       comments: [comment(recordBody("D1", "Chosen: a\nAlternatives: b\nWhy: c\nCost to switch: low"), ago(now, 5))],
     }),
     issue(A, 175, "Stability demo: design round", {
       now,
       ageH: 40,
-      labels: ["needs-design", "phase:design", "needs-decision"],
+      labels: ["needs-design", "needs-decision"], status: "In progress",
       body: "Fixture for drafts of a design round.",
       comments: [comment(roundBody(1, "Stability demo"), ago(now, 10)), comment(requestBody("D1", "Which layout?\n- a: Grouped list\n- b: Split pane\n- c: Cards grid\nRecommendation: b (confidence medium)"), ago(now, 10))],
     }),
@@ -422,7 +422,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 182, "Axes demo: welcome samples", {
       now,
       ageH: 30,
-      labels: ["needs-design", "phase:design", "needs-decision"],
+      labels: ["needs-design", "needs-decision"], status: "In progress",
       body: "Samples become a third start option on the welcome screen.",
       comments: [
         comment(axesRoundBody(1, "Axes demo: welcome samples"), ago(now, 5.5)),
@@ -434,7 +434,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
       issue(A, n, `Dialog keys demo ${n}`, {
         now,
         ageH: 40,
-        labels: ["needs-design", "phase:design", "needs-decision"],
+        labels: ["needs-design", "needs-decision"], status: "In progress",
         body: "Fixture for keys inside a dialog.",
         comments: [comment(roundBody(1, `Dialog keys demo ${n}`), ago(now, 10)), comment(requestBody("D1", "Which layout?\n- a: Grouped list\n- b: Split pane\n- c: Cards grid\nRecommendation: b (confidence medium)"), ago(now, 10))],
       }),
@@ -444,7 +444,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 183, "Setup sheet for connections", {
       now,
       ageH: 52,
-      labels: ["needs-design", "phase:design", "needs-decision"],
+      labels: ["needs-design", "needs-decision"], status: "In progress",
       body: "## Problem\n\nConnecting Notion and Reminders are two different flows today, and the way back is in a different place in each.\n\nJob: connect a source without losing my place.\n\n## Solution\n\nOpen (needs a design round): one sheet for both, with a rail that names the steps.\n\n- back and next sit together\n- the same form at every width",
       comments: [
         comment(questionRoundBody(1, "Setup sheet for connections"), ago(now, 4.5)),
@@ -462,7 +462,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 184, "Retry policy for webhooks", {
       now,
       ageH: 22,
-      labels: ["needs-spec", "phase:build", "needs-decision"],
+      labels: ["needs-spec", "needs-decision"], status: "In progress",
       body: "Failed webhook deliveries are dropped today.\n\n## Acceptance criteria\n- a failed delivery is retried\n- a delivery that keeps failing is visible",
       comments: [
         comment(
@@ -474,7 +474,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 185, "Visual re-design of the desk", {
       now,
       ageH: 470,
-      labels: ["needs-design", "phase:design", "needs-decision"],
+      labels: ["needs-design", "needs-decision"], status: "In progress",
       body: "The desk should get a look of its own.",
       comments: [
         comment(
@@ -490,25 +490,25 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 130, "Hand demo: delivered", { now, ageH: 15, labels: ["ready"], body: "Hand this one to the coordinator." }),
     issue(A, 131, "Hand demo: failing Push", { now, ageH: 16, labels: ["ready"], body: "Its Push fails once." }),
     issue(B, 40, "Hand demo: no coordinator", { now, ageH: 17, labels: ["ready"], body: "No coordinator runs for this repo." }),
-    // native issue status (#18): Todo = handed and not started yet; the other demo issues have none (older than statuses) and sit where their labels put them
+    // native issue status (#18): Todo = handed and not started yet; started work is In progress (agent-workflow writes no phase labels, #44); the others have none and sit where their lane labels put them
     issue(A, 132, "Hand demo: handed earlier", { now, ageH: 18, labels: ["ready"], status: "Todo", body: "Handed to the coordinator before this page was opened: the status on GitHub says so." }),
     // agents at work, in every activity state (their log lines come from the fixture source's `fixtureActivity`)
-    // in Build by its status alone: no phase label
+    // in Build by its status alone
     issue(A, 112, "Undo for deleted tasks", { now, ageH: 3, labels: ["ready"], status: "In progress", body: "Undo a delete for 10 seconds." }),
     issue(A, 113, "Offline banner", {
       now,
       ageH: 9,
-      labels: ["ready", "phase:build", "needs-decision"],
+      labels: ["ready", "needs-decision"], status: "In progress",
       body: "Show a banner while offline.",
       comments: [comment(requestBody("D1", "Where does the banner go?\n- A: top\n- B: bottom\nRecommendation: A (confidence high)"), ago(now, 4)), comment("A", ago(now, 1))],
     }),
-    issue(A, 114, "Bulk edit tags", { now, ageH: 12, labels: ["ready", "phase:build", "on-hold"], body: "Edit tags of many tasks at once." }),
+    issue(A, 114, "Bulk edit tags", { now, ageH: 12, labels: ["ready", "on-hold"], status: "In progress", body: "Edit tags of many tasks at once." }),
     // Move demo (#19): Cards for the multi-select and move specs; Inbox Cards sit above the older ones (newest first)
     // Shortcut overview E2E (shortcuts.spec.ts owns 180-181): the palette picks on a PR approval and on two agent decisions, both only drafts (nothing is sent)
     issue(A, 180, "Shortcuts demo: PR approval", {
       now,
       ageH: 33,
-      labels: ["ready", "phase:build", "needs-decision"],
+      labels: ["ready", "needs-decision"], status: "In progress",
       body: "Fixture for the palette entries of a PR approval.",
       pullRequests: [{ number: 214, title: "feat: shortcuts demo", url: `https://github.com/${A}/pull/214`, state: "open", isDraft: false, labels: [], body: "Closes #180\n\n## Review\nNo findings above low.", updatedAt: ago(now, 2) }],
       comments: [comment(requestBody("D1", "Merge held: risk area. Merge?\n- approve: merge now\n- hold: keep it open\nRecommendation: approve (confidence high)"), ago(now, 2))],
@@ -516,7 +516,7 @@ export function demoIssues(now = Date.now()): RawIssue[] {
     issue(A, 181, "Shortcuts demo: agent decisions", {
       now,
       ageH: 16,
-      labels: ["ready", "phase:build", "agent-decided"],
+      labels: ["ready", "agent-decided"], status: "In progress",
       body: "## Decisions\nD1: a · alternatives: b · why: c · cost to switch: low\nD2: x · alternatives: y · why: z · cost to switch: low",
       comments: [comment(recordBody("D1", "Chosen: a\nAlternatives: b\nWhy: c\nCost to switch: low"), ago(now, 6)), comment(recordBody("D2", "Chosen: x\nAlternatives: y\nWhy: z\nCost to switch: low"), ago(now, 5))],
     }),
