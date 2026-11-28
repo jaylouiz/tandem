@@ -266,6 +266,7 @@ describe("Hand to agent writes the native issue status (#18)", () => {
     store.setRepoPath(B, "/tmp/agent-workflow");
     await source.setStatus(B, 40, "In progress");
     await source.setStatus(B, 21, "In review");
+    await source.setStatus(B, 22, "Backlog"); // not started (the demo issue is In progress)
     await board.refreshAll(true);
     const set = vi.spyOn(source, "setStatus");
     expect((await post("/api/coordinator/start", { repo: B, numbers: [40, 21, 22] })).status).toBe(200);
